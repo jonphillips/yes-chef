@@ -1457,11 +1457,15 @@ public enum YesChefDataPasses {
     in database: any DatabaseWriter,
     beforePass: @escaping @Sendable (Int) throws -> Void
   ) async {
+    let needsAllPasses: Bool
     do {
-      let version = try await database.read { db in
-        try Int.fetchOne(db, sql: "SELECT version FROM localDataPassState WHERE id = 1") ?? 0
+      let (version, queuedCount) = try await database.read { db in
+        let version = try Int.fetchOne(db, sql: "SELECT version FROM localDataPassState WHERE id = 1") ?? 0
+        let queuedCount = try Int.fetchOne(db, sql: "SELECT count(*) FROM recipeSyncRepairQueue") ?? 0
+        return (version, queuedCount)
       }
-      guard version < currentVersion else {
+      needsAllPasses = version < currentVersion
+      guard needsAllPasses || queuedCount > 0 else {
         AppLog.performance.log("data-passes skipped version=\(version, privacy: .public)")
         return
       }
@@ -1511,6 +1515,8 @@ public enum YesChefDataPasses {
     ]
     var succeeded = true
     for (index, pass) in passes.enumerated() {
+      // Sync repair is last: its queue needs another launch after parents are confirmed.
+      guard needsAllPasses || index == passes.count - 1 else { continue }
       let start = ContinuousClock.now
       do {
         try await database.write { db in
@@ -1524,7 +1530,7 @@ public enum YesChefDataPasses {
       let duration = start.duration(to: .now)
       AppLog.performance.log("data-pass \(pass.0, privacy: .public) duration=\(String(describing: duration), privacy: .public)")
     }
-    guard succeeded else { return }
+    guard succeeded && needsAllPasses else { return }
     do {
       try await database.write { db in
         try db.execute(sql: "INSERT OR REPLACE INTO localDataPassState (id, version) VALUES (1, ?)", arguments: [currentVersion])
