@@ -115,15 +115,14 @@ struct MenuDishList: View {
           },
           onRecipeSelected: onRecipeSelected
         )
-        .padding(8)
         .background {
           if hoveredDay == dayOffset {
-            RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.1))
+            RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.1)).padding(-8)
           }
         }
         .overlay {
           if hoveredDay == dayOffset {
-            RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor, lineWidth: 1).padding(-8)
           }
         }
         .background {
@@ -155,6 +154,7 @@ struct MenuDishList: View {
       case .entering, .active:
         hoveredDay = dayFrames.first(where: { $0.value.contains(session.location) })?.key
           ?? session.reorderDestination(for: MenuItemRowData.self, in: Int.self)?.collectionID
+          ?? hoveredDay
       @unknown default:
         hoveredDay = nil
       }
@@ -172,12 +172,14 @@ struct MenuDishList: View {
       case .end, nil:
         .end
       }
-      _ = model.addRecipesToMenu(
+      if model.addRecipesToMenu(
         recipeIDs: recipes.map(\.recipeID),
         menuID: menu.id,
         destinationDayOffset: destinationDayOffset,
         destination: destination
-      )
+      ) {
+        dayExpansionOverrides[destinationDayOffset] = true
+      }
     }
   }
 

@@ -399,7 +399,6 @@ private struct RecipeReaderView: View {
             .frame(maxWidth: .infinity, minHeight: proxy.size.height)
         }
       }
-
     }
     .sheet(isPresented: $isPhotoGalleryPresented) {
       NavigationStack {
@@ -756,7 +755,6 @@ private struct RecipeReaderView: View {
               .buttonStyle(.plain)
               .accessibilityHint("Returns to the top of the recipe directions.")
             }
-            .id("recipe-playbook")
 
             RecipePlaybookView(
               model: model,

@@ -187,6 +187,7 @@ struct RecipePlaybookView: View {
         VStack(alignment: .leading, spacing: 2) {
           Text(title)
             .font(.title2.bold())
+            .foregroundStyle(.tint)
           if let preview {
             Text(preview)
               .font(.caption)
@@ -194,14 +195,14 @@ struct RecipePlaybookView: View {
               .lineLimit(1)
           }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { withAnimation { isExpanded.wrappedValue.toggle() } }
         Spacer(minLength: 12)
         if showsActions {
           actions()
             .padding(.trailing, 12)
         }
       }
+      .contentShape(Rectangle())
+      .onTapGesture { withAnimation { isExpanded.wrappedValue.toggle() } }
     }
     .disclosureGroupStyle(PlaybookDisclosureStyle(title: title, isFilled: isFilled))
     .accessibilityValue(Text(isFilled ? "Contains content" : "Empty"))
@@ -762,6 +763,7 @@ private struct PlaybookDisclosureStyle: DisclosureGroupStyle {
           withAnimation { configuration.isExpanded.toggle() }
         } label: {
           Image(systemName: isFilled ? "chevron.right.circle.fill" : "chevron.right.circle")
+            .foregroundStyle(isFilled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
             .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
         }
         .buttonStyle(.plain)
