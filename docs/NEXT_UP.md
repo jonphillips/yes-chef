@@ -1,6 +1,5 @@
-# Next Up — Take the data passes off the launch path
+# Next Up — nothing dispatched
 
-**Slices:** effort `launch-data-passes`
-**Briefs:** [docs/efforts/launch-data-passes.md](efforts/launch-data-passes.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

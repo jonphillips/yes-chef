@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-04 — Take the data passes off the launch path (`effort/launch-data-passes`)
+
+- **Result:** Runs the five post-engine data passes in separate writes after launch, once per local database version, before sync starts; failures are reported and retried.
+- **Verification:** check-drift passed (761 package tests); generic iOS build passed; YesChefTests passed (111 tests).
+- **Owed:** launch-data-passes's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-03 — Hand-off prompts carry the finalize routing; S3 device gate closed (`fix/handoff-prompt-finalize-line`)
 
 - **Result:** Every routed hand-off prompt now says, right after its token, to finalize through `stage_handoff_return` when the chat has it, and otherwise to start the reply with the `YC-HANDOFF:` line. Capture hand-offs leave it out. See ADR-0060 Amd 1's note of the same date.

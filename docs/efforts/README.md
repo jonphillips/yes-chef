@@ -25,5 +25,3 @@ discoverable"):
 
 ## Live
 
-- [launch-data-passes.md](launch-data-passes.md) — **Ready** · Run the five launch-time data passes after launch and
-  before sync starts, and only when their version has changed.
