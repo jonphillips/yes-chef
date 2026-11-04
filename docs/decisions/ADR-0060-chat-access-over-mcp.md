@@ -386,6 +386,21 @@ same day, and the two meet in S3b.
 - **The device pass starts from ADR-0061's one door.** After ADR-0061 D1 the toolbar **Hand off** mints
   `.recipe`, not `.adjustRecipe`, so the pass below starts there. The effort brief holds the revised pass.
 
+### Amd 1 — note: the prompt also carries the finalize routing (2026-11-03)
+
+Found in the S3 device pass, and this narrows D4. In ChatGPT's Mac app with the plugin on, the first finalize of a
+`.recipe` hand-off printed a block with no token and made no tool call, and nothing reached the helper. Asked to
+send it through the tool in the same chat, ChatGPT asked permission, Jon allowed it, and the file staged. Jon's
+next hand-off, from the iPad, staged with no nudge. Whether that first permission caused the miss is unproven, and
+Jon chose not to measure how often it happens.
+
+D4's rules stay on the server, but a tool's description isn't enough to get it called. So every routed prompt now
+also says, right after its token: call `stage_handoff_return` if the chat has it, and otherwise start the reply with
+the `YC-HANDOFF:` line (`AIHandoffToken.finalizeInstruction`). A printed return then still routes when it's pasted.
+
+- **No contract bump.** The marker stays out of every prompt, and the Project's instructions don't change.
+- **Capture hand-offs leave the line out,** because their returns go back only to the open capture editor (D3).
+
 ### Amd 1 — consequences
 
 - The last copy-paste in the recipe loop goes: out is still a copied prompt, but back is a confirmation tap.

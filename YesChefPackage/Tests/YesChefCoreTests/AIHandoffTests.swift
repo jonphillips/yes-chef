@@ -12,6 +12,32 @@ import YesChefCore
   }
 )
 struct AIHandoffTests {
+  @Test(arguments: [AIHandoffToken.PromptMode.discuss, .immediate])
+  func handoffPromptsCarryTheFinalizeRoutingRightAfterTheToken(mode: AIHandoffToken.PromptMode) {
+    let handoffID = SampleUUIDSequence.uuid(38_002)
+    let expected = "Title\nYC-HANDOFF: \(handoffID.uuidString)\n\(AIHandoffToken.finalizeInstruction)\n\n"
+    let prompt = AIHandoffToken.prompt(handoffID: handoffID, title: "Title", context: "Context", mode: mode)
+
+    #expect(prompt.hasPrefix(expected))
+    #expect(AIHandoffToken.finalizeInstruction.contains("stage_handoff_return"))
+    #expect(AIHandoffToken.finalizeInstruction.contains(AIHandoffToken.prefix))
+    #expect(!AIHandoffToken.finalizeInstruction.contains(AIHandoffReturnContract.marker))
+    #expect(AIHandoffToken.selfContainedPrompt(handoffID: handoffID, title: "Title", body: "Body").hasPrefix(expected))
+  }
+
+  @Test(arguments: [AIHandoffToken.PromptMode.discuss, .immediate])
+  func captureHandoffPromptsLeaveOutTheFinalizeRouting(mode: AIHandoffToken.PromptMode) {
+    let prompt = AIHandoffToken.prompt(
+      handoffID: SampleUUIDSequence.uuid(38_003),
+      context: "Context",
+      mode: mode,
+      deliverableFormat: .readerFeedbackCuration
+    )
+
+    #expect(!prompt.contains(AIHandoffToken.finalizeInstruction))
+    #expect(!prompt.contains("stage_handoff_return"))
+  }
+
   @Test
   func handoffPromptUsesTheTitleThenTokenAndTheProjectContractOwnsTheReturnShape() throws {
     let handoffID = SampleUUIDSequence.uuid(38_001)

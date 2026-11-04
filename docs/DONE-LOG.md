@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-03 — Hand-off prompts carry the finalize routing; S3 device gate closed (`fix/handoff-prompt-finalize-line`)
+
+- **Result:** Every routed hand-off prompt now says, right after its token, to finalize through `stage_handoff_return` when the chat has it, and otherwise to start the reply with the `YC-HANDOFF:` line. Capture hand-offs leave it out. See ADR-0060 Amd 1's note of the same date.
+- **Verification:** `check-drift.sh` and YesChefTests on a simulator (111 tests). ChatGPT's behavior with the new line can't be tested from the repo, so later hand-offs will show whether it helps.
+- **Device gate:** Jon closed the S3 pass on 2026-11-03. Seen in `MCP/Inbox/`: the Chicken Kebabs return staged only after a nudge (19:24), with its token and `YC-CONTRACT: v3`, and it was still unopened at closing. A later iPad hand-off staged with no nudge (19:29) and was claimed a minute later, keeping its `.ycreturn` extension. The two S3a returns were claimed the same way at 19:02. The pass's other checks (repeat returns, a riff, a single-return task, cross-device copy, Discard across devices) weren't reported separately, and Jon chose not to measure how often the unprompted tool call misses.
+
+---
 ## 2026-11-03 — Chat access S3b — token-routed returns (`effort/chat-access-mcp-s3b`)
 
 - **Result:** Routes staged hand-off returns to their originating device for review, preserving copy-only returns and handling retention and repeat deliveries.

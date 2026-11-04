@@ -50,6 +50,7 @@ extension AIHandoffTests {
     #expect(prompt == """
     Adjust Recipe: Chili
     YC-HANDOFF: \(handoffID.uuidString)
+    \(AIHandoffToken.finalizeInstruction)
 
     The body carries its own finalize contract.
     """)
