@@ -4,6 +4,7 @@ import YesChefCore
 
 struct MenuRecipeBrowserPanel: View {
   let recipeModel: RecipeLibraryModel
+  var isTinted = false
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
 
   var body: some View {
@@ -57,17 +58,19 @@ struct MenuRecipeBrowserPanel: View {
             )
           }
           .buttonStyle(.plain)
+          .listRowBackground(Color.clear)
           .draggable(MenuDraggedRecipe(recipeID: row.recipe.id))
         }
       }
       .listStyle(.plain)
+      .scrollContentBackground(isTinted ? .hidden : .automatic)
       .overlay {
         if recipeModel.visibleRecipeRows.isEmpty {
           ContentUnavailableView.search(text: recipeModel.searchText)
         }
       }
     }
-    .background(.background)
+    .background(isTinted ? Color(uiColor: .secondarySystemBackground) : Color(uiColor: .systemBackground))
   }
 }
 
@@ -80,6 +83,8 @@ struct MenuDishList: View {
   var isInitiallyExpanded = true
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   @State private var dayExpansionOverrides: [Int: Bool] = [:]
+  @State private var dayFrames: [Int: CGRect] = [:]
+  @State private var hoveredDay: Int?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -110,8 +115,25 @@ struct MenuDishList: View {
           },
           onRecipeSelected: onRecipeSelected
         )
+        .background {
+          if hoveredDay == dayOffset {
+            RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.1)).padding(-8)
+          }
+        }
+        .overlay {
+          if hoveredDay == dayOffset {
+            RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor, lineWidth: 1).padding(-8)
+          }
+        }
+        .background {
+          GeometryReader { proxy in
+            Color.clear.preference(key: MenuDayFramesKey.self, value: [dayOffset: proxy.frame(in: .named("menuDays"))])
+          }
+        }
       }
     }
+    .coordinateSpace(name: "menuDays")
+    .onPreferenceChange(MenuDayFramesKey.self) { dayFrames = $0 }
     .reorderContainer(for: MenuItemRowData.self, in: Int.self) { difference in
       let destination: MenuItemReorderDestination = switch difference.destination.position {
       case let .before(itemID):
@@ -125,22 +147,39 @@ struct MenuDishList: View {
         destination: destination
       )
     }
+    .onDropSessionUpdated { session in
+      switch session.phase {
+      case .exiting, .ended, .dataTransferCompleted:
+        hoveredDay = nil
+      case .entering, .active:
+        hoveredDay = dayFrames.first(where: { $0.value.contains(session.location) })?.key
+          ?? session.reorderDestination(for: MenuItemRowData.self, in: Int.self)?.collectionID
+          ?? hoveredDay
+      @unknown default:
+        hoveredDay = nil
+      }
+    }
     .dropDestination(for: MenuDraggedRecipe.self) { recipes, session -> Void in
       guard !recipes.isEmpty else { return }
       let reorderDestination = session.reorderDestination(for: MenuItemRowData.self, in: Int.self)
-      let destinationDayOffset = reorderDestination?.collectionID ?? max(detail.menu.dayCount - 1, 0)
-      let destination: MenuItemReorderDestination = switch reorderDestination?.position {
+      guard let destinationDayOffset = dayFrames.first(where: { $0.value.contains(session.location) })?.key
+        ?? reorderDestination?.collectionID ?? hoveredDay else { return }
+      hoveredDay = nil
+      let position = reorderDestination?.collectionID == destinationDayOffset ? reorderDestination?.position : nil
+      let destination: MenuItemReorderDestination = switch position {
       case let .before(itemID):
         .before(itemID)
       case .end, nil:
         .end
       }
-      _ = model.addRecipesToMenu(
+      if model.addRecipesToMenu(
         recipeIDs: recipes.map(\.recipeID),
         menuID: menu.id,
         destinationDayOffset: destinationDayOffset,
         destination: destination
-      )
+      ) {
+        dayExpansionOverrides[destinationDayOffset] = true
+      }
     }
   }
 
@@ -148,13 +187,6 @@ struct MenuDishList: View {
     Group {
       Text("Dishes")
         .font(.title2.weight(.semibold))
-
-      Button {
-        model.addItemButtonTapped(menu: menu)
-      } label: {
-        Label("Add Dish", systemImage: "plus")
-      }
-      .buttonStyle(.bordered)
 
       Button {
         model.placeMenuButtonTapped(menu: menu, minimumDayCount: minimumDayCount)
@@ -542,4 +574,11 @@ struct MenuDraggedRecipe: Codable, Transferable {
 
 extension UTType {
   static let yesChefMenuRecipe = UTType(exportedAs: "com.jonphillips.yeschef.menu-recipe")
+}
+
+private struct MenuDayFramesKey: PreferenceKey {
+  static var defaultValue: [Int: CGRect] { [:] }
+  static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
+    value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+  }
 }

@@ -95,11 +95,13 @@ private extension View {
         }
         .tint(.blue)
       }
-      Button(role: .destructive) {
+      // The row remains until confirmation; a destructive role can cause an invalid List update.
+      Button {
         model.deleteWorkbenchButtonTapped(row)
       } label: {
         Label("Delete", systemImage: "trash")
       }
+      .tint(.red)
     }
   }
 }

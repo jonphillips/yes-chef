@@ -24,7 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [dogfood-2026-11-04.md](dogfood-2026-11-04.md) — **Ready** · One schema-free dispatch for Jon's morning pass: the
-  swipe-delete crash on Workbench and Menu, Playbook and recipe toolbar cleanup, the Menu recipe panel (tint, icon, drop
-  feedback, wrong-day fallback), and removing the header Add Dish. Serve With recipe links are held for their own ADR.

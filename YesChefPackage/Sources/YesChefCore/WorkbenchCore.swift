@@ -838,7 +838,9 @@ private func areWorkbenchRowsInIncreasingOrder(_ lhs: WorkbenchRowData, _ rhs: W
   if lhs.workbench.dateCreated != rhs.workbench.dateCreated {
     return lhs.workbench.dateCreated < rhs.workbench.dateCreated
   }
-  return lhs.workbench.title.localizedStandardCompare(rhs.workbench.title) == .orderedAscending
+  let titleOrder = lhs.workbench.title.localizedStandardCompare(rhs.workbench.title)
+  if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
+  return lhs.id.uuidString < rhs.id.uuidString
 }
 
 private func areWorkbenchCandidatesInIncreasingOrder(

@@ -12,11 +12,13 @@ struct MenuListView: View {
       MenuRowView(row: row)
         .tag(row.id)
         .swipeActions {
-          Button(role: .destructive) {
+          // The row remains until confirmation; a destructive role can cause an invalid List update.
+          Button {
             model.deleteMenuButtonTapped(row)
           } label: {
             Label("Delete", systemImage: "trash")
           }
+          .tint(.red)
         }
     }
     .navigationTitle("Menus")
@@ -179,7 +181,7 @@ struct MenuDetailView: View {
           Button {
             detailModel.recipeBrowserButtonTapped()
           } label: {
-            Label("Browse Recipes", systemImage: "book.closed")
+            Label("Browse Recipes", systemImage: "book.badge.plus")
           }
         }
       }
@@ -265,7 +267,7 @@ struct MenuDetailView: View {
   ) -> some View {
     switch tool {
     case .recipeBrowser:
-      MenuRecipeBrowserPanel(recipeModel: recipeModel, onRecipeSelected: onRecipeSelected)
+      MenuRecipeBrowserPanel(recipeModel: recipeModel, isTinted: usesToolOverlay, onRecipeSelected: onRecipeSelected)
     case let .chat(chatModel):
       RecipeChatPanel(
         chatModel: chatModel,

@@ -43,6 +43,22 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func tiedWorkbenchesSortByID() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 807_500_000)
+      let lowerID = SampleUUIDSequence.uuid(32_100)
+      let higherID = SampleUUIDSequence.uuid(32_101)
+      try database.write { db in
+        for id in [higherID, lowerID] {
+          try Workbench.insert {
+            Workbench(id: id, title: "Same", sortOrder: 0, dateCreated: now, dateModified: now)
+          }.execute(db)
+        }
+        expectNoDifference(try WorkbenchListRequest().fetch(db).activeRows.map(\.id), [lowerID, higherID])
+      }
+    }
+
+    @Test
     func inlineTitleCommitRestoresTheLastGoodTitleForAnEmptyDraft() {
       #expect(WorkbenchInlineEditor.titleToPersist(draft: "  \n") == nil)
       expectNoDifference(
