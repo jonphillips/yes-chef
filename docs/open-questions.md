@@ -24,6 +24,11 @@ and everything downstream move forward without waiting on it.
 - **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
   Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
 
+**Hand-edited Serve With suggestions can vanish on regeneration (found 2026-11-04, drafting ADR-0062).**
+`RecipeServeWithRepository.update` leaves `provenance` at `.model`, so an edited suggestion no longer matches and
+`replaceModelSuggestions` deletes it. ADR-0048 meant regeneration to keep the cook's work. ADR-0062 protects linked rows
+only. Decide whether an edit should protect a row too, without misusing provenance as "touched".
+
 From the old Next Up:
 
 - **"Up to date" can't see inbound records that never arrived (found 2026-10-27, PROD-CUTOVER Step 4 audit).**
