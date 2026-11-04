@@ -534,6 +534,16 @@ public enum AIHandoffToken {
 
   public static let prefix = "YC-HANDOFF:"
 
+  /// The prompt's own finalize routing (ADR-0060 Amd 1, note of 2026-11-03). A host can offer
+  /// `stage_handoff_return` and still print the return, so the rule can't live only in the tool's
+  /// description and the server instructions. Capture hand-offs leave it out: their returns go back
+  /// only to the open capture editor (Amd 1-D3). The contract marker stays out of every prompt.
+  public static let finalizeInstruction = """
+    To finalize: if this chat has the `stage_handoff_return` tool, call it with the whole return \
+    instead of printing it. Otherwise, start the reply with the `\(prefix)` line above. This applies \
+    whatever return format is described below.
+    """
+
   /// Assembles a hand-off whose body already carries its own return contract — the recipe-body
   /// adjustment prompt describes both of its finalize outcomes (revision brief vs. new-recipe
   /// JSON-LD) itself. Unlike `prompt(...)`, it appends no generic deliverable instruction: that
@@ -546,7 +556,7 @@ public enum AIHandoffToken {
   ) -> String {
     let titleLine = title.trimmingCharacters(in: .whitespacesAndNewlines)
     let titlePrefix = titleLine.isEmpty ? "" : "\(titleLine)\n"
-    return "\(titlePrefix)\(header(handoffID: handoffID))\n\n\(body)"
+    return "\(titlePrefix)\(header(handoffID: handoffID))\n\(finalizeInstruction)\n\n\(body)"
   }
 
   public static func prompt(
@@ -556,7 +566,8 @@ public enum AIHandoffToken {
     mode: PromptMode = .discuss,
     deliverableFormat: DeliverableFormat = .menuPrepPlan
   ) -> String {
-    let token = header(handoffID: handoffID)
+    let routing = deliverableFormat == .readerFeedbackCuration ? "" : "\n\(finalizeInstruction)"
+    let token = "\(header(handoffID: handoffID))\(routing)"
     let titleLine = title.trimmingCharacters(in: .whitespacesAndNewlines)
     let titlePrefix = titleLine.isEmpty ? "" : "\(titleLine)\n"
     switch mode {
