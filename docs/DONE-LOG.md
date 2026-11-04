@@ -9,6 +9,26 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-04 — Tidied device-passes.md (`plan/device-passes-tidy`)
+
+- **Result:** Split the file into Owed now, Held and Older, added how entries get added and cleared, and corrected the standing state and the ADR-0030 heading. No pass was removed. The clearance notes below moved here from the file, unchanged.
+- **Verification:** Docs only. Compared the text before and after; `check-handoff --strict` passed.
+
+Moved notes:
+
+- Device-passed 2026-08-08 and removed: **ADR-0053 S1 (PR #290) + S2 (PR #291)** — the combined Create Recipe
+  pass (sidebar → paste → review cues → Save → lands on the new recipe, Clear, resident session, tier/labels-on-save,
+  web-capture re-check); the S2 cue-volume and `unattributedSource` notes did not warrant an S2.1. **ADR-0052 S1+S2
+  (PR #292)** — the grocery learned-area two-device correction-sync and the high-effort budget stress both cleared.
+- The full ADR-0049 facet/labeling arc — PRs #270/#272/#274 (D1–D3), #275 (D5), #276 (F1/F2), #277 (OQ4 seed),
+  #278 (S5/S6+D8 backfill tooling), #281 (Amd-4 floor), #282 (Edit Tags refine) — is device-passed 2026-08-05 and
+  removed. D4 hand pass done.
+- All other owed passes are **device-passed 2026-08-05 and removed** (Jon): variation-anchor-repair Dispatch 0
+  (PR #284) + Dispatch 1, ADR-0021 V4a (PR #285), prep-plan Slice 2 (PR #262), Recipe section grain S1 (PR #246),
+  ADR-0032 S3, and the combined PRs #243+#244 four-chat-surface pass. They had been bundled — strangely — into one
+  paragraph with ADR-0030 S2, which is why they are cleared together.
+
+---
 ## 2026-11-04 — Dogfood list, Playbook, and Menu fixes (`effort/dogfood-2026-11-04`)
 
 - **Result:** Fixed confirmation swipe actions and stable workbench ordering, simplified Playbook and recipe controls, and added Menu recipe drop targeting and feedback.
