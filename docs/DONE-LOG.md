@@ -9,6 +9,56 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-04 — Owed device passes cleared (`plan/device-passes-cleared`)
+
+- **Result:** Jon confirmed all 11 passes in Owed now, all 23 in Older, and the Recipe Lenses CloudKit step. Their lines are gone from `device-passes.md`. The Serve With CloudKit step, the Cockpit Find round trip and ADR-0030 S2 stay held.
+- **Verification:** Jon's report on 2026-11-04, given per section rather than per pass. It includes the swipe-delete crash fix, which only a device could prove.
+
+Owed now:
+
+- Chat access S2b — search rows show categories
+- Control conventions
+- Recipe Lenses
+- Yes Chef Dev variant
+- Pantry seed collision
+- Hand-off review over the recipe cover
+- SQLiteData 1.12.1 rebase
+- TestFlight expected-fields check
+- one-recipe-handoff
+- launch-data-passes
+- dogfood-2026-11-04
+
+Held:
+
+- Recipe Lenses (held ops, before the next TestFlight build)
+
+Older:
+
+- Calendar day-rail actions and recipe-editor columns
+- Before the CloudSyncKit backup lift's Yes Chef PR merges
+- Backup importer accepts `.data` (side-by-side with Galavant)
+- NYT capture fidelity
+- Move a category's recipes to another category
+- Power Browser responsiveness + reader header wrapping
+- Reader count scaling — count-only amounts and unit agreement
+- Ingredient range scaling — reader, grocery, and sync
+- ADR-0055 — menu Dishes drag-to-reorder (PR #310)
+- ADR-0042 Amd 5 — tolerant LLMHandoffKit contract marker (PR #309)
+- ADR-0052 S3 — audit learned grocery `.model` placements (PR #306)
+- ADR-0042 Amd 4 — recipe-body hand-off finalizes two ways (PR #309)
+- ADR-0054 — extraction preserves structure & identity (PR #308)
+- ADR-0053 Amd 2 / S3 — Shortcuts return path + two ride-alongs (PR #307)
+- ADR-0050 S3 + S3.5 — Power Browser typed filters + compact-list convergence (PR #303)
+- Import P0 — preserve divergent import duplicates (PR #304)
+- ADR-0050 OQ5(a) — Cuisine/Course facet backfill (PR #305)
+- ADR-0050 S2 — Power Browser surface (PR #301)
+- ADR-0042 Amd 3 — Recipe JSON-LD v2 capture (PR #302)
+- ADR-0046 S1 — the sidebar-adaptable app shell (PR #297)
+- ADR-0046 S2 — the chat presentation merge (PR #298)
+- ADR-0021 Amendment 4 V4b (PR #293) — the two-device `recipeRelatedRecipes` sync pass
+- ADR-0021 anchor-repair Dispatch 2 (PR #294) — the repair-UI pass
+
+---
 ## 2026-11-04 — Tidied device-passes.md (`plan/device-passes-tidy`)
 
 - **Result:** Split the file into Owed now, Held and Older, added how entries get added and cleared, and corrected the standing state and the ADR-0030 heading. No pass was removed. The clearance notes below moved here from the file, unchanged.
