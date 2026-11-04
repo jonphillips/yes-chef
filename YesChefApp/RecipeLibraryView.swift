@@ -514,11 +514,13 @@ struct RecipeListView: View {
                     Label("Archive", systemImage: "archivebox")
                   }
                   .tint(.red)
-                  Button(role: .destructive) {
+                  // The row remains until confirmation; a destructive role can cause an invalid List update.
+                  Button {
                     model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
                   } label: {
                     Label("Delete…", systemImage: "trash")
                   }
+                  .tint(.red)
                 }
             }
           }

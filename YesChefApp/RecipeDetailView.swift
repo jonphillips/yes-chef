@@ -12,8 +12,6 @@ struct RecipeDetailView: View {
   @State private var toastCenter: AppToastCenter
   @State private var isConfirmingBaseRecipeHandoff = false
   @State private var isVariationManagerPresented = false
-  @State private var isPlaybookJumpAvailable = false
-  @State private var playbookJumpRequest = UUID()
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -154,8 +152,6 @@ struct RecipeDetailView: View {
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
       isVariationManagerPresented: $isVariationManagerPresented,
-      isPlaybookJumpAvailable: $isPlaybookJumpAvailable,
-      playbookJumpRequest: playbookJumpRequest,
       onRecipeSelected: onRecipeSelected
     )
   }
@@ -227,21 +223,13 @@ struct RecipeDetailView: View {
       } label: {
         Label("Hand off", systemImage: "sparkles.square.filled.on.square")
       }
-      if isPlaybookJumpAvailable {
-        Button {
-          playbookJumpRequest = UUID()
-        } label: {
-          Label("Playbook", systemImage: "text.book.closed")
-        }
-        .accessibilityHint("Jumps to the recipe Playbook after the instructions.")
-      }
+    }
+    ToolbarItemGroup(placement: .secondaryAction) {
       Button {
         libraryModel.editButtonTapped(recipeID: model.recipeID)
       } label: {
         Label("Edit", systemImage: "square.and.pencil")
       }
-    }
-    ToolbarItemGroup(placement: .secondaryAction) {
       Button {
         model.openWorkbenchButtonTapped()
       } label: {
@@ -374,8 +362,6 @@ private struct RecipeReaderView: View {
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
   @Binding var isVariationManagerPresented: Bool
-  @Binding var isPlaybookJumpAvailable: Bool
-  let playbookJumpRequest: UUID
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @State private var compactSection: CompactSection = .ingredients
@@ -413,20 +399,7 @@ private struct RecipeReaderView: View {
             .frame(maxWidth: .infinity, minHeight: proxy.size.height)
         }
       }
-      .onAppear {
-        isPlaybookJumpAvailable = model.recipe != nil
-      }
-      .onChange(of: playbookJumpRequest) { _, _ in
-        if proxy.size.width < twoColumnThreshold {
-          compactSection = .playbook
-        }
-      }
-      .onChange(of: model.recipe?.id) { _, _ in
-        isPlaybookJumpAvailable = model.recipe != nil
-      }
-      .onDisappear {
-        isPlaybookJumpAvailable = false
-      }
+
     }
     .sheet(isPresented: $isPhotoGalleryPresented) {
       NavigationStack {
@@ -793,11 +766,6 @@ private struct RecipeReaderView: View {
           .padding()
           .frame(maxWidth: directionsContentMaximumWidth, alignment: .topLeading)
           .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-        .onChange(of: playbookJumpRequest) { _, _ in
-          withAnimation(.snappy) {
-            scrollProxy.scrollTo("recipe-playbook", anchor: .top)
-          }
         }
         .swipeActionsContainer()
         .frame(width: directionsWidth)

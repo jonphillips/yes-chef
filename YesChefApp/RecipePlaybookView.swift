@@ -182,8 +182,7 @@ struct RecipePlaybookView: View {
       }
         .padding(.top, 8)
     } label: {
-      // The fill-dot and the disclosure chevron read as one status pair hugging the trailing edge; the menu
-      // sits well clear of them so its tap target can't be confused for the disclosure's.
+      // The disclosure symbol communicates both content status and expansion.
       HStack(spacing: 0) {
         VStack(alignment: .leading, spacing: 2) {
           Text(title)
@@ -200,11 +199,9 @@ struct RecipePlaybookView: View {
           actions()
             .padding(.trailing, 12)
         }
-        Image(systemName: isFilled ? "circle.fill" : "circle")
-          .foregroundStyle(isFilled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-          .accessibilityLabel(Text(isFilled ? "Contains content" : "Empty"))
       }
     }
+    .disclosureGroupStyle(PlaybookDisclosureStyle(isFilled: isFilled))
     .accessibilityValue(Text(isFilled ? "Contains content" : "Empty"))
   }
 
@@ -303,7 +300,9 @@ struct RecipePlaybookView: View {
   }
 
   private func sectionEditButton(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
-    Button(isFilled ? "Edit" : "Write") { editingSection = section }
+    Button { editingSection = section } label: {
+      Image(systemName: "square.and.pencil")
+    }
       .accessibilityLabel("\(isFilled ? "Edit" : "Write") \(section.title)")
   }
 
@@ -374,8 +373,12 @@ private struct RecipeServeWithStrip: View {
         Text("Serve With")
           .font(.title3.bold())
         Spacer()
-        Button(items.isEmpty ? "Write" : "Edit") { isManaging = true }
-          .accessibilityLabel("\(items.isEmpty ? "Write" : "Edit") Serve With")
+        if !items.isEmpty {
+          Button { isManaging = true } label: {
+            Image(systemName: "square.and.pencil")
+          }
+          .accessibilityLabel("Edit Serve With")
+        }
       }
 
       if needsRepair {
@@ -741,6 +744,28 @@ private struct RecipePlaybookSectionEditorSheet: View {
       dismiss()
     } catch {
       errorMessage = String(describing: error)
+    }
+  }
+}
+
+private struct PlaybookDisclosureStyle: DisclosureGroupStyle {
+  let isFilled: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack {
+        configuration.label
+        Button {
+          withAnimation { configuration.isExpanded.toggle() }
+        } label: {
+          Image(systemName: isFilled ? "chevron.right.circle.fill" : "chevron.right.circle")
+            .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(configuration.isExpanded ? "Collapse" : "Expand")
+        .accessibilityValue(isFilled ? "Contains content" : "Empty")
+      }
+      if configuration.isExpanded { configuration.content }
     }
   }
 }

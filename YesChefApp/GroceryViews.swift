@@ -653,11 +653,13 @@ private extension View {
         .tint(.blue)
 
         if model.listRows.count > 1 {
-          Button(role: .destructive) {
+          // The row remains until confirmation; a destructive role can cause an invalid List update.
+          Button {
             model.deleteListButtonTapped(listID: row.id)
           } label: {
             Label("Delete", systemImage: "trash")
           }
+          .tint(.red)
         }
       }
   }
