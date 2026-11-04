@@ -74,7 +74,7 @@ In `YesChefCoreTests`:
 - The existing per-pass tests still pass unchanged.
 
 **Verification:** `scripts/check-drift.sh`, the generic device build, and `YesChefTests` on a simulator (guardrail #9;
-the commands are in [`verification.md`](../verification.md)).
+the commands are in [`verification.md`](../../verification.md)).
 
 **Done when:** the build items are in, the tests pass, and closeout runs.
 

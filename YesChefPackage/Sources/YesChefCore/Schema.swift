@@ -47,16 +47,14 @@ extension DependencyValues {
     }
     try bootstrapDatabase(
       path: databasePath,
-      syncMode: syncMode,
-      runsPostEngineDataPasses: false
+      syncMode: syncMode
     )
   }
 
   public mutating func bootstrapDatabaseForShareExtension(path: String?) throws {
     try bootstrapDatabase(
       path: path,
-      syncMode: .configured(startImmediately: false),
-      runsPostEngineDataPasses: false
+      syncMode: .configured(startImmediately: false)
     )
   }
 
@@ -67,7 +65,6 @@ extension DependencyValues {
   public mutating func bootstrapDatabase(
     path: String?,
     syncMode: YesChefCloudSync.BootstrapMode,
-    runsPostEngineDataPasses: Bool = true,
     eraseDatabaseOnSchemaChange: Bool? = nil
   ) throws {
     var configuration = Configuration()
@@ -1349,6 +1346,15 @@ extension DependencyValues {
       .execute(db)
     }
 
+    migrator.registerMigration("Create local data pass state") { db in
+      try db.execute(sql: """
+        CREATE TABLE "localDataPassState" (
+          "id" INTEGER PRIMARY KEY CHECK ("id" = 1),
+          "version" INTEGER NOT NULL
+        ) STRICT
+        """)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)
@@ -1362,60 +1368,7 @@ extension DependencyValues {
         for: database,
         startImmediately: startImmediately
       )
-      if runsPostEngineDataPasses {
-        try database.write { db in
-          let facetMigrationAudit = try CategoryRepository.seedStarterFacets(in: db)
-          if facetMigrationAudit.requiresReview {
-            AppLog.dataIntegrity.warning("\(facetMigrationAudit.logSummary, privacy: .public)")
-          }
-          let variationAnchorBackfill = try RecipeRepository.backfillVariationAnchors(in: db)
-          if variationAnchorBackfill.hasFindings {
-            AppLog.dataIntegrity.warning("\(variationAnchorBackfill.logSummary, privacy: .public)")
-          }
-          let ingredientRangeBackfill = try RecipeRepository.reparseIngredientRanges(in: db)
-          if ingredientRangeBackfill.hasFindings {
-            AppLog.dataIntegrity.warning("\(ingredientRangeBackfill.logSummary, privacy: .public)")
-          }
-          let cuisineCourseBackfill = try RecipeRepository.backfillCuisineCourseFacets(in: db)
-          if cuisineCourseBackfill.hasFindings {
-            AppLog.dataIntegrity.warning("\(cuisineCourseBackfill.logSummary, privacy: .public)")
-          }
-          do {
-            try db.inSavepoint {
-              let recipeMetadataStates = try recipeSyncMetadataStates(for: Recipe.tableName, in: db)
-              let syncedTableNames = Set(try String.fetchAll(
-                db,
-                sql: #"SELECT "tableName" FROM "sqlitedata_icloud_recordTypes""#
-              ))
-              let syncRepair = try RecipeSyncRepair.run(
-                recipeMetadata: recipeMetadataStates,
-                syncedTableNames: syncedTableNames,
-                childMetadataFor: { table, primaryKeys, db in
-                  var metadataStates: [RecipeSyncMetadataState] = []
-                  for start in stride(from: 0, to: primaryKeys.count, by: 500) {
-                    let chunk = Array(primaryKeys[start..<min(start + 500, primaryKeys.count)])
-                    metadataStates.append(contentsOf: try recipeSyncMetadataStates(
-                      for: table,
-                      primaryKeys: chunk,
-                      in: db
-                    ))
-                  }
-                  return metadataStates
-                },
-                in: db
-              )
-              if syncRepair.hasFindings {
-                AppLog.dataIntegrity.warning("\(syncRepair.logSummary, privacy: .public)")
-              }
-              return .commit
-            }
-          } catch {
-            AppLog.dataIntegrity.error(
-              "recipe-sync-repair failed: \(String(describing: error), privacy: .public)"
-            )
-          }
-        }
-      }
+
     }
   }
 
@@ -1489,5 +1442,107 @@ private func recipeSyncMetadataStates(
       recordID: RecipeSyncRecordID(table: metadataID.recordType, primaryKey: metadataID.recordPrimaryKey),
       hasServerChangeTag: confirmedRecordNames.contains("\(metadataID.recordPrimaryKey):\(metadataID.recordType)")
     )
+  }
+}
+
+public enum YesChefDataPasses {
+  // Raise this when a pass changes or a new pass is added.
+  public static let currentVersion = 1
+
+  public static func runIfNeeded(in database: any DatabaseWriter) async {
+    await runIfNeeded(in: database, beforePass: { _ in })
+  }
+
+  static func runIfNeeded(
+    in database: any DatabaseWriter,
+    beforePass: @escaping @Sendable (Int) throws -> Void
+  ) async {
+    let needsAllPasses: Bool
+    do {
+      let (version, queuedCount) = try await database.read { db in
+        let version = try Int.fetchOne(db, sql: "SELECT version FROM localDataPassState WHERE id = 1") ?? 0
+        let queuedCount = try Int.fetchOne(db, sql: "SELECT count(*) FROM recipeSyncRepairQueue") ?? 0
+        return (version, queuedCount)
+      }
+      needsAllPasses = version < currentVersion
+      guard needsAllPasses || queuedCount > 0 else {
+        AppLog.performance.log("data-passes skipped version=\(version, privacy: .public)")
+        return
+      }
+    } catch {
+      reportFailure("version check", error)
+      return
+    }
+
+    let passes: [(String, @Sendable (Database) throws -> Void)] = [
+      ("starter facets", { db in
+        let audit = try CategoryRepository.seedStarterFacets(in: db)
+        if audit.requiresReview { AppLog.dataIntegrity.warning("\(audit.logSummary, privacy: .public)") }
+      }),
+      ("variation anchors", { db in
+        let audit = try RecipeRepository.backfillVariationAnchors(in: db)
+        if audit.hasFindings { AppLog.dataIntegrity.warning("\(audit.logSummary, privacy: .public)") }
+      }),
+      ("ingredient ranges", { db in
+        let audit = try RecipeRepository.reparseIngredientRanges(in: db)
+        if audit.hasFindings { AppLog.dataIntegrity.warning("\(audit.logSummary, privacy: .public)") }
+      }),
+      ("cuisine and course", { db in
+        let audit = try RecipeRepository.backfillCuisineCourseFacets(in: db)
+        if audit.hasFindings { AppLog.dataIntegrity.warning("\(audit.logSummary, privacy: .public)") }
+      }),
+      ("sync repair", { db in
+        try db.inSavepoint {
+          let states = try recipeSyncMetadataStates(for: Recipe.tableName, in: db)
+          let tables = Set(try String.fetchAll(db, sql: #"SELECT "tableName" FROM "sqlitedata_icloud_recordTypes""#))
+          let audit = try RecipeSyncRepair.run(
+            recipeMetadata: states,
+            syncedTableNames: tables,
+            childMetadataFor: { table, primaryKeys, db in
+              var result: [RecipeSyncMetadataState] = []
+              for start in stride(from: 0, to: primaryKeys.count, by: 500) {
+                let chunk = Array(primaryKeys[start..<min(start + 500, primaryKeys.count)])
+                result.append(contentsOf: try recipeSyncMetadataStates(for: table, primaryKeys: chunk, in: db))
+              }
+              return result
+            },
+            in: db
+          )
+          if audit.hasFindings { AppLog.dataIntegrity.warning("\(audit.logSummary, privacy: .public)") }
+          return .commit
+        }
+      }),
+    ]
+    var succeeded = true
+    for (index, pass) in passes.enumerated() {
+      // Sync repair is last: its queue needs another launch after parents are confirmed.
+      guard needsAllPasses || index == passes.count - 1 else { continue }
+      let start = ContinuousClock.now
+      do {
+        try await database.write { db in
+          try beforePass(index)
+          try pass.1(db)
+        }
+      } catch {
+        succeeded = false
+        reportFailure(pass.0, error)
+      }
+      let duration = start.duration(to: .now)
+      AppLog.performance.log("data-pass \(pass.0, privacy: .public) duration=\(String(describing: duration), privacy: .public)")
+    }
+    guard succeeded && needsAllPasses else { return }
+    do {
+      try await database.write { db in
+        try db.execute(sql: "INSERT OR REPLACE INTO localDataPassState (id, version) VALUES (1, ?)", arguments: [currentVersion])
+      }
+    } catch {
+      reportFailure("version write", error)
+    }
+  }
+
+  private static func reportFailure(_ pass: String, _ error: any Error) {
+    let message = "data pass \(pass) failed: \(error)"
+    AppLog.dataIntegrity.error("\(message, privacy: .public)")
+    reportIssue(message)
   }
 }

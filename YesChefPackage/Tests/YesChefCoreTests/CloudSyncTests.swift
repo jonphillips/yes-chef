@@ -30,7 +30,7 @@ extension RecipeCoreTests {
         try schemaTableNames(in: db)
       }
       let localOnlyTableNames = [
-        "aiHandoffs", "chatMessages", "chatThreads", "recipeActiveVariations", "recipeSyncRepairQueue",
+        "aiHandoffs", "chatMessages", "chatThreads", "recipeActiveVariations", "recipeSyncRepairQueue", "localDataPassState",
       ]
 
       expectNoDifference(

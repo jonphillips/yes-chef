@@ -37,7 +37,7 @@ public enum YesChefCloudSync {
     preRestoreFilenamePrefix: "YesChef-PreRestore-",
     restoreStagingFilenamePrefix: "YesChef-Restore-",
     identifyingTableNames: ["recipes"],
-    declaredSchemaVersion: 55,
+    declaredSchemaVersion: 56,
     lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
     cloudSync: configuration,
     variant: backupVariant,
@@ -131,6 +131,7 @@ public enum YesChefCloudSync {
   // MARK: Start / redrain / pending (forwarded)
 
   public static func startIfManuallyEnabled() async -> StartResult {
+    await prepareLaunchDataPasses()
     let result = await CloudSync.startIfManuallyEnabled(configuration: configuration)
     guard case .started = result else { return result }
 
@@ -138,6 +139,11 @@ public enum YesChefCloudSync {
       await purgeRetiredRecordTypesWhenIdle()
     }
     return result
+  }
+
+  public static func prepareLaunchDataPasses() async {
+    @Dependency(\.defaultDatabase) var database
+    await LaunchDataPassGate.shared.wait(for: database)
   }
 
   private static func purgeRetiredRecordTypesWhenIdle() async {
@@ -215,7 +221,10 @@ public enum YesChefCloudSync {
     stopSyncEngine: (() -> Void)? = nil,
     startSyncEngine: (() async throws -> Void)? = nil
   ) async -> PendingRecordZoneRedrainResult {
-    await CloudSync.redrainPendingRecordZoneChangesIfManuallyEnabled(
+    if providedDatabase == nil && startSyncEngine == nil {
+      await prepareLaunchDataPasses()
+    }
+    return await CloudSync.redrainPendingRecordZoneChangesIfManuallyEnabled(
       configuration: configuration, defaults: defaults, environment: environment,
       arguments: arguments, database: providedDatabase,
       accountStatus: providedAccountStatus, stopSyncEngine: stopSyncEngine,
@@ -361,5 +370,21 @@ public enum YesChefCloudSync {
       containerIdentifier: configuration.containerIdentifier,
       startImmediately: startImmediately
     )
+  }
+}
+
+// Every live sync entry point waits for the same launch run, including foreground redrains.
+private actor LaunchDataPassGate {
+  static let shared = LaunchDataPassGate()
+  private var task: Task<Void, Never>?
+
+  func wait(for database: any DatabaseWriter) async {
+    if let task {
+      await task.value
+      return
+    }
+    let task = Task { await YesChefDataPasses.runIfNeeded(in: database) }
+    self.task = task
+    await task.value
   }
 }
