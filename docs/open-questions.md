@@ -44,14 +44,6 @@ From the old Next Up:
   The fix is a jon-platform CloudSyncKit slice (Galavant shares it): show "Syncing…" or the last scan's result
   instead of green when the scan is skipped, and count the engine's real queue. Do it after the cut.
 
-- **Launch-time repair passes run on the main thread on every launch (found 2026-10-28).** `bootstrapDatabase`
-  (`Schema.swift`, the `runsPostEngineDataPasses` block) runs in `YesChefApp.init`, before the first frame:
-  `reparseIngredientRanges` loads and parses all ~27,600 lines, `RecipeSyncRepair` decodes every recipe's
-  `lastKnownServerRecord`, and the cuisine/course and variation-anchor backfills scan every recipe. All of it runs
-  in one write transaction. The app is unresponsive for 5 seconds or more at launch. Make each pass run once
-  (gated by a stored version) or retire the finished ones, and run what's left off the main thread. Do it after
-  the cut, with a TestFlight build.
-
 - **Settings' Sync detail sheet slides up, then straight back down (Jon, 2026-10-29; long-standing).** Tapping
   the Sync row usually takes a second tap. The likely cause: `SyncStatusSection` hangs `.sheet(isPresented:)` on
   its `Section` inside the Settings `Form` (`SyncStatusSection.swift`), so the presentation lives on a lazy,
