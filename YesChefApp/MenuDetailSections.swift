@@ -153,8 +153,8 @@ struct MenuDishList: View {
       case .exiting, .ended, .dataTransferCompleted:
         hoveredDay = nil
       case .entering, .active:
-        hoveredDay = session.reorderDestination(for: MenuItemRowData.self, in: Int.self)?.collectionID
-          ?? dayFrames.first(where: { $0.value.contains(session.location) })?.key
+        hoveredDay = dayFrames.first(where: { $0.value.contains(session.location) })?.key
+          ?? session.reorderDestination(for: MenuItemRowData.self, in: Int.self)?.collectionID
       @unknown default:
         hoveredDay = nil
       }
@@ -162,11 +162,11 @@ struct MenuDishList: View {
     .dropDestination(for: MenuDraggedRecipe.self) { recipes, session -> Void in
       guard !recipes.isEmpty else { return }
       let reorderDestination = session.reorderDestination(for: MenuItemRowData.self, in: Int.self)
-      guard let destinationDayOffset = reorderDestination?.collectionID
-        ?? dayFrames.first(where: { $0.value.contains(session.location) })?.key
-        ?? hoveredDay else { return }
+      guard let destinationDayOffset = dayFrames.first(where: { $0.value.contains(session.location) })?.key
+        ?? reorderDestination?.collectionID ?? hoveredDay else { return }
       hoveredDay = nil
-      let destination: MenuItemReorderDestination = switch reorderDestination?.position {
+      let position = reorderDestination?.collectionID == destinationDayOffset ? reorderDestination?.position : nil
+      let destination: MenuItemReorderDestination = switch position {
       case let .before(itemID):
         .before(itemID)
       case .end, nil:

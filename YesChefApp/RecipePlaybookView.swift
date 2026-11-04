@@ -194,6 +194,8 @@ struct RecipePlaybookView: View {
               .lineLimit(1)
           }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { withAnimation { isExpanded.wrappedValue.toggle() } }
         Spacer(minLength: 12)
         if showsActions {
           actions()
@@ -201,7 +203,7 @@ struct RecipePlaybookView: View {
         }
       }
     }
-    .disclosureGroupStyle(PlaybookDisclosureStyle(isFilled: isFilled))
+    .disclosureGroupStyle(PlaybookDisclosureStyle(title: title, isFilled: isFilled))
     .accessibilityValue(Text(isFilled ? "Contains content" : "Empty"))
   }
 
@@ -749,9 +751,10 @@ private struct RecipePlaybookSectionEditorSheet: View {
 }
 
 private struct PlaybookDisclosureStyle: DisclosureGroupStyle {
+  let title: String
   let isFilled: Bool
 
-  func makeBody(configuration: Configuration) -> some View {
+  func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack {
         configuration.label
@@ -762,8 +765,8 @@ private struct PlaybookDisclosureStyle: DisclosureGroupStyle {
             .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(configuration.isExpanded ? "Collapse" : "Expand")
-        .accessibilityValue(isFilled ? "Contains content" : "Empty")
+        .accessibilityLabel("\(configuration.isExpanded ? "Collapse" : "Expand") \(title)")
+        .accessibilityValue("\(configuration.isExpanded ? "Expanded" : "Collapsed"), \(isFilled ? "Contains content" : "Empty")")
       }
       if configuration.isExpanded { configuration.content }
     }

@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-04 — Dogfood list, Playbook, and Menu fixes (`effort/dogfood-2026-11-04`)
+
+- **Result:** Fixed confirmation swipe actions and stable workbench ordering, simplified Playbook and recipe controls, and added Menu recipe drop targeting and feedback.
+- **Verification:** check-drift passed: SwiftLint, 763 package tests and 13 additional tests, and app test target build; generic iOS device build passed.
+- **Owed:** dogfood-2026-11-04's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-04 — Take the data passes off the launch path (`effort/launch-data-passes`)
 
 - **Result:** Runs the five post-engine data passes in separate writes after launch, once per local database version, before sync starts; failures are reported and retried.
