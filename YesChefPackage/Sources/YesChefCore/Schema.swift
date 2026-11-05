@@ -1355,6 +1355,10 @@ extension DependencyValues {
         """)
     }
 
+    migrator.registerMigration("Add Serve With recipe link") { db in
+      try db.execute(sql: #"ALTER TABLE "recipeServeWith" ADD COLUMN "linkedRecipeID" TEXT"#)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

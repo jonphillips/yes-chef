@@ -538,6 +538,7 @@ public enum RecipeServeWithRepository {
     _ suggestions: [ServeWithSuggestion],
     to recipeID: Recipe.ID,
     provenance: ServeWithProvenance,
+    linkedRecipeID: Recipe.ID? = nil,
     in db: Database,
     now: Date,
     uuid: () -> UUID
@@ -549,6 +550,7 @@ public enum RecipeServeWithRepository {
         RecipeServeWith(
           id: uuid(),
           recipeID: recipeID,
+          linkedRecipeID: linkedRecipeID,
           title: suggestion.title,
           note: suggestion.note,
           sortOrder: firstSortOrder + LearningOrdering.rankStride * index,
@@ -571,18 +573,16 @@ public enum RecipeServeWithRepository {
     uuid: () -> UUID
   ) throws {
     let existing = try serveWith(for: recipeID, in: db)
-    var unmatchedModelRows = Dictionary(grouping: existing.filter { $0.provenance == .model }) {
-      ServeWithSuggestion(title: $0.title, note: $0.note)
-    }
+    var unmatchedModelRows = Dictionary(grouping: existing.filter { $0.provenance == .model }) { $0.title }
     var retainedIDs = Set<RecipeServeWith.ID>()
     let nextSortOrder = (existing.map(\.sortOrder).max() ?? -LearningOrdering.rankStride) + LearningOrdering.rankStride
     var newItemOffset = 0
 
     for suggestion in suggestions {
-      var candidates = unmatchedModelRows[suggestion] ?? []
+      var candidates = unmatchedModelRows[suggestion.title] ?? []
       if let existing = candidates.first {
         candidates.removeFirst()
-        unmatchedModelRows[suggestion] = candidates
+        unmatchedModelRows[suggestion.title] = candidates
         retainedIDs.insert(existing.id)
         continue
       }
@@ -601,7 +601,7 @@ public enum RecipeServeWithRepository {
       try RecipeServeWith.insert { row }.execute(db)
     }
 
-    for row in existing where row.provenance == .model && !retainedIDs.contains(row.id) {
+    for row in existing where row.provenance == .model && row.linkedRecipeID == nil && !retainedIDs.contains(row.id) {
       try RecipeServeWith.find(row.id).delete().execute(db)
     }
     try touchRecipe(recipeID, in: db, now: now)
@@ -621,6 +621,15 @@ public enum RecipeServeWithRepository {
       $0.dateModified = #bind(now)
     }
     .execute(db)
+    try touchRecipe(existing.recipeID, in: db, now: now)
+  }
+
+  public static func setLink(id: RecipeServeWith.ID, linkedRecipeID: Recipe.ID?, in db: Database, now: Date) throws {
+    guard let existing = try RecipeServeWith.find(id).fetchOne(db) else { return }
+    try RecipeServeWith.find(id).update {
+      $0.linkedRecipeID = #bind(linkedRecipeID)
+      $0.dateModified = #bind(now)
+    }.execute(db)
     try touchRecipe(existing.recipeID, in: db, now: now)
   }
 

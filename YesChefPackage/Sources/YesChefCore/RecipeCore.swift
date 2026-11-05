@@ -102,6 +102,7 @@ public struct RecipeDetailData: Equatable, Sendable {
   public var categoryDisplayNames: [String]
   public var learnings: [Learning]
   public var serveWith: [RecipeServeWith]
+  public var resolvedServeWithRecipeIDs: Set<Recipe.ID>
   public var variations: [RecipeVariation]
   public var relatedRecipes: [Recipe]
   public var deliberationLogEntries: [RecipeDeliberationLogEntry]
@@ -120,6 +121,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     categoryDisplayNames: [String] = [],
     learnings: [Learning] = [],
     serveWith: [RecipeServeWith] = [],
+    resolvedServeWithRecipeIDs: Set<Recipe.ID> = [],
     variations: [RecipeVariation] = [],
     relatedRecipes: [Recipe] = [],
     deliberationLogEntries: [RecipeDeliberationLogEntry] = [],
@@ -137,6 +139,7 @@ public struct RecipeDetailData: Equatable, Sendable {
     self.categoryDisplayNames = categoryDisplayNames
     self.learnings = learnings
     self.serveWith = serveWith
+    self.resolvedServeWithRecipeIDs = resolvedServeWithRecipeIDs
     self.variations = variations
     self.relatedRecipes = relatedRecipes
     self.deliberationLogEntries = deliberationLogEntries
@@ -270,6 +273,10 @@ public enum RecipeRepository {
       .where { $0.recipeID.eq(recipeID) }
       .fetchAll(db)
       .sorted(by: areServeWithInDisplayOrder)
+    let linkedIDs = Array(Set(serveWith.compactMap(\.linkedRecipeID)))
+    let resolvedServeWithRecipeIDs = Set(try Recipe
+      .where { $0.id.in(linkedIDs) && !$0.archived }
+      .fetchAll(db).map(\.id))
     let activeVariationID = try activeVariationID(recipeID: recipeID, variations: variations, in: db)
     let allCategories = CategoryRepository.visibleCategories(
       try Category.fetchAll(db),
@@ -308,6 +315,7 @@ public enum RecipeRepository {
       categoryDisplayNames: categoryDisplayNames,
       learnings: try LearningRepository.learnings(sourceType: .recipe, sourceID: recipeID, in: db),
       serveWith: serveWith,
+      resolvedServeWithRecipeIDs: resolvedServeWithRecipeIDs,
       variations: variations,
       relatedRecipes: try relatedRecipes(for: recipeID, in: db),
       deliberationLogEntries: deliberationLogEntries,
@@ -497,6 +505,9 @@ extension RecipeRepository {
     try RecipeRelatedRecipe
       .where { $0.recipeID.eq(recipeID) || $0.relatedRecipeID.eq(recipeID) }
       .delete()
+      .execute(db)
+    try RecipeServeWith.where { $0.linkedRecipeID.eq(recipeID) }
+      .update { $0.linkedRecipeID = nil }
       .execute(db)
     try Recipe.find(recipeID).delete().execute(db)
   }
