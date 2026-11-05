@@ -25,6 +25,3 @@ discoverable"):
 
 ## Live
 
-- [handoff-menu.md](handoff-menu.md) — **Ready** · Lift the AI toolbar menu into a shared `HandoffMenu` in jon-platform, adopt
-  it on all five Yes Chef screens, and give Meal Calendar and Workbench Compare the Hand off and Paste they lack. No schema or
-  sync change.

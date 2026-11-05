@@ -1,16 +1,6 @@
 import Foundation
 import YesChefCore
 
-extension MealCalendarDayAgendaView {
-  var handoffSource: HandoffExportSource? {
-    HandoffExportSource.mealPlanSources(on: model.selectedDate, rows: model.selectedDayRows)?.makeAhead
-  }
-
-  var complementHandoffSource: HandoffExportSource? {
-    HandoffExportSource.mealPlanSources(on: model.selectedDate, rows: model.selectedDayRows)?.complement
-  }
-}
-
 extension HandoffExportSource {
   struct MealPlanSources: Sendable {
     let makeAhead: HandoffExportSource

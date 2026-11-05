@@ -1,5 +1,7 @@
+import LLMHandoffUI
 import LLMClientKit
 import SwiftUI
+import UIKit
 import YesChefCore
 
 /// The Compare surface: an aligned ingredient-diff matrix (Ingredients) plus a whole-recipe
@@ -23,6 +25,8 @@ struct WorkbenchCompareView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var segment: Segment = .ingredients
   @State private var chatModel: RecipeChatModel?
+  @State private var toastCenter = AppToastCenter()
+  @State private var handoffTransport = HandoffInAppTransport()
 
   private var workingDetail: RecipeDetailData? {
     detail.draftRecipeDetail
@@ -121,24 +125,27 @@ struct WorkbenchCompareView: View {
         }
         if let chatContext {
           ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-              Toggle(isOn: Binding(
+            HandoffMenu(
+              handOff: {
+                Task { await handoffTransport.copyPrompt(for: .workbench(detail.workbench.id, task: .compare)) }
+              },
+              paste: {
+                let results = UIPasteboard.general.string.map { [$0] } ?? []
+                Task {
+                  await handoffTransport.pastedResultsReceived(
+                    results, source: .workbench(detail.workbench.id, task: .compare)
+                  )
+                }
+              },
+              isAskActive: Binding(
                 get: { chatModel != nil },
                 set: { isOpen in
                   if isOpen != (chatModel != nil) {
-                    if chatModel != nil {
-                      chatModel = nil
-                    } else {
-                      chatModel = RecipeChatModel(context: chatContext)
-                    }
+                    chatModel = isOpen ? RecipeChatModel(context: chatContext) : nil
                   }
                 }
-              )) {
-                Label("Ask now", systemImage: "sparkles")
-              }
-            } label: {
-              Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-            }
+              )
+            )
           }
         }
         if segment == .ingredients {
@@ -175,6 +182,13 @@ struct WorkbenchCompareView: View {
         }
       }
     }
+    .onAppear { handoffTransport.toastCenter = toastCenter }
+    .handoffTransportAlert(handoffTransport)
+    .handoffReviewDestinations()
+    .overlay(alignment: .top) {
+      AppToastOverlay(toastCenter: toastCenter).ignoresSafeArea(.keyboard)
+    }
+    .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
     .recipeChatInspector(
       chatModel: $chatModel,
       isEnabled: isChatInspectorEnabled

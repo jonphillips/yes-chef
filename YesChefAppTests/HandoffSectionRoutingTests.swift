@@ -12,6 +12,28 @@ struct HandoffSectionRoutingTests {
   // redirect toast on a same-item mismatch rather than a rejection. These tests pin that split.
 
   @Test
+  func mealPlanComplementReturnMatchesOnlyItsOwnItem() {
+    let itemID = UUID(uuidString: "00000000-0000-0000-0000-000000003911")!
+    let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000003912")!
+    let handoff = AIHandoff(
+      id: UUID(uuidString: "00000000-0000-0000-0000-000000003913")!,
+      sourceType: .mealPlan,
+      sourceID: itemID,
+      taskType: .mealPlanComplement,
+      createdAt: .distantPast,
+      exportedPrompt: ""
+    )
+
+    #expect(HandoffExportSource.mealPlan(itemID).matches(handoff))
+    #expect(!HandoffExportSource.mealPlan(otherID).matches(handoff))
+  }
+
+  @Test
+  func emptyDayHasNoHandoffSources() {
+    #expect(HandoffExportSource.mealPlanSources(on: .distantPast, rows: []) == nil)
+  }
+
+  @Test
   func recipeSectionReturnMatchesTheRecipeButScopesToItsOwnSection() {
     let recipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003901")!
     let otherRecipeID = UUID(uuidString: "00000000-0000-0000-0000-000000003921")!

@@ -14,6 +14,7 @@ points here. The executor never reads this file; it only appends its own gate th
 Dev, on CloudKit Development.
 
 ## Owed now
+- **handoff-menu:** On iPad and iPhone, verify the five AI menus, Ask now checkmarks, Compare copy/paste feedback and review presentation, and calendar Complement routing and empty-day feedback as described in the brief. ([brief](efforts/archive/handoff-menu.md))
 
 ## Held
 

@@ -4,9 +4,6 @@ import YesChefCore
 struct MealCalendarDayHeader: View {
   let model: MealCalendarModel
   var cookSession: (() -> Void)?
-  var handoffSource: HandoffExportSource?
-  var complementHandoffSource: HandoffExportSource?
-  let handoffTransport: HandoffInAppTransport
 
   var body: some View {
     ViewThatFits(in: .horizontal) {
@@ -49,33 +46,15 @@ struct MealCalendarDayHeader: View {
     }
   }
 
-  /// Per-day overflow menu. Hosts the grocery add (item 2) alongside the hand-off actions so a cook
-  /// can send a whole day to their list without switching to the Grocery tab. Shows whenever either
-  /// affordance is available.
+  /// Sends a whole day to the grocery list without switching tabs.
   @ViewBuilder
   private var dayActionsMenu: some View {
-    if model.canAddSelectedDayToGroceries || (handoffSource != nil && complementHandoffSource != nil) {
+    if model.canAddSelectedDayToGroceries {
       Menu {
-        if model.canAddSelectedDayToGroceries {
-          Button {
-            model.addSelectedDayToGroceriesButtonTapped()
-          } label: {
-            Label("Add Day to Groceries", systemImage: "cart.badge.plus")
-          }
-        }
-
-        if let handoffSource, let complementHandoffSource {
-          Section {
-            HandoffMenuActions(
-              handoffSource: handoffSource,
-              complementHandoffSource: complementHandoffSource,
-              transport: handoffTransport,
-              prepLabel: "Hand off · Make-ahead",
-              pastePrepLabel: "Paste · Make-ahead",
-              complementLabel: "Hand off · Complement",
-              pasteComplementLabel: "Paste · Complement"
-            )
-          }
+        Button {
+          model.addSelectedDayToGroceriesButtonTapped()
+        } label: {
+          Label("Add Day to Groceries", systemImage: "cart.badge.plus")
         }
       } label: {
         Label("Day actions", systemImage: "ellipsis")

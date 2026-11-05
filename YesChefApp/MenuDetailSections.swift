@@ -1,3 +1,4 @@
+import LLMHandoffUI
 import SwiftUI
 import UniformTypeIdentifiers
 import YesChefCore
@@ -275,7 +276,7 @@ private struct MenuDaySection: View {
             pasteComplementLabel: "Paste · Complement"
           )
         } label: {
-          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+          Label("Hand off", systemImage: HandoffSymbol.handOff)
         }
         .accessibilityLabel("Hand off actions for Day \(dayNumber)")
       }
