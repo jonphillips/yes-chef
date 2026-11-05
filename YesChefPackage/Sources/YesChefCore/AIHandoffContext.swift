@@ -304,9 +304,10 @@ public struct MealPlanHandoffContext: Equatable, Sendable {
     You are suggesting dishes that complement this one meal-plan day. Keep every accepted suggestion on this fixed
     date; choose only its meal slot. Return a small number of concrete dishes that improve the day as a whole.
 
-    Return format: one blank-line-separated block per suggestion, exactly two lines each:
+    Return format: one blank-line-separated block per suggestion:
     Note: short dish name
     Date - Meal slot
+    optional short reason the dish fits this meal, plus any useful ingredient or method detail
 
     `Meal slot` must be Breakfast, Lunch, Dinner, or Snack. Do not return dates, recipe IDs, JSON, headings,
     Markdown bullets, or a merged meal plan. Return no blocks when nothing usefully complements the day.
@@ -418,7 +419,7 @@ public struct MenuHandoffContext: Equatable, Sendable {
     Return format: one blank-line-separated block per suggestion:
     Note: short dish name
     Day N - Meal slot
-    optional ingredient and method detail
+    optional short reason the dish fits this meal, plus any useful ingredient or method detail
 
     `N` must be an existing menu day and `Meal slot` must be Breakfast, Lunch, Dinner, or Snack. Keep any optional
     detail specific to that one dish. Do not return recipe IDs, JSON, headings, Markdown bullets, or a merged menu.

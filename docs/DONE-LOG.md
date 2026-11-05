@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-05 — Polish recipe links, complements, and sync sheet (`effort/polish-batch-2026-11`)
+
+- **Result:** Recipe links refresh the full-screen detail; calendar complement reasons survive review into notes; the Sync sheet is presented by Settings.
+- **Verification:** check-drift passed (766 package tests and 13 additional tests); generic iOS build passed; YesChefTests passed (113 tests).
+- **Owed:** polish-batch-2026-11's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-05 — One shared AI menu device pass cleared (`plan/polish-batch-2026-11`)
 
 - **Result:** The `handoff-menu` device gate is done, and its line is gone from `device-passes.md`.

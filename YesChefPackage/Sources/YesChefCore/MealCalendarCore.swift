@@ -381,7 +381,7 @@ public enum MealCalendarRepository {
       title: title,
       scheduledDate: scheduledDate,
       mealSlot: suggestion.mealSlot,
-      notes: nil,
+      notes: suggestion.body?.nonEmptyMealCalendarText,
       sortOrder: try nextSortOrder(on: scheduledDate, mealSlot: suggestion.mealSlot, in: db),
       dateCreated: now,
       dateModified: now

@@ -14,13 +14,12 @@ import AppKit
 /// carried after the CloudSyncKit lift.
 struct SyncStatusSection: View {
   let model: SyncHealthModel
-  @Environment(SyncActivityRecorder.self) private var activityRecorder
-  @State private var showingDetail = false
+  let showDetail: () -> Void
 
   var body: some View {
     Section {
       Button {
-        showingDetail = true
+        showDetail()
       } label: {
         HStack(spacing: 12) {
           SyncStatusDot(status: model.displayStatus)
@@ -34,9 +33,6 @@ struct SyncStatusSection: View {
       }
     } header: {
       Text("Sync")
-    }
-    .sheet(isPresented: $showingDetail) {
-      SyncStatusDetailView(model: model, activityRecorder: activityRecorder)
     }
   }
 }

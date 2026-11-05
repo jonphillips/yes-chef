@@ -183,11 +183,13 @@ extension MenuComplementClient: DependencyKey {
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 1536,
+      maxTokens: 4096,
       reasoningEffort: .medium,
       promptPreferenceKey: AIPromptPreferenceKind.complements.rawValue
     )
     let response = try await call.complete(using: modelClient)
+    guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
+    guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
     return parse(response.text)
   }
 
@@ -200,8 +202,8 @@ extension MenuComplementClient: DependencyKey {
     Return ONLY strict JSON:
     {"items":[{"kind":"note","title":"short dish name","body":"ingredients and method detail","dayOffset":0,"mealSlot":"dinner"}]}.
     Allowed kind values are "note" and "recipe"; use "note" for freeform suggested dishes that are not already
-    represented by an existing recipe row. "body" holds the ingredient/spice/method detail for that one dish
-    (omit it or use "" when there is no detail beyond the name). dayOffset is zero-based and must be valid for
+    represented by an existing recipe row. Optional "body" gives a short reason the dish fits this meal, plus any
+    useful ingredient or method detail (omit it or use "" when there is no detail). dayOffset is zero-based and must be valid for
     the menu context. Allowed mealSlot values are "breakfast", "lunch", "dinner", and "snack".
     Return {"items":[]} when there is no concrete dish to add.
     """

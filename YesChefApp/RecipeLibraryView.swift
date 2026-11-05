@@ -412,6 +412,7 @@ private struct RecipeFullScreenCover: View {
         hostsHandoffReviews: true,
         onRecipeSelected: onRecipeSelected
       )
+      .id(presentation.id)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Done") {

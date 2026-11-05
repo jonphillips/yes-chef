@@ -1,6 +1,5 @@
-# Next Up — Polish batch, November 2026
+# Next Up — nothing dispatched
 
-**Slices:** effort `polish-batch-2026-11`
-**Briefs:** [docs/efforts/polish-batch-2026-11.md](efforts/polish-batch-2026-11.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

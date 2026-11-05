@@ -13,7 +13,7 @@ extension RecipeCoreTests {
       let plan = MealPlanComplementClient.parse(
         """
         {"items":[
-          {"kind":"note","title":"  Cucumber herb salad  ","mealSlot":"dinner"},
+          {"kind":"note","title":"  Cucumber herb salad  ","body":"  Bright against the grilled main.  ","mealSlot":"dinner"},
           {"kind":"recipe","title":"Cardamom buns","mealSlot":"breakfast"},
           {"kind":"reservation","title":"Cafe brunch","mealSlot":"lunch"},
           {"kind":"note","title":"No slot"},
@@ -29,6 +29,7 @@ extension RecipeCoreTests {
             MealPlanComplementSuggestion(
               kind: .note,
               title: "Cucumber herb salad",
+              body: "Bright against the grilled main.",
               mealSlot: .dinner
             ),
             MealPlanComplementSuggestion(
@@ -51,8 +52,12 @@ extension RecipeCoreTests {
       let suggestion = MealPlanComplementSuggestion(
         kind: .note,
         title: "Cucumber herb salad",
+        body: "Brightens dinner.\nAdd fresh herbs.",
         mealSlot: .dinner
       )
+
+      let rendered = suggestion.editableReviewText(dayTitle: "Tuesday, July 8")
+      expectNoDifference(suggestion.applyingEditableReviewText(rendered), suggestion)
 
       let edited = suggestion.applyingEditableReviewText(
         """
@@ -93,7 +98,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func handoffParserKeepsUnknownSlotsAndSurplusLinesAsReviewEvidence() {
+    func handoffParserKeepsBodyAndUnknownSlotsAsReviewEvidence() {
       let parsed = MealPlanComplementPlan.parsingHandoffText(
         """
         Note: Charred peaches
@@ -106,18 +111,40 @@ extension RecipeCoreTests {
 
       expectNoDifference(
         parsed.plan.items,
-        [MealPlanComplementSuggestion(title: "Charred peaches", mealSlot: .snack)]
+        [MealPlanComplementSuggestion(
+          title: "Charred peaches", body: "Grill them over the coals after dinner.", mealSlot: .snack
+        )]
       )
       expectNoDifference(
         parsed.unparsedBlocks,
         [
-          "Grill them over the coals after dinner.",
           """
           Note: Cucumber herb salad
           Tuesday, July 8 - Dessert
           """,
         ]
       )
+    }
+
+    @Test
+    func mealPlanComplementClientFailsLoudlyWhenAStrictResponseIsTruncated() async {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(
+            text: #"{"items":[{"kind":"note","title":"Salad","body":"Bright.","mealSlot":"dinner"},{"kind":"note","#,
+            stopReason: "length"
+          )
+        }
+      } operation: {
+        await #expect(throws: StructuredModelResponseError.responseTruncated) {
+          _ = try await MealPlanComplementClient.liveValue(
+            selection: "What complements this day?",
+            messages: [],
+            context: "Meal plan context",
+            tier: .frontier(.anthropic)
+          )
+        }
+      }
     }
 
     @Test
@@ -268,6 +295,7 @@ extension RecipeCoreTests {
           MealPlanComplementSuggestion(
             kind: .recipe,
             title: "Roasted carrots",
+            body: "Their sweetness balances the meal.",
             mealSlot: .dinner
           ),
           on: scheduledDate,
@@ -279,6 +307,7 @@ extension RecipeCoreTests {
         let complement = try #require(try MealPlanItem.find(complementID).fetchOne(db))
         expectNoDifference(complement.sortOrder, 1)
         expectNoDifference(complement.title, "Roasted carrots")
+        expectNoDifference(complement.notes, "Their sweetness balances the meal.")
         expectNoDifference(complement.kind, .note)
         expectNoDifference(complement.recipeID, nil)
         expectNoDifference(complement.scheduledDate, scheduledDate)

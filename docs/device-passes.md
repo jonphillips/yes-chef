@@ -14,6 +14,7 @@ points here. The executor never reads this file; it only appends its own gate th
 Dev, on CloudKit Development.
 
 ## Owed now
+- **polish-batch-2026-11:** On iPad and iPhone, check linked Serve With, Related Recipes and Drafted From recipes in a Menu cover; calendar and Menu complement reasons through review and insertion; and repeated Sync sheet opening, including during sync. ([brief](efforts/archive/polish-batch-2026-11.md))
 
 ## Held
 
