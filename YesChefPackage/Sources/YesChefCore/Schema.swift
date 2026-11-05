@@ -1065,10 +1065,11 @@ extension DependencyValues {
           continue
         }
         for row in rows {
-          try RecipeServeWith.insert {
-            row
-          }
-          .execute(db)
+          try #sql("""
+            INSERT INTO "recipeServeWith" ("id", "recipeID", "title", "note", "sortOrder", "provenance", "dateCreated", "dateModified")
+            VALUES (\(bind: row.id), \(bind: row.recipeID), \(bind: row.title), \(bind: row.note),
+              \(bind: row.sortOrder), \(bind: row.provenance), \(bind: row.dateCreated), \(bind: row.dateModified))
+            """).execute(db)
         }
       }
     }
@@ -1353,6 +1354,10 @@ extension DependencyValues {
           "version" INTEGER NOT NULL
         ) STRICT
         """)
+    }
+
+    migrator.registerMigration("Add Serve With recipe link") { db in
+      try db.execute(sql: #"ALTER TABLE "recipeServeWith" ADD COLUMN "linkedRecipeID" TEXT"#)
     }
 
     try migrator.migrate(database)

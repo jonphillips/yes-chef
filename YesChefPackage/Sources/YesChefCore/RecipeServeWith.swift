@@ -5,6 +5,7 @@ import SQLiteData
 public struct RecipeServeWith: Codable, Identifiable, Equatable, Sendable {
   public let id: UUID
   public var recipeID: Recipe.ID
+  public var linkedRecipeID: Recipe.ID?
   public var title: String
   public var note: String?
   public var sortOrder: Int
@@ -15,6 +16,7 @@ public struct RecipeServeWith: Codable, Identifiable, Equatable, Sendable {
   public init(
     id: UUID,
     recipeID: Recipe.ID,
+    linkedRecipeID: Recipe.ID? = nil,
     title: String,
     note: String? = nil,
     sortOrder: Int,
@@ -24,6 +26,7 @@ public struct RecipeServeWith: Codable, Identifiable, Equatable, Sendable {
   ) {
     self.id = id
     self.recipeID = recipeID
+    self.linkedRecipeID = linkedRecipeID
     self.title = title
     self.note = note
     self.sortOrder = sortOrder

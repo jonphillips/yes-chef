@@ -1729,7 +1729,7 @@ extension RecipeRepository {
     for row in rows {
       try RecipeServeWith.insert {
         RecipeServeWith(
-          id: uuid(), recipeID: recipeID, title: row.title, note: row.note,
+          id: uuid(), recipeID: recipeID, linkedRecipeID: row.linkedRecipeID, title: row.title, note: row.note,
           sortOrder: row.sortOrder, provenance: row.provenance, dateCreated: now, dateModified: now
         )
       }

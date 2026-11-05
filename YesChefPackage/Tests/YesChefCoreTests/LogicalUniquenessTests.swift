@@ -13,6 +13,43 @@ extension RecipeCoreTests {
   @Suite
   struct ImportDuplicateConvergenceTests {
     @Test
+    func incomingServeWithLinkPreventsDuplicateMerge() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 814_000_000)
+      let winner = SampleUUIDSequence.uuid(96_100)
+      let target = SampleUUIDSequence.uuid(96_101)
+      let owner = SampleUUIDSequence.uuid(96_102)
+      let incoming = SampleUUIDSequence.uuid(96_103)
+      let sourceURL = "https://example.com/linked-duplicate"
+      try database.write { db in
+        for id in [winner, target, owner] {
+          try Recipe.insert { Recipe(id: id, title: "Recipe", dateCreated: now, dateModified: now) }.execute(db)
+        }
+        for (id, recipeID, date) in [
+          (SampleUUIDSequence.uuid(96_104), winner, now),
+          (SampleUUIDSequence.uuid(96_105), target, now.addingTimeInterval(1)),
+        ] {
+          try RecipeImportRef.insert {
+            RecipeImportRef(id: id, recipeID: recipeID, normalizedSourceURL: sourceURL,
+              normalizedTitle: "recipe", dateCreated: date)
+          }.execute(db)
+        }
+        try RecipeServeWith.insert {
+          RecipeServeWith(id: SampleUUIDSequence.uuid(96_106), recipeID: owner, linkedRecipeID: target,
+            title: "Side", sortOrder: 0, provenance: .model, dateCreated: now, dateModified: now)
+        }.execute(db)
+        _ = try RecipeRepository.importBundle(
+          RecipeBundleCoding.RecipeBundle(
+            recipe: Recipe(id: incoming, title: "Recipe", dateCreated: now, dateModified: now),
+            source: RecipeSource(id: SampleUUIDSequence.uuid(96_107), recipeID: incoming, url: sourceURL)
+          ), in: db, now: now, uuid: UUID.init
+        )
+        #expect(try Recipe.find(target).fetchOne(db) != nil)
+        #expect(try RecipeServeWith.find(SampleUUIDSequence.uuid(96_106)).fetchOne(db)?.linkedRecipeID == target)
+      }
+    }
+
+    @Test
     func sourceBackedImportIdentityConvergesDuplicateRefsAndRecipeReferences() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 814_000_000)

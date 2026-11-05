@@ -581,7 +581,7 @@ extension RecipeRepository {
     if try RecipeVariation.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeActiveVariation.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeDeliberationLogEntry.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
-    if try RecipeServeWith.where({ $0.recipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
+    if try RecipeServeWith.where({ $0.recipeID.eq(recipeID) || $0.linkedRecipeID.eq(recipeID) }).fetchOne(db) != nil { return false }
     if try RecipeRelatedRecipe.where({
       $0.recipeID.eq(recipeID) || $0.relatedRecipeID.eq(recipeID)
     }).fetchOne(db) != nil { return false }

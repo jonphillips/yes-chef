@@ -1,6 +1,6 @@
-# Next Up — Serve With recipe links
+# Next Up — One shared AI menu
 
-**Slices:** effort `serve-with-recipe-links`
-**Briefs:** [docs/efforts/serve-with-recipe-links.md](efforts/serve-with-recipe-links.md)
+**Slices:** effort `handoff-menu`
+**Briefs:** [docs/efforts/handoff-menu.md](efforts/handoff-menu.md)
 **Done when:** per the brief
 **Owed:** see [device-passes.md](device-passes.md)

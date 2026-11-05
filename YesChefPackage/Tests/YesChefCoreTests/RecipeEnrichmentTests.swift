@@ -9,6 +9,70 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeEnrichmentTests {
     @Test
+    func legacyServeWithRowsDecodeWithoutLink() throws {
+      let row = RecipeServeWith(
+        id: UUID(), recipeID: UUID(), title: "Bread", sortOrder: 0, provenance: .model,
+        dateCreated: Date(), dateModified: Date()
+      )
+      let encoded = try JSONEncoder().encode(row)
+      var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+      object.removeValue(forKey: "linkedRecipeID")
+      let decoded = try JSONDecoder().decode(RecipeServeWith.self, from: JSONSerialization.data(withJSONObject: object))
+      #expect(decoded == row)
+    }
+
+    @Test
+    func serveWithLinksSurviveEditsAndRegenerationAndResolveOnRead() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 826_000_000)
+      let owner = SampleUUIDSequence.uuid(96_000)
+      let target = SampleUUIDSequence.uuid(96_001)
+      let missing = SampleUUIDSequence.uuid(96_002)
+      let linked = SampleUUIDSequence.uuid(96_003)
+      let unlinked = SampleUUIDSequence.uuid(96_004)
+      let absent = SampleUUIDSequence.uuid(96_005)
+      let retained = SampleUUIDSequence.uuid(96_006)
+      try database.write { db in
+        for id in [owner, target] {
+          try Recipe.insert { Recipe(id: id, title: "Recipe", dateCreated: now, dateModified: now) }.execute(db)
+        }
+        for row in [
+          RecipeServeWith(id: linked, recipeID: owner, title: "Bread", note: "Warm", sortOrder: 0,
+            provenance: .model, dateCreated: now, dateModified: now),
+          RecipeServeWith(id: unlinked, recipeID: owner, title: "Slaw", sortOrder: 1,
+            provenance: .model, dateCreated: now, dateModified: now),
+          RecipeServeWith(id: absent, recipeID: owner, linkedRecipeID: missing, title: "Missing", sortOrder: 2,
+            provenance: .handAuthored, dateCreated: now, dateModified: now),
+          RecipeServeWith(id: retained, recipeID: owner, linkedRecipeID: target, title: "Corn", sortOrder: 3,
+            provenance: .model, dateCreated: now, dateModified: now),
+        ] { try RecipeServeWith.insert { row }.execute(db) }
+        try RecipeServeWithRepository.setLink(id: linked, linkedRecipeID: target, in: db, now: now)
+        try RecipeServeWithRepository.update(id: linked, title: "Bread", note: "Toast", in: db, now: now)
+        try RecipeServeWithRepository.replaceModelSuggestions(
+          [ServeWithSuggestion(title: "Bread", note: "Different")], for: owner, in: db, now: now, uuid: UUID.init
+        )
+        let rows = try RecipeServeWithRepository.serveWith(for: owner, in: db)
+        #expect(rows.count == 3)
+        #expect(rows.first { $0.id == retained }?.provenance == .model)
+        #expect(rows.first { $0.id == linked }?.linkedRecipeID == target)
+        #expect(rows.first { $0.id == linked }?.provenance == .model)
+        #expect(try RecipeRepository.fetchDetail(recipeID: owner, in: db)?.resolvedServeWithRecipeIDs == [target])
+        try Recipe.find(target).update { $0.archived = #bind(true) }.execute(db)
+        #expect(try RecipeRepository.fetchDetail(recipeID: owner, in: db)?.resolvedServeWithRecipeIDs.isEmpty == true)
+        try Recipe.find(target).update { $0.archived = #bind(false) }.execute(db)
+        #expect(try RecipeRepository.fetchDetail(recipeID: owner, in: db)?.resolvedServeWithRecipeIDs == [target])
+        try RecipeRepository.permanentlyDelete(recipeID: target, in: db)
+        let preserved = try #require(try RecipeServeWith.find(linked).fetchOne(db))
+        #expect(preserved.linkedRecipeID == nil)
+        #expect(preserved.title == "Bread" && preserved.note == "Toast")
+        try RecipeServeWithRepository.setLink(id: absent, linkedRecipeID: nil, in: db, now: now)
+        #expect(try RecipeServeWith.find(absent).fetchOne(db)?.linkedRecipeID == nil)
+        try RecipeServeWithRepository.deleteAll(for: owner, in: db, now: now)
+        #expect(try RecipeServeWithRepository.serveWith(for: owner, in: db).isEmpty)
+      }
+    }
+
+    @Test
     func ingredientReaderPresentationPromotesMeasureAndItemWhenFieldsCoverSource() {
       let line = IngredientLine(
         id: SampleUUIDSequence.uuid(36_500),

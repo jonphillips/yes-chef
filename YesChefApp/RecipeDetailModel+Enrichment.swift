@@ -221,7 +221,7 @@ extension RecipeDetailModel {
     createServeWith(title: text, note: nil)
   }
 
-  func createServeWith(title text: String, note: String?) -> Bool {
+  func createServeWith(title text: String, note: String?, linkedRecipeID: Recipe.ID? = nil) -> Bool {
     let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
     let trimmedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else { return false }
@@ -231,6 +231,7 @@ extension RecipeDetailModel {
           [ServeWithSuggestion(title: title, note: trimmedNote?.isEmpty == false ? trimmedNote : nil)],
           to: recipeID,
           provenance: .handAuthored,
+          linkedRecipeID: linkedRecipeID,
           in: db,
           now: now,
           uuid: { uuid() }
@@ -269,6 +270,49 @@ extension RecipeDetailModel {
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
+    }
+  }
+
+  func saveServeWith(_ item: RecipeServeWith, title text: String, note: String?, linkedRecipeID: Recipe.ID?) -> Bool {
+    let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !title.isEmpty else { return false }
+    do {
+      try database.write { db in
+        try RecipeServeWithRepository.update(id: item.id, title: title, note: note, in: db, now: now)
+        if linkedRecipeID != item.linkedRecipeID {
+          try RecipeServeWithRepository.setLink(id: item.id, linkedRecipeID: linkedRecipeID, in: db, now: now)
+        }
+      }
+      return true
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+      return false
+    }
+  }
+
+  func serveWithLinkedRecipeTitle(_ id: Recipe.ID) async -> String? {
+    do {
+      return try await database.read { db in try Recipe.find(id).fetchOne(db)?.title }
+    } catch is CancellationError {
+      return nil
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return nil
+    }
+  }
+
+  func loadServeWithPickerRows() async -> Bool {
+    do {
+      relatedRecipePickerRows = try await database.read { db in
+        try RecipeRepository.relatedRecipePickerRows(in: db)
+      }
+      return true
+    } catch {
+      errorMessage = error.localizedDescription
+      isShowingError = true
+      return false
     }
   }
 
