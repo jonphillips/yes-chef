@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Dependencies
 import Foundation
 import Observation

@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Dependencies
 import Foundation
 import LLMHandoffKit
@@ -269,7 +270,7 @@ struct ChatAccessInboxModelTests {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let suiteName = "ChatAccessInboxModelTests-\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
-    return (ChatAccessFolder(containerURL: temporary), defaults, suiteName, temporary)
+    return (ChatAccessFolder(containerURL: temporary, isDevelopment: false), defaults, suiteName, temporary)
   }
 
   private func makeRow(in folder: ChatAccessFolder) -> ChatAccessInbox.Row {

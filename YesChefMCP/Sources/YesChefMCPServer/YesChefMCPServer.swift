@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Foundation
 import LLMHandoffKit
 import MCPServerKit
@@ -25,6 +26,7 @@ private struct StageRecipeResult: Encodable, Sendable {
 private struct StageContext: Sendable {
   let containerURL: URL
   let now: @Sendable () -> Date
+  let isDevelopment: Bool
 
   func stage(_ recipe: MCPValue) throws -> StageRecipeResult {
     let data = try JSONEncoder().encode(recipe)
@@ -69,7 +71,7 @@ private struct StageContext: Sendable {
     guard FileManager.default.fileExists(atPath: containerURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
       throw StageContainerUnavailable(path: containerURL.path)
     }
-    return ChatAccessFolder(containerURL: containerURL)
+    return ChatAccessFolder(containerURL: containerURL, isDevelopment: isDevelopment)
   }
 }
 
@@ -99,11 +101,12 @@ public enum YesChefMCPServer {
   public static func make(
     containerURL: URL = FileManager.default.homeDirectoryForCurrentUser
       .appending(path: "Library/Mobile Documents/iCloud~com~jonphillips~yeschef", directoryHint: .isDirectory),
+    isDevelopment: Bool = false,
     now: @escaping @Sendable () -> Date = { Date() },
     exportMaterializer: (@Sendable (URL) async throws -> Data)? = nil,
     materializationDeadline: Duration = .seconds(60)
   ) -> MCPServer {
-    let context = StageContext(containerURL: containerURL, now: now)
+    let context = StageContext(containerURL: containerURL, now: now, isDevelopment: isDevelopment)
     let recipeSchema: MCPValue = .object([
       "type": .string("object"),
       "additionalProperties": .bool(true),
@@ -162,7 +165,7 @@ public enum YesChefMCPServer {
             return .error(error.localizedDescription)
           }
         },
-      ] + ChatAccessReadTools.make(containerURL: containerURL, now: now, materialize: exportMaterializer, materializationDeadline: materializationDeadline)
+      ] + ChatAccessReadTools.make(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: exportMaterializer, materializationDeadline: materializationDeadline)
     )
   }
 }

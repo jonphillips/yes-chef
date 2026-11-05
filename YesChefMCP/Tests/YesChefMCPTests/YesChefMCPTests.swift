@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Foundation
 import LLMHandoffKit
 import MCPServerKit
@@ -26,7 +27,7 @@ struct YesChefMCPTests {
     #expect(content?.contains("\"next\":\"Jon reviews and saves it in Yes Chef → Create Recipe.\"") == true)
     #expect(!content.orEmpty.contains(container.path))
 
-    let inboxURL = ChatAccessFolder(containerURL: container).inboxURL
+    let inboxURL = ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL
     let inbox = HandoffInbox(root: inboxURL, fileExtension: "json")
     let staged = try #require(try inbox.list().first)
     #expect(!staged.url.lastPathComponent.contains(":"))
@@ -40,7 +41,7 @@ struct YesChefMCPTests {
   @Test func readToolsServeTextOnlyResultsAndRejectOldRefs() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exportFolder = ChatAccessFolder(containerURL: container).exportsURL
+    let exportFolder = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exportFolder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
     let fixedDate = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
@@ -128,7 +129,7 @@ struct YesChefMCPTests {
   @Test func materializerSeamSuccessResolvesRecipeNamesInMenu() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    let exports = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
     let date = Date(timeIntervalSince1970: 1_800_000_000)
@@ -161,7 +162,7 @@ struct YesChefMCPTests {
   @Test func materializerSeamReturnsTimeoutErrorWithoutWaitingSixtySeconds() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    let exports = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
     try Data("placeholder".utf8).write(to: exports.appending(path: "install.json"))
     defer { try? FileManager.default.removeItem(at: temporary) }
@@ -177,7 +178,7 @@ struct YesChefMCPTests {
   @Test func recipeSearchUsesTwentyDefaultAndFiftyMaximum() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    let exports = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
     let date = Date(timeIntervalSince1970: 1_800_000_000)
@@ -205,7 +206,7 @@ struct YesChefMCPTests {
     let responseObject = try object(response)["result"]?.objectValue ?? [:]
     #expect(responseObject["isError"] == .bool(true))
     #expect(responseObject["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue?.contains("ingredients and instructions") == true)
-    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container).inboxURL.path))
+    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL.path))
   }
 
   @Test func missingContainerReturnsErrorWithoutCreatingIt() async throws {
@@ -253,7 +254,7 @@ struct YesChefMCPTests {
       #expect(result["warning"] == nil)
       #expect(result["next"]?.stringValue == "Staged for review on the device that started this hand-off. Jon opens it from From Chat there.")
     }
-    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container).inboxURL, fileExtension: "ycreturn")
+    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL, fileExtension: "ycreturn")
     let files = try inbox.list()
     #expect(files.count == 2)
     for file in files {
@@ -280,7 +281,7 @@ struct YesChefMCPTests {
       #expect(try object(response)["result"]?.objectValue?["isError"] == .bool(true))
       #expect(try toolText(response).contains(message))
     }
-    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container).inboxURL.path))
+    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL.path))
   }
 
   @Test func olderAndMissingMarkersStageWithWarnings() async throws {
@@ -294,7 +295,7 @@ struct YesChefMCPTests {
       #expect(try object(response)["result"]?.objectValue?["isError"] != .bool(true))
       #expect(try object(toolText(response))["warning"]?.stringValue != nil)
     }
-    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container).inboxURL, fileExtension: "ycreturn")
+    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL, fileExtension: "ycreturn")
     #expect(try inbox.list().count == 2)
   }
 

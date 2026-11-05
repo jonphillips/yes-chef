@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Darwin
 import MCPServerKit
 import YesChefMCPServer
@@ -6,6 +7,6 @@ import YesChefMCPServer
 enum YesChefMCP {
   static func main() async {
     _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_ON)
-    await YesChefMCPServer.make().run()
+    await YesChefMCPServer.make(isDevelopment: ChatAccessHelperFolder.isDevelopment(arguments: CommandLine.arguments)).run()
   }
 }

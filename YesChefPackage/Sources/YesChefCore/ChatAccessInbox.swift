@@ -3,9 +3,6 @@ import LLMHandoffKit
 
 /// Pure projections for the file-backed Chat Access inbox.
 public enum ChatAccessInbox {
-  /// The dispatched recovery window for mistakenly discarded staged recipes.
-  public static let processedRetentionInterval: TimeInterval = 30 * 24 * 60 * 60
-
   public enum DownloadState: Equatable, Sendable {
     case current
     case downloading
@@ -38,16 +35,6 @@ public enum ChatAccessInbox {
       self.name = name
       self.stagedAt = stagedAt
       self.downloadState = downloadState
-    }
-  }
-
-  public struct ProcessedSnapshot: Sendable {
-    public let url: URL
-    public let modifiedAt: Date?
-
-    public init(url: URL, modifiedAt: Date?) {
-      self.url = url
-      self.modifiedAt = modifiedAt
     }
   }
 
@@ -129,15 +116,6 @@ public enum ChatAccessInbox {
     return lhs.id.compare(rhs.id, options: .numeric) == .orderedAscending
   }
 
-  public static func expiredReturns(_ urls: [URL], inbox: URL, now: Date) -> [URL] {
-    urls.filter { url in
-      guard url.deletingLastPathComponent().standardizedFileURL == inbox.standardizedFileURL,
-        url.pathExtension == "ycreturn", let staged = StagedHandoff(url: url)
-      else { return false }
-      return now.timeIntervalSince(staged.stagedAt) > processedRetentionInterval
-    }
-  }
-
   public static func rows(from snapshots: [MetadataSnapshot]) -> [Row] {
     snapshots.compactMap { snapshot in
       guard snapshot.url.pathExtension == "json", let handoff = StagedHandoff(url: snapshot.url) else { return nil }
@@ -167,14 +145,4 @@ public enum ChatAccessInbox {
     return trimmedTitle.isEmpty ? nil : trimmedTitle
   }
 
-  public static func expired(_ snapshots: [ProcessedSnapshot], now: Date) -> [URL] {
-    snapshots.compactMap { snapshot in
-      let stagedAt = StagedHandoff(url: snapshot.url)?.stagedAt
-      let date = snapshot.url.pathExtension == "ycreturn" ? (snapshot.modifiedAt ?? stagedAt) : (stagedAt ?? snapshot.modifiedAt)
-      guard let date,
-        now.timeIntervalSince(date) > processedRetentionInterval
-      else { return nil }
-      return snapshot.url
-    }
-  }
 }

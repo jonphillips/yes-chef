@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Dependencies
 import Foundation
 import Testing
@@ -9,7 +10,7 @@ import YesChefCore
 struct ChatAccessExportModelTests {
   @Test func refreshWritesThroughInjectedFolderResolution() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let folder = ChatAccessFolder(containerURL: temporary)
+    let folder = ChatAccessFolder(containerURL: temporary, isDevelopment: false)
     let suiteName = "ChatAccessExportModelTests-\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer {

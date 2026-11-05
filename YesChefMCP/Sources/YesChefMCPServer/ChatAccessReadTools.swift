@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Foundation
 import MCPServerKit
 import YesChefCore
@@ -18,8 +19,8 @@ private actor ChatAccessExportStore {
   private var cachedKey: String?
   private var cachedSnapshot: ExportSnapshot?
 
-  init(containerURL: URL, now: @escaping @Sendable () -> Date, materialize: @escaping @Sendable (URL) async throws -> Data, materializationDeadline: Duration) {
-    self.directory = ChatAccessFolder(containerURL: containerURL).exportsURL
+  init(containerURL: URL, isDevelopment: Bool, now: @escaping @Sendable () -> Date, materialize: @escaping @Sendable (URL) async throws -> Data, materializationDeadline: Duration) {
+    self.directory = ChatAccessFolder(containerURL: containerURL, isDevelopment: isDevelopment).exportsURL
     self.now = now
     self.materialize = materialize
     self.materializationDeadline = materializationDeadline
@@ -159,12 +160,13 @@ enum ChatAccessReadTools {
 
   static func make(
     containerURL: URL,
+    isDevelopment: Bool,
     now: @escaping @Sendable () -> Date,
     materialize: (@Sendable (URL) async throws -> Data)? = nil,
     materializationDeadline: Duration = .seconds(60)
   ) -> [MCPTool] {
     let reader = materialize ?? { url in try await Task.detached(priority: .utility) { try ChatAccessExportStore.coordinatedRead(url) }.value }
-    let store = ChatAccessExportStore(containerURL: containerURL, now: now, materialize: reader, materializationDeadline: materializationDeadline)
+    let store = ChatAccessExportStore(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: reader, materializationDeadline: materializationDeadline)
     return [
       tool("search_recipes", "Search recipes by name, ingredients, categories, and notes.", schema: objectSchema(["query": stringSchema, "limit": integerSchema], required: ["query"])) { input in
         let args = arguments(input)

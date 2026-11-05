@@ -30,17 +30,6 @@ struct ChatAccessInboxTests {
     #expect(rows.contains { if case .unreadable = $0.destination { true } else { false } })
   }
 
-  @Test func returnExpiryOnlySelectsOldReturnsInInbox() {
-    let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
-    let now = ISO8601DateFormatter().date(from: "2027-02-15T08:00:00Z")!
-    let old = root.appending(path: "20270115T080000Z-old.ycreturn")
-    let recent = root.appending(path: "20270214T080000Z-new.ycreturn")
-    let recipe = root.appending(path: "20270115T080000Z-old.json")
-    let processed = root.appending(path: "Processed/20270115T080000Z-old.ycreturn")
-    #expect(ChatAccessInbox.expiredReturns([old, recent, recipe, processed], inbox: root, now: now) == [old])
-    #expect(ChatAccessInbox.expired([.init(url: processed, modifiedAt: now)], now: now).isEmpty)
-  }
-
   @Test func returnsStagedInSameSecondUseCollisionSequence() throws {
     let id = UUID()
     let handoff = AIHandoff(id: id, sourceType: .menu, sourceID: UUID(), taskType: .prepPlan,
@@ -82,23 +71,6 @@ struct ChatAccessInboxTests {
     let text = #"{"@context":"https://schema.org","@type":"Recipe","name":"Crème Brûlée","recipeIngredient":["1 cup cream"],"recipeInstructions":[{"@type":"HowToStep","text":"Heat the cream."}]}"#
     #expect(ChatAccessInbox.recipeName(from: text) == "Crème Brûlée")
     #expect(ChatAccessInbox.recipeName(from: "not json") == nil)
-  }
-
-  @Test func expirationUsesStagingDateAndFallsBackToModificationDate() {
-    let root = URL(fileURLWithPath: "/tmp/MCP/Inbox/Processed", isDirectory: true)
-    let now = ISO8601DateFormatter().date(from: "2027-02-15T08:00:00Z")!
-    let expiredDate = now.addingTimeInterval(-ChatAccessInbox.processedRetentionInterval - 1)
-    let recentDate = now.addingTimeInterval(-ChatAccessInbox.processedRetentionInterval + 1)
-    let fromName = root.appending(path: "20270115T080000Z-old.json")
-    let fallback = root.appending(path: "unparseable.json")
-    let recent = root.appending(path: "20270117T080000Z-recent.json")
-    let snapshots = [
-      ChatAccessInbox.ProcessedSnapshot(url: fromName, modifiedAt: recentDate),
-      ChatAccessInbox.ProcessedSnapshot(url: fallback, modifiedAt: expiredDate),
-      ChatAccessInbox.ProcessedSnapshot(url: recent, modifiedAt: expiredDate),
-    ]
-
-    #expect(ChatAccessInbox.expired(snapshots, now: now) == [fromName, fallback])
   }
 
   @Test func stagingRejectsMalformedAndIncompleteContractsWithTypedReasons() throws {

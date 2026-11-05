@@ -10,6 +10,7 @@ let package = Package(
   ],
   dependencies: [
     .package(path: "../YesChefPackage"),
+    .package(path: "../../../jon-platform/packages/ChatAccessKit"),
     .package(path: "../../../jon-platform/packages/MCPServerKit"),
     .package(path: "../../../jon-platform/packages/LLMHandoffKit"),
   ],
@@ -18,14 +19,15 @@ let package = Package(
       name: "YesChefMCPServer",
       dependencies: [
         .product(name: "YesChefCore", package: "YesChefPackage"),
+        .product(name: "ChatAccessKit", package: "ChatAccessKit"),
         .product(name: "MCPServerKit", package: "MCPServerKit"),
         .product(name: "LLMHandoffKit", package: "LLMHandoffKit"),
       ]
     ),
-    .executableTarget(name: "YesChefMCP", dependencies: ["YesChefMCPServer", .product(name: "MCPServerKit", package: "MCPServerKit")]),
+    .executableTarget(name: "YesChefMCP", dependencies: ["YesChefMCPServer", .product(name: "ChatAccessKit", package: "ChatAccessKit"), .product(name: "MCPServerKit", package: "MCPServerKit")]),
     .testTarget(
       name: "YesChefMCPTests",
-      dependencies: ["YesChefMCPServer", .product(name: "MCPServerKit", package: "MCPServerKit")]
+      dependencies: ["YesChefMCPServer", .product(name: "ChatAccessKit", package: "ChatAccessKit"), .product(name: "MCPServerKit", package: "MCPServerKit")]
     ),
   ],
   swiftLanguageModes: [.v6]
