@@ -1,3 +1,4 @@
+import LLMHandoffUI
 import SwiftUI
 import SwiftUINavigation
 import UIKit
@@ -85,7 +86,7 @@ struct RecipeDetailView: View {
           onRecipeSelected: onRecipeSelected
         )
       }
-      .handoffReviewDestinations()
+      .workbenchHandoffReviewHost()
     }
     .sheet(item: $model.destination.repairServeWith) { presentation in
       ServeWithRepairSheet(presentation: presentation, save: model.repairServeWith)
@@ -181,48 +182,23 @@ struct RecipeDetailView: View {
       } label: {
         Label("Plan", systemImage: "calendar.badge.plus")
       }
-      Menu {
-        // `PasteButton` does not render inside a `Menu`, so this stays a plain button that reads the
-        // pasteboard directly, matching the scoped Playbook hand-off menu (ADR-0041 Amd 1).
-        Button {
-          // The hand-off exports the base recipe even when a variation is displayed, so confirm rather
-          // than let the cook argue for an hour about text the return cannot apply to (Amd1-OQ3).
+      HandoffMenu(
+        handOff: {
           if model.activeVariation == nil {
             copyAdjustmentPrompt()
           } else {
             isConfirmingBaseRecipeHandoff = true
           }
-        } label: {
-          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-        }
-
-        Button {
-          // A declined paste alert (or a non-string clipboard) yields nil. Hand the empty case to the
-          // transport rather than returning silently, so the tap always produces visible feedback.
+        },
+        paste: {
           let results = UIPasteboard.general.string.map { [$0] } ?? []
-          Task {
-            await handoffTransport.pastedResultsReceived(
-              results,
-              source: .recipe(model.recipeID)
-            )
-          }
-        } label: {
-          Label("Paste", systemImage: "doc.on.clipboard")
-        }
-
-        Toggle(isOn: Binding(
+          Task { await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID)) }
+        },
+        isAskActive: Binding(
           get: { model.destination.chat != nil },
-          set: { isOpen in
-            if isOpen != (model.destination.chat != nil) {
-              model.askButtonTapped()
-            }
-          }
-        )) {
-          Label("Ask now", systemImage: "sparkles")
-        }
-      } label: {
-        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-      }
+          set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
+        )
+      )
     }
     ToolbarItemGroup(placement: .secondaryAction) {
       Button {

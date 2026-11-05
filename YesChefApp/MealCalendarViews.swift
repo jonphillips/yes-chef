@@ -1,4 +1,6 @@
+import LLMHandoffUI
 import SwiftUI
+import UIKit
 import YesChefCore
 
 struct MealCalendarWorkspaceView: View {
@@ -10,6 +12,7 @@ struct MealCalendarWorkspaceView: View {
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
   @State private var chatModel: RecipeChatModel?
+  @State private var handoffTransport = HandoffInAppTransport()
 
   var body: some View {
     calendarContent
@@ -33,6 +36,8 @@ struct MealCalendarWorkspaceView: View {
         )
       }
     }
+    .onAppear { handoffTransport.toastCenter = model.toastCenter }
+    .handoffTransportAlert(handoffTransport)
     .onChange(of: mealPlanChatContext) { _, context in
       chatModel?.updateContext(context)
     }
@@ -46,6 +51,7 @@ struct MealCalendarWorkspaceView: View {
       MealCalendarNavigationToolbar(
         model: model,
         chatButtonTapped: chatButtonTapped,
+        handoffTransport: handoffTransport,
         isChatOpen: chatModel != nil
       )
     }
@@ -58,7 +64,6 @@ struct MealCalendarWorkspaceView: View {
           model: model,
           agendaWidth: agendaWidth(for: geometry.size.width),
           weekCellMinHeight: weekCellHeight(for: geometry.size.height),
-          chatButtonTapped: chatButtonTapped,
           onMenuSelected: onMenuSelected,
           onRecipeSelected: onRecipeSelected,
           onCookSessionRequested: onCookSessionRequested
@@ -70,7 +75,6 @@ struct MealCalendarWorkspaceView: View {
           monthCellMinHeight: 104,
           weekCellMinHeight: 260,
           maxContentWidth: 1120,
-          chatButtonTapped: chatButtonTapped,
           onMenuSelected: onMenuSelected,
           onRecipeSelected: onRecipeSelected,
           onCookSessionRequested: onCookSessionRequested
@@ -115,7 +119,6 @@ private struct MealCalendarWideWorkspace: View {
   let model: MealCalendarModel
   let agendaWidth: CGFloat
   let weekCellMinHeight: CGFloat
-  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -128,7 +131,6 @@ private struct MealCalendarWideWorkspace: View {
         monthCellMinHeight: 118,
         weekCellMinHeight: weekCellMinHeight,
         maxContentWidth: nil,
-        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -139,7 +141,6 @@ private struct MealCalendarWideWorkspace: View {
 
       MealCalendarAgendaRail(
         model: model,
-        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -156,7 +157,6 @@ private struct MealCalendarStackedContent: View {
   var monthCellMinHeight: CGFloat
   var weekCellMinHeight: CGFloat
   var maxContentWidth: CGFloat?
-  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -170,7 +170,6 @@ private struct MealCalendarStackedContent: View {
           model: model,
           monthCellMinHeight: monthCellMinHeight,
           weekCellMinHeight: weekCellMinHeight,
-          chatButtonTapped: chatButtonTapped,
           onMenuSelected: onMenuSelected,
           onRecipeSelected: onRecipeSelected,
           onCookSessionRequested: onCookSessionRequested
@@ -181,7 +180,6 @@ private struct MealCalendarStackedContent: View {
           MealCalendarDayAgendaView(
             model: model,
             showsHeader: true,
-            chatButtonTapped: chatButtonTapped,
             onMenuSelected: onMenuSelected,
             onRecipeSelected: onRecipeSelected,
             onCookSessionRequested: onCookSessionRequested
@@ -201,7 +199,6 @@ private struct MealCalendarCalendarBody: View {
   let model: MealCalendarModel
   var monthCellMinHeight: CGFloat
   var weekCellMinHeight: CGFloat
-  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -227,7 +224,6 @@ private struct MealCalendarCalendarBody: View {
       MealCalendarDayAgendaView(
         model: model,
         showsHeader: true,
-        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -238,7 +234,6 @@ private struct MealCalendarCalendarBody: View {
 
 private struct MealCalendarAgendaRail: View {
   let model: MealCalendarModel
-  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
@@ -248,7 +243,6 @@ private struct MealCalendarAgendaRail: View {
       MealCalendarDayAgendaView(
         model: model,
         showsHeader: true,
-        chatButtonTapped: chatButtonTapped,
         onMenuSelected: onMenuSelected,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
@@ -263,7 +257,8 @@ private struct MealCalendarAgendaRail: View {
 
 private struct MealCalendarNavigationToolbar: ToolbarContent {
   let model: MealCalendarModel
-  var chatButtonTapped: (() -> Void)?
+  let chatButtonTapped: () -> Void
+  let handoffTransport: HandoffInAppTransport
   var isChatOpen: Bool
 
   var body: some ToolbarContent {
@@ -273,21 +268,15 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
       } label: {
         Label("Today", systemImage: "calendar.badge.clock")
       }
-      if let chatButtonTapped {
-        Menu {
-          Toggle(isOn: Binding(
-            get: { isChatOpen },
-            set: { isOpen in
-              if isOpen != isChatOpen {
-                chatButtonTapped()
-              }
-            }
-          )) {
-            Label("Ask now", systemImage: "sparkles")
-          }
-        } label: {
-          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-        }
+      HandoffMenu(
+        paste: { performHandoff(paste: true) },
+        isAskActive: Binding(
+          get: { isChatOpen },
+          set: { if $0 != isChatOpen { chatButtonTapped() } }
+        )
+      ) {
+        Button("Make-ahead") { performHandoff(paste: false) }
+        Button("Complement") { performHandoff(paste: false, complement: true) }
       }
       Menu {
         Button {
@@ -305,16 +294,29 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
       }
     }
   }
+
+  private func performHandoff(paste: Bool, complement: Bool = false) {
+    guard let sources = HandoffExportSource.mealPlanSources(on: model.selectedDate, rows: model.selectedDayRows) else {
+      handoffTransport.errorMessage = "No meals on this day to hand off."
+      handoffTransport.isShowingError = true
+      return
+    }
+    let source = complement ? sources.complement : sources.makeAhead
+    if paste {
+      let results = UIPasteboard.general.string.map { [$0] } ?? []
+      Task { await handoffTransport.pastedResultsReceived(results, source: source) }
+    } else {
+      Task { await handoffTransport.copyPrompt(for: source) }
+    }
+  }
 }
 
 struct MealCalendarDayAgendaView: View {
   let model: MealCalendarModel
   var showsHeader: Bool
-  var chatButtonTapped: (() -> Void)?
   var onMenuSelected: ((CoreMenu.ID) -> Void)?
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
-  @State private var handoffTransport = HandoffInAppTransport()
 
   private var occupiedMealSlots: [MealPlanItemSlot] {
     MealPlanItemSlot.allCases.filter { !model.rows(on: model.selectedDate, mealSlot: $0).isEmpty }
@@ -322,9 +324,6 @@ struct MealCalendarDayAgendaView: View {
 
   var body: some View {
     agendaContent
-    .handoffTransportAlert(handoffTransport)
-    // This view has no custom `init`, so the transport picks up the shared toast center on appear.
-    .onAppear { handoffTransport.toastCenter = model.toastCenter }
   }
 
   private var agendaContent: some View {
@@ -332,10 +331,7 @@ struct MealCalendarDayAgendaView: View {
       if showsHeader {
         MealCalendarDayHeader(
           model: model,
-          cookSession: cookSessionAction,
-          handoffSource: handoffSource,
-          complementHandoffSource: complementHandoffSource,
-          handoffTransport: handoffTransport
+          cookSession: cookSessionAction
         )
       }
 
@@ -898,7 +894,7 @@ private struct MealCalendarWeekCell: View {
             pasteComplementLabel: "Paste · Complement"
           )
         } label: {
-          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
+          Label("Hand off", systemImage: HandoffSymbol.handOff)
         }
         .padding(8)
         .accessibilityLabel("Hand off actions for \(summary.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))")

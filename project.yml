@@ -134,6 +134,8 @@ targets:
         product: CloudSyncKit
       - package: LLMHandoffKit
         product: LLMHandoffKit
+      - package: LLMHandoffKit
+        product: LLMHandoffUI
       - package: Dependencies
         product: Dependencies
       - package: SQLiteData

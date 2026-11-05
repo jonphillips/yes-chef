@@ -1,3 +1,4 @@
+import LLMHandoffUI
 import LLMClientKit
 import SwiftUI
 import UIKit
@@ -214,40 +215,21 @@ struct WorkbenchDetailView: View {
             Label("Add Candidates", systemImage: "plus")
           }
           if let workbenchID = model.detail?.workbench.id {
-            Menu {
-              Button {
-                Task {
-                  await handoffTransport.copyPrompt(
-                    for: .workbench(workbenchID, task: .compare)
-                  )
-                }
-              } label: {
-                Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-              }
-              Button {
+            HandoffMenu(
+              handOff: {
+                Task { await handoffTransport.copyPrompt(for: .workbench(workbenchID, task: .compare)) }
+              },
+              paste: {
                 let results = UIPasteboard.general.string.map { [$0] } ?? []
                 Task {
-                  await handoffTransport.pastedResultsReceived(
-                    results,
-                    source: .workbench(workbenchID, task: .compare)
-                  )
+                  await handoffTransport.pastedResultsReceived(results, source: .workbench(workbenchID, task: .compare))
                 }
-              } label: {
-                Label("Paste", systemImage: "doc.on.clipboard")
-              }
-              Toggle(isOn: Binding(
+              },
+              isAskActive: Binding(
                 get: { model.destination.chat != nil },
-                set: { isOpen in
-                  if isOpen != (model.destination.chat != nil) {
-                    model.chatButtonTapped()
-                  }
-                }
-              )) {
-                Label("Ask now", systemImage: "sparkles")
-              }
-            } label: {
-              Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-            }
+                set: { if $0 != (model.destination.chat != nil) { model.chatButtonTapped() } }
+              )
+            )
           }
         }
       }
@@ -332,6 +314,7 @@ struct WorkbenchDetailView: View {
     ) {
       compareCover
     }
+    .preference(key: HandoffReviewHostClaimKey.self, value: model.isShowingCompare)
     // The workbench is itself presented as a sheet, so it needs its own toast host — an overlay
     // mounted by a presenting view does not draw over the sheet it presents.
     .overlay(alignment: .top) {

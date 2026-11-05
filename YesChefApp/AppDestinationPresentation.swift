@@ -9,6 +9,16 @@ struct HandoffReviewHostClaimKey: PreferenceKey {
   }
 }
 
+private struct WorkbenchHandoffReviewHostModifier: ViewModifier {
+  @State private var hasNestedHost = false
+
+  func body(content: Content) -> some View {
+    content
+      .onPreferenceChange(HandoffReviewHostClaimKey.self) { hasNestedHost = $0 }
+      .handoffReviewDestinations(isPresentationEnabled: !hasNestedHost)
+  }
+}
+
 private struct HandoffReviewDestinationsModifier: ViewModifier {
   @Dependency(\.handoffReviewCoordinator) private var coordinator
   var isPresentationEnabled: Bool
@@ -203,6 +213,10 @@ private struct RecipeDetailDestinationsModifier: ViewModifier {
 }
 
 extension View {
+  func workbenchHandoffReviewHost() -> some View {
+    modifier(WorkbenchHandoffReviewHostModifier())
+  }
+
   func handoffReviewDestinations(isPresentationEnabled: Bool = true) -> some View {
     modifier(HandoffReviewDestinationsModifier(isPresentationEnabled: isPresentationEnabled))
   }

@@ -1,3 +1,4 @@
+import LLMHandoffUI
 import SwiftUI
 import UIKit
 import YesChefCore
@@ -214,36 +215,17 @@ struct MenuDetailReader: View {
   private var menuPlaybookHeader: some View {
     HStack(alignment: .top, spacing: 12) {
       Spacer()
-      Menu {
-        Button {
-          Task { await handoffTransport.copyPrompt(for: .menu(detailModel.menuID)) }
-        } label: {
-          Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-        }
-        Button {
+      HandoffMenu(
+        handOff: { Task { await handoffTransport.copyPrompt(for: .menu(detailModel.menuID)) } },
+        paste: {
           let results = UIPasteboard.general.string.map { [$0] } ?? []
-          Task {
-            await handoffTransport.pastedResultsReceived(
-              results,
-              source: .menu(detailModel.menuID)
-            )
-          }
-        } label: {
-          Label("Paste", systemImage: "doc.on.clipboard")
-        }
-        Toggle(isOn: Binding(
+          Task { await handoffTransport.pastedResultsReceived(results, source: .menu(detailModel.menuID)) }
+        },
+        isAskActive: Binding(
           get: { isAskActive },
-          set: { isOpen in
-            if isOpen != isAskActive {
-              askButtonTapped()
-            }
-          }
-        )) {
-          Label("Ask now", systemImage: "sparkles")
-        }
-      } label: {
-        Label("Hand off", systemImage: "sparkles.square.filled.on.square")
-      }
+          set: { if $0 != isAskActive { askButtonTapped() } }
+        )
+      )
       .accessibilityValue(isAskActive ? "Panel open" : "Panel closed")
       Button(action: regeneratePrepPlan) {
         Label("Regenerate whole plan", systemImage: "arrow.clockwise")

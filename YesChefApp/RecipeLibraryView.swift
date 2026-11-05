@@ -162,7 +162,7 @@ struct AppContainer: View {
           }
         )
       }
-      .handoffReviewDestinations()
+      .workbenchHandoffReviewHost()
     }
     .sheet(isPresented: $workbenchModel.destination.addWorkbench) {
       NavigationStack {

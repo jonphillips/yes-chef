@@ -1,3 +1,4 @@
+import LLMHandoffUI
 import Dependencies
 import Observation
 import SwiftUI
@@ -324,7 +325,7 @@ struct HandoffCopyPasteControls: View {
           await transport.copyPrompt(for: source)
         }
       } label: {
-        Label(copyLabel, systemImage: "sparkles.square.filled.on.square")
+        Label(copyLabel, systemImage: HandoffSymbol.handOff)
       }
 
       PasteButton(payloadType: String.self) { results in
@@ -350,7 +351,7 @@ struct HandoffMenuActions: View {
     Button {
       Task { await transport.copyPrompt(for: handoffSource) }
     } label: {
-      Label(prepLabel, systemImage: "sparkles.square.filled.on.square")
+      Label(prepLabel, systemImage: HandoffSymbol.handOff)
     }
     Button {
       Task {
@@ -360,12 +361,12 @@ struct HandoffMenuActions: View {
         )
       }
     } label: {
-      Label(pastePrepLabel, systemImage: "doc.on.clipboard")
+      Label(pastePrepLabel, systemImage: HandoffSymbol.paste)
     }
     Button {
       Task { await transport.copyPrompt(for: complementHandoffSource) }
     } label: {
-      Label(complementLabel, systemImage: "sparkles.square.filled.on.square")
+      Label(complementLabel, systemImage: HandoffSymbol.handOff)
     }
     Button {
       Task {
@@ -375,7 +376,7 @@ struct HandoffMenuActions: View {
         )
       }
     } label: {
-      Label(pasteComplementLabel, systemImage: "doc.on.clipboard")
+      Label(pasteComplementLabel, systemImage: HandoffSymbol.paste)
     }
   }
 }
@@ -393,7 +394,7 @@ struct ReaderFeedbackHandoffControls: View {
       Button {
         Task { await transport.copyPrompt(for: source) }
       } label: {
-        Label("Copy Curation Prompt", systemImage: "sparkles.square.filled.on.square")
+        Label("Copy Curation Prompt", systemImage: HandoffSymbol.handOff)
       }
 
       Button {
@@ -406,7 +407,7 @@ struct ReaderFeedbackHandoffControls: View {
           )
         }
       } label: {
-        Label("Paste Curated Comments", systemImage: "doc.on.clipboard")
+        Label("Paste Curated Comments", systemImage: HandoffSymbol.paste)
       }
     }
   }
