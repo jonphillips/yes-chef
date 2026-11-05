@@ -507,7 +507,7 @@ extension RecipeRepository {
       .delete()
       .execute(db)
     try RecipeServeWith.where { $0.linkedRecipeID.eq(recipeID) }
-      .update { $0.linkedRecipeID = nil }
+      .update { $0.linkedRecipeID = #bind(Optional<Recipe.ID>.none) }
       .execute(db)
     try Recipe.find(recipeID).delete().execute(db)
   }

@@ -1,6 +1,5 @@
-# Next Up — Serve With recipe links
+# Next Up — nothing dispatched
 
-**Slices:** effort `serve-with-recipe-links`
-**Briefs:** [docs/efforts/serve-with-recipe-links.md](efforts/serve-with-recipe-links.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

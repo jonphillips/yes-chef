@@ -4,7 +4,7 @@
 > Linking is the cook's act: the model never sees or sets a link. It adds one nullable, synced column.
 
 Status: **Accepted** — 2026-11-04. Effort:
-[`efforts/serve-with-recipe-links.md`](../efforts/serve-with-recipe-links.md).
+[`efforts/archive/serve-with-recipe-links.md`](../efforts/archive/serve-with-recipe-links.md).
 Origin: Jon's 2026-11-04 dogfood pass: *"Serve with is kind of pointless because you can only enter Freeform text. There
 should be some sort of recipe selector as well? What are we doing here?"* He chose optional links the same day.
 Builds on: [ADR-0048](ADR-0048-playbook-edit-grain.md) (Serve With rows, provenance, regeneration keeps identity) ·

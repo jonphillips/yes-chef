@@ -14,6 +14,7 @@ points here. The executor never reads this file; it only appends its own gate th
 Dev, on CloudKit Development.
 
 ## Owed now
+- **serve-with-recipe-links:** Before release, deploy the two new CloudKit Production fields, then link a Serve With row on iPad, confirm navigation and editing, sync to iPhone, regenerate, and verify archive and restore behavior. ([brief](efforts/archive/serve-with-recipe-links.md))
 
 ## Held
 

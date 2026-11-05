@@ -9,6 +9,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
   let itemText: KeyPath<Item, String>
   var addItem: ((String) -> Bool)? = nil
   var addButtonLabel: String? = nil
+  var editItem: ((Item) -> Void)? = nil
   let updateItem: (Item, String) -> Void
   let deleteItem: (Item) -> Void
   var reorderItems: (([Item.ID], Item.ID?) -> Void)? = nil
@@ -28,6 +29,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
     itemText: KeyPath<Item, String>,
     addItem: ((String) -> Bool)? = nil,
     addButtonLabel: String? = nil,
+    editItem: ((Item) -> Void)? = nil,
     updateItem: @escaping (Item, String) -> Void,
     deleteItem: @escaping (Item) -> Void,
     reorderItems: (([Item.ID], Item.ID?) -> Void)? = nil,
@@ -42,6 +44,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
     self.itemText = itemText
     self.addItem = addItem
     self.addButtonLabel = addButtonLabel
+    self.editItem = editItem
     self.updateItem = updateItem
     self.deleteItem = deleteItem
     self.reorderItems = reorderItems
@@ -58,6 +61,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
     itemText: KeyPath<Item, String>,
     addItem: ((String) -> Bool)? = nil,
     addButtonLabel: String? = nil,
+    editItem: ((Item) -> Void)? = nil,
     updateItem: @escaping (Item, String) -> Void,
     deleteItem: @escaping (Item) -> Void,
     reorderItems: (([Item.ID], Item.ID?) -> Void)? = nil,
@@ -72,6 +76,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
       itemText: itemText,
       addItem: addItem,
       addButtonLabel: addButtonLabel,
+      editItem: editItem,
       updateItem: updateItem,
       deleteItem: deleteItem,
       reorderItems: reorderItems,
@@ -174,7 +179,8 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
         item: item,
         editorLabel: editorLabel,
         itemText: item[keyPath: itemText],
-        updateItem: updateItem,
+        editItem: editItem,
+      updateItem: updateItem,
         deleteItem: deleteItem,
         content: itemContent,
         badge: badge
@@ -190,6 +196,7 @@ private struct EditableRow<Item: Identifiable, Content: View, Badge: View>: View
   let item: Item
   let editorLabel: String
   let itemText: String
+  let editItem: ((Item) -> Void)?
   let updateItem: (Item, String) -> Void
   let deleteItem: (Item) -> Void
   let content: (Item) -> Content
@@ -219,8 +226,12 @@ private struct EditableRow<Item: Identifiable, Content: View, Badge: View>: View
         }
       } else {
         Button {
-          draft = itemText
-          isEditing = true
+          if let editItem {
+            editItem(item)
+          } else {
+            draft = itemText
+            isEditing = true
+          }
         } label: {
           VStack(alignment: .leading, spacing: 4) {
             content(item)

@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-04 — Serve With recipe links (`effort/serve-with-recipe-links`)
+
+- **Result:** Added optional synced recipe links to Serve With rows, preserving text and links through editing, regeneration, cloning, deletion and import convergence.
+- **Verification:** check-drift, generic iOS build, and YesChefTests on a simulator.
+- **Owed:** serve-with-recipe-links's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-04 — Owed device passes cleared (`plan/device-passes-cleared`)
 
 - **Result:** Jon confirmed all 11 passes in Owed now, all 23 in Older, and the Recipe Lenses CloudKit step. Their lines are gone from `device-passes.md`. The Serve With CloudKit step, the Cockpit Find round trip and ADR-0030 S2 stay held.

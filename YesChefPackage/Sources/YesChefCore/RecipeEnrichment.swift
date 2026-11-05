@@ -573,16 +573,18 @@ public enum RecipeServeWithRepository {
     uuid: () -> UUID
   ) throws {
     let existing = try serveWith(for: recipeID, in: db)
-    var unmatchedModelRows = Dictionary(grouping: existing.filter { $0.provenance == .model }) { $0.title }
+    var unmatchedModelRows = existing.filter { $0.provenance == .model || $0.linkedRecipeID != nil }
     var retainedIDs = Set<RecipeServeWith.ID>()
     let nextSortOrder = (existing.map(\.sortOrder).max() ?? -LearningOrdering.rankStride) + LearningOrdering.rankStride
     var newItemOffset = 0
 
     for suggestion in suggestions {
-      var candidates = unmatchedModelRows[suggestion.title] ?? []
-      if let existing = candidates.first {
-        candidates.removeFirst()
-        unmatchedModelRows[suggestion.title] = candidates
+      if let index = unmatchedModelRows.firstIndex(where: {
+        $0.title == suggestion.title && $0.linkedRecipeID != nil
+      }) ?? unmatchedModelRows.firstIndex(where: {
+        $0.provenance == .model && $0.title == suggestion.title && $0.note == suggestion.note
+      }) {
+        let existing = unmatchedModelRows.remove(at: index)
         retainedIDs.insert(existing.id)
         continue
       }

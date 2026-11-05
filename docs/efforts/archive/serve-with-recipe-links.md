@@ -4,8 +4,8 @@ Status: Ready
 Summary: Let a Serve With row link to a recipe, with free text unchanged. Adds one nullable synced column, the link
 editor and picker, and a chip that opens the linked recipe.
 
-Implements: [ADR-0062](../decisions/ADR-0062-serve-with-recipe-links.md). Its decisions are the spec; D-numbers below
-refer to it. Related: [ADR-0048](../decisions/ADR-0048-playbook-edit-grain.md).
+Implements: [ADR-0062](../../decisions/ADR-0062-serve-with-recipe-links.md). Its decisions are the spec; D-numbers below
+refer to it. Related: [ADR-0048](../../decisions/ADR-0048-playbook-edit-grain.md).
 
 **Persistent model change (AGENTS.md).**
 - **What:** a nullable `linkedRecipeID TEXT` on `recipeServeWith`, as `linkedRecipeID: Recipe.ID?` on the model, with no
@@ -63,7 +63,7 @@ In `YesChefCoreTests`:
 - The expected-fields test passes with exactly the two new lines.
 
 **Verification:** `scripts/check-drift.sh`, the generic device build, and `YesChefTests` on a simulator, because this
-touches app model code ([`verification.md`](../verification.md)).
+touches app model code ([`verification.md`](../../verification.md)).
 
 **Done when:** the build items are in, the tests pass, and closeout runs (ADR-0005 D16), appending the device gate below.
 

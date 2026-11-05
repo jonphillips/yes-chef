@@ -100,7 +100,8 @@ struct RecipePlaybookView: View {
       RecipeServeWithStrip(
         model: model,
         items: serveWith,
-        needsRepair: serveWithNeedsRepair
+        needsRepair: serveWithNeedsRepair,
+        onRecipeSelected: onRecipeSelected
       )
     }
     .sheet(item: $editingSection) { section in
@@ -365,8 +366,10 @@ private struct RecipeServeWithStrip: View {
   let model: RecipeDetailModel
   let items: [RecipeServeWith]
   let needsRepair: Bool
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @State private var editor: ServeWithItemEditorRoute?
+  @State private var managingEditor: ServeWithItemEditorRoute?
   @State private var isManaging = false
   @State private var isConfirmingClear = false
 
@@ -405,9 +408,19 @@ private struct RecipeServeWithStrip: View {
           HStack(spacing: 8) {
             ForEach(items) { item in
               Button {
-                editor = .edit(item)
+                if let id = item.linkedRecipeID, model.detail?.resolvedServeWithRecipeIDs.contains(id) == true {
+                  onRecipeSelected(RecipeDetailPresentation(recipeID: id))
+                } else {
+                  editor = .edit(item)
+                }
               } label: {
-                Text(item.title)
+                Label {
+                  Text(item.title)
+                } icon: {
+                  if let id = item.linkedRecipeID, model.detail?.resolvedServeWithRecipeIDs.contains(id) == true {
+                    Image(systemName: "link")
+                  }
+                }
                   .font(.subheadline.weight(.medium))
                   .lineLimit(1)
                   .padding(.horizontal, 12)
@@ -416,7 +429,11 @@ private struct RecipeServeWithStrip: View {
               }
               .buttonStyle(.plain)
               .accessibilityLabel(item.title)
-              .accessibilityHint("Opens the full note and editing actions.")
+              .accessibilityHint(item.linkedRecipeID.map { model.detail?.resolvedServeWithRecipeIDs.contains($0) == true } == true
+                ? "Opens the linked recipe. Use Edit to change this accompaniment."
+                : "Opens the full note and editing actions.")
+              .contextMenu { Button("Edit") { editor = .edit(item) } }
+              .accessibilityAction(named: "Edit") { editor = .edit(item) }
             }
             Button {
               editor = .add
@@ -447,12 +464,12 @@ private struct RecipeServeWithStrip: View {
     .sheet(item: $editor) { route in
       ServeWithItemEditorSheet(
         item: route.item,
-        save: { title, note in
+        model: model,
+        save: { title, note, linkedRecipeID in
           if let item = route.item {
-            model.updateServeWith(item, title: title, note: note)
-            return true
+            return model.saveServeWith(item, title: title, note: note, linkedRecipeID: linkedRecipeID)
           }
-          return model.createServeWith(title: title, note: note)
+          return model.createServeWith(title: title, note: note, linkedRecipeID: linkedRecipeID)
         },
         delete: {
           guard let item = route.item else { return }
@@ -475,6 +492,7 @@ private struct RecipeServeWithStrip: View {
               itemText: \.title,
               addItem: model.createServeWith,
               addButtonLabel: "Add Serve With",
+              editItem: { managingEditor = .edit($0) },
               updateItem: { model.updateServeWith($0, text: $1) },
               deleteItem: { model.deleteServeWith($0.id) },
               reorderItems: { ids, destinationID in
@@ -488,7 +506,11 @@ private struct RecipeServeWithStrip: View {
                 .foregroundStyle(.secondary)
             } itemContent: { item in
               VStack(alignment: .leading, spacing: 3) {
-                Text(item.title).font(.headline)
+                Label { Text(item.title).font(.headline) } icon: {
+                  if let id = item.linkedRecipeID, model.detail?.resolvedServeWithRecipeIDs.contains(id) == true {
+                    Image(systemName: "link")
+                  }
+                }
                 if let note = item.note {
                   Text(note).font(.callout).foregroundStyle(.secondary)
                 }
@@ -507,6 +529,16 @@ private struct RecipeServeWithStrip: View {
             }
           }
           .padding()
+        }
+        .sheet(item: $managingEditor) { route in
+          ServeWithItemEditorSheet(
+            item: route.item, model: model,
+            save: { title, note, linkedRecipeID in
+              guard let item = route.item else { return false }
+              return model.saveServeWith(item, title: title, note: note, linkedRecipeID: linkedRecipeID)
+            },
+            delete: { if let item = route.item { model.deleteServeWith(item.id) } }
+          )
         }
         .confirmationDialog("Clear Serve With?", isPresented: $isConfirmingClear) {
           Button("Clear Serve With", role: .destructive) {
@@ -549,17 +581,24 @@ private enum ServeWithItemEditorRoute: Identifiable {
 private struct ServeWithItemEditorSheet: View {
   @Environment(\.dismiss) private var dismiss
   let item: RecipeServeWith?
-  let save: (String, String?) -> Bool
+  let model: RecipeDetailModel
+  let save: (String, String?, Recipe.ID?) -> Bool
   let delete: () -> Void
 
+  @State private var linkedRecipeID: Recipe.ID?
+  @State private var linkedRecipeTitle: String?
+  @State private var isPickingRecipe = false
   @State private var title: String
   @State private var note: String
   @State private var isConfirmingDelete = false
 
-  init(item: RecipeServeWith?, save: @escaping (String, String?) -> Bool, delete: @escaping () -> Void) {
+  init(item: RecipeServeWith?, model: RecipeDetailModel, save: @escaping (String, String?, Recipe.ID?) -> Bool, delete: @escaping () -> Void) {
     self.item = item
+    self.model = model
     self.save = save
     self.delete = delete
+    _linkedRecipeID = State(initialValue: item?.linkedRecipeID)
+    _linkedRecipeTitle = State(initialValue: nil)
     _title = State(initialValue: item?.title ?? "")
     _note = State(initialValue: item?.note ?? "")
   }
@@ -568,6 +607,16 @@ private struct ServeWithItemEditorSheet: View {
     NavigationStack {
       Form {
         TextField("Accompaniment", text: $title)
+        Section("Recipe") {
+          if linkedRecipeID != nil {
+            Text(linkedRecipeTitle ?? "Linked recipe")
+            Button("Remove Link", role: .destructive) { linkedRecipeID = nil; linkedRecipeTitle = nil }
+          } else {
+            Button("Link a Recipe") {
+              Task { if await model.loadServeWithPickerRows() { isPickingRecipe = true } }
+            }
+          }
+        }
         Section("Note") {
           TextEditor(text: $note)
             .frame(minHeight: 130)
@@ -587,10 +636,26 @@ private struct ServeWithItemEditorSheet: View {
         ToolbarItem(placement: .confirmationAction) {
           Button("Save") {
             let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-            if save(title, cleanNote.isEmpty ? nil : cleanNote) { dismiss() }
+            if save(title, cleanNote.isEmpty ? nil : cleanNote, linkedRecipeID) { dismiss() }
           }
           .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
+      }
+      .task {
+        if let linkedRecipeID {
+          linkedRecipeTitle = await model.serveWithLinkedRecipeTitle(linkedRecipeID)
+        }
+      }
+      .sheet(isPresented: $isPickingRecipe) {
+        RelatedRecipePicker(
+          recipeRows: model.relatedRecipePickerRows,
+          excludedRecipeIDs: Set(model.serveWith.filter { $0.id != item?.id }.compactMap(\.linkedRecipeID)).union([model.recipeID]),
+          link: { row in
+            linkedRecipeID = row.id
+            linkedRecipeTitle = row.title
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { title = row.title }
+          }
+        )
       }
       .confirmationDialog("Delete this accompaniment?", isPresented: $isConfirmingDelete) {
         Button("Delete", role: .destructive) {

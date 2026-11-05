@@ -188,11 +188,19 @@ extension RecipeCoreTests {
       let now = Date(timeIntervalSinceReferenceDate: 902_200_000)
       let recipeID = SampleUUIDSequence.uuid(92_301)
       let variationID = SampleUUIDSequence.uuid(92_302)
+      let accompanimentID = SampleUUIDSequence.uuid(92_303)
       var uuids = SampleUUIDSequence(start: 92_400)
 
       let standaloneID = try database.write { db in
         let base = Recipe(id: recipeID, title: "Pasta", dateCreated: now, dateModified: now)
         try Recipe.insert { base }.execute(db)
+        try Recipe.insert {
+          Recipe(id: accompanimentID, title: "Bread", dateCreated: now, dateModified: now)
+        }.execute(db)
+        try RecipeServeWith.insert {
+          RecipeServeWith(id: SampleUUIDSequence.uuid(92_304), recipeID: recipeID, linkedRecipeID: accompanimentID,
+            title: "Bread", sortOrder: 0, provenance: .handAuthored, dateCreated: now, dateModified: now)
+        }.execute(db)
         let variation = RecipeVariation(
           id: variationID,
           recipeID: recipeID,
@@ -218,6 +226,7 @@ extension RecipeCoreTests {
         let standalone = try #require(try RecipeRepository.fetchDetail(recipeID: standaloneID, in: db))
         expectNoDifference(base.relatedRecipes.map(\.id), [standaloneID])
         expectNoDifference(standalone.relatedRecipes.map(\.id), [recipeID])
+        #expect(standalone.serveWith.first?.linkedRecipeID == accompanimentID)
       }
     }
   }

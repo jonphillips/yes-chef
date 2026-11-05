@@ -39,9 +39,8 @@ struct RecipeRelatedRecipeChoices: View {
     .sheet(isPresented: $model.destination.relatedRecipePicker) {
       RelatedRecipePicker(
         recipeRows: model.relatedRecipePickerRows,
-        currentRecipeID: model.recipeID,
-        linkedRecipeIDs: Set(relatedRecipes.map(\.id)),
-        link: model.linkRelatedRecipe
+        excludedRecipeIDs: Set(relatedRecipes.map(\.id)).union([model.recipeID]),
+        link: { model.linkRelatedRecipe($0.id) }
       )
     }
     .confirmationDialog(
@@ -95,20 +94,19 @@ struct RecipeRelatedRecipeChoices: View {
   }
 }
 
-private struct RelatedRecipePicker: View {
+struct RelatedRecipePicker: View {
   @Environment(\.dismiss) private var dismiss
 
   let recipeRows: [RecipeRelatedRecipePickerRow]
-  let currentRecipeID: Recipe.ID
-  let linkedRecipeIDs: Set<Recipe.ID>
-  let link: (Recipe.ID) -> Void
+  let excludedRecipeIDs: Set<Recipe.ID>
+  let link: (RecipeRelatedRecipePickerRow) -> Void
 
   @State private var searchText = ""
 
   private var availableRecipeRows: [RecipeRelatedRecipePickerRow] {
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     return recipeRows
-      .filter { $0.id != currentRecipeID && !linkedRecipeIDs.contains($0.id) }
+      .filter { !excludedRecipeIDs.contains($0.id) }
       .filter { row in
         query.isEmpty || RecipeSearchMatcher.matches(
           query: query,
@@ -131,7 +129,7 @@ private struct RelatedRecipePicker: View {
         } else {
           ForEach(availableRecipeRows) { row in
             Button {
-              link(row.id)
+              link(row)
               dismiss()
             } label: {
               VStack(alignment: .leading, spacing: 3) {
