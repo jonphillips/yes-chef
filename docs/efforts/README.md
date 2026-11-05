@@ -25,3 +25,7 @@ discoverable"):
 
 ## Live
 
+- [polish-batch-2026-11.md](polish-batch-2026-11.md) — **Ready** · Three small fixes in one PR: recipe links inside the
+  full-screen recipe cover, calendar complements that keep the model's reason, and the Settings Sync sheet that slides back
+  down. No schema or sync change.
+

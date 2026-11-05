@@ -29,21 +29,6 @@ and everything downstream move forward without waiting on it.
 `replaceModelSuggestions` deletes it. ADR-0048 meant regeneration to keep the cook's work. ADR-0062 protects linked rows
 only. Decide whether an edit should protect a row too, without misusing provenance as "touched".
 
-**Recipe links don't navigate inside the full-screen recipe cover (found 2026-11-04, ADR-0062 device pass).** On Menu, a
-linked Serve With chip closes and reopens the cover on the parent recipe, and the linked recipe never shows. Likely
-cause, from reading the code and not yet tested: `RecipeFullScreenCover` swaps `presentedRecipe`, but `RecipeDetailView`
-builds its model once in `@State` and the cover has no `.id`, unlike the split-view path. Related Recipes and "Drafted
-From" links use the same handler, so they probably fail too. If that's the cause, the fix may be one line
-(`.id(presentation.id)`), so this is a small dispatch rather than an effort.
-
-**Calendar complements lose their reason (found 2026-11-05, `handoff-menu` device pass).** ChatGPT explained why each dish
-fit the meal, but the staged complement held only the dish name, because the prompt asks for "exactly two lines each". It's
-the calendar's copy of the bug [ADR-0012 Amendment 2](decisions/ADR-0012-menu-actionable-chat.md) fixed for Menu in July.
-The change is small and schema-free: `MealPlanItem.notes` exists and the calendar row already shows it. It touches the
-prompt, a `body` on `MealPlanComplementSuggestion`, the parser (extra lines now land under "Couldn't parse"), the hard-coded
-`notes: nil` in `addComplementItem`, and Ask now's JSON format. Menu's prompt asks only for "ingredient and method detail",
-so word both to ask for the reason too.
-
 **A calendar day gets a real plan (decided 2026-11-05, not scheduled).** Replaces the make-ahead note that saves the whole
 strategy as one block of text. Jon chose a new date-keyed synced table that shares Menu's bands and views, and expects light
 use, so keep it cheap. The design and the questions for a brief are in
@@ -68,14 +53,6 @@ From the old Next Up:
 
   The fix is a jon-platform CloudSyncKit slice (Galavant shares it): show "Syncing…" or the last scan's result
   instead of green when the scan is skipped, and count the engine's real queue. Do it after the cut.
-
-- **Settings' Sync detail sheet slides up, then straight back down (Jon, 2026-10-29; long-standing).** Tapping
-  the Sync row usually takes a second tap. The likely cause: `SyncStatusSection` hangs `.sheet(isPresented:)` on
-  its `Section` inside the Settings `Form` (`SyncStatusSection.swift`), so the presentation lives on a lazy,
-  List-backed row. The row re-renders whenever `SyncHealthModel` ticks, which is often while the engine runs,
-  and that can dismiss the sheet. Fix: hoist the sheet's state and `.sheet` out to the `Form` in `SettingsView`,
-  and leave the row as a plain button. It's the only sheet in Settings; the other detail views push and are
-  fine. Small, post-cut; bundle with the next polish dispatch.
 
 - **Drop the vendored SQLiteData when upstream fixes #547.** `Vendor/sqlite-data` (ADR-0056 Amd 2) exits when a
   SQLiteData release keeps children of parents the server never confirmed. Watch
