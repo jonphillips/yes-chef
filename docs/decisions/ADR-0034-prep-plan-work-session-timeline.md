@@ -60,6 +60,7 @@ The prep plan stays a single blob on `Menu.prepPlan`, rendered in the existing P
 per-day, not on the calendar. Jon's "prep tomorrow's meat today" observation is the proof: tasks are
 relative to future *meals*, not to the wall-clock day you do them, so a per-day home is structurally
 wrong. The human authors, reads, and executes from this one surface.
+[Amendment 1](#amendment-1--a-calendar-day-gets-a-real-plan-2026-11-05) narrows "not on the calendar" for days outside a menu.
 
 ### D2 — The step is reshaped: `session` + `serves` + tappable link
 
@@ -161,7 +162,7 @@ Because the clipboard now carries a runnable prompt rather than raw context, the
   the bottom. The banded reader + ordered timing + tappable serves (D4) delivers ~80% of that feeling with
   zero new surface; cook mode is the last 20% and its own milestone.
 - **Retire/realign the meal-calendar per-day make-ahead note verb** now that the menu owns the prep-plan
-  home.
+  home. Decided in [Amendment 1](#amendment-1--a-calendar-day-gets-a-real-plan-2026-11-05): realign.
 
 ## Storage sketch
 
@@ -224,3 +225,58 @@ to live at `efforts/adr-0034-prep-plan-work-session-timeline.md` when dispatched
 - Memory: [[prep-plan-horizon-redesign]] (the design capture), [[menu-planner-dogfood-2026-07-09]] (the
   superseded strict call), [[llm-vs-determinism-surface-boundary]], [[llm-curation-not-synthesis]],
   [[batch-slices-and-lean-handoff]], [[sqlitedata-blob-cloudkit-asset]].
+
+## Amendment 1 — A calendar day gets a real plan (2026-11-05)
+
+Accepted 2026-11-05 by Jon, during the `handoff-menu` device pass. Not scheduled: there's no brief yet, and Jon expects
+light use, so this should stay cheap. It settles the deferred "retire or realign" item above in favor of realign.
+
+**The problem.** The calendar's make-ahead verb saves its whole strategy as one `.note` row
+(`MealCalendarRepository.addMakeAheadStrategyNote`). In Jon's words, it's "a huge block of text that I lose myself
+through halfway down". It can't be navigated, and it can't be edited step by step
+([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md)'s grain rule).
+
+**What changes in D1.** D1 stays true for a menu: a menu has one plan, in its Prep Plan section. D1's "not on the
+calendar" no longer holds for a day that isn't part of a menu. Its reasoning still does: a task belongs to the meal it
+feeds, not the day you do it. So a calendar plan belongs to the **service date**, and a task done on Friday for Saturday's
+dinner sits in Saturday's plan, under a band such as "The day before". A view of what's due today stays deferred, with
+real-date anchoring.
+
+### A1 — Storage: a new date-keyed synced table
+
+Add a table with the same step fields as `prepPlanSteps`, with `scheduledDate` in place of `menuID`. It has no parent FK,
+and `sourceDish` stays a loose ID, here to a `MealPlanItem`.
+
+- **Why not reuse `prepPlanSteps`:** every row there requires `menuID`, and that's the row's one CloudKit parent.
+- **Why not turn the day into a one-day menu:** it needs no schema, but menu rows are read-only on the calendar, and the
+  Menus list would fill with small one-day menus.
+- **Cost:** additive, and it needs a CloudKit Production schema deploy. The consumer ships in the same change.
+
+### A2 — One plan surface, shared with Menu
+
+The day shows Menu's plan UI: collapsible session bands, and step add, edit, reorder, and clear. Share
+`MenuPrepPlanSection` and its step views rather than copying them. They're written against `PrepPlanStepRecord` and
+`MenuItemRowData` today, so the brief must size that separation. The size is unknown.
+
+### A3 — The verb writes steps
+
+The calendar make-ahead verb commits steps to this table, through Ask now and through Hand off and Paste. It stops
+creating a note. Its review should follow Menu's prep-plan review rather than today's editable text block. When a plan
+already exists, the verb replaces it with a full plan, as Menu's weave does.
+
+### A4 — Existing notes stay
+
+Make-ahead notes already on the calendar stay as ordinary notes, with no conversion or backfill. Parsing them would be a
+data pass for little value. Jon can delete any he doesn't want.
+
+### Questions for the brief
+
+- **Days with a placed menu.** The menu already has a plan, so the day probably links to it and doesn't offer a second
+  one. Decide what happens when the same day also has its own items.
+- **Moved or deleted dishes.** Steps stay on their date when a dish moves or is deleted, unless the brief adds handling.
+  *Lean:* leave them, and keep the text readable if `sourceDish` no longer resolves. Decide what happens to a plan when
+  the day's last dish goes ([[no-dead-data]]).
+- **Conflicts across devices.** A full-replacement write from each of two devices could mix steps from both plans. Check
+  how Menu's plan behaves before copying it.
+- **Check-off.** Steps have no completion state, in Menu either. Try bands alone first. If Jon still loses his place while
+  cooking, a check-off is the next step, and it should cover both plans. This doesn't change the cook-mode deferral above.
