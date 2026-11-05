@@ -22,7 +22,7 @@ whole fix. If it isn't, find the real cause and say what it was in the PR body.
 ## 2. Calendar complements keep their reason
 
 **The bug.** The chat explains why each dish fits the meal, but the staged complement holds only the dish name, because
-`MealPlanHandoffContext.complementPrompt` (`AIHandoffContext.swift` ≈ line 300) asks for "exactly two lines each". This is the calendar's copy of the bug [ADR-0012 Amendment 2](../decisions/ADR-0012-menu-actionable-chat.md) fixed
+`MealPlanHandoffContext.complementPrompt` (`AIHandoffContext.swift` ≈ line 300) asks for "exactly two lines each". This is the calendar's copy of the bug [ADR-0012 Amendment 2](../../decisions/ADR-0012-menu-actionable-chat.md) fixed
 for Menu. Follow what `MenuComplementSuggestion` does.
 
 1. **`MealPlanComplementSuggestion`** gains an optional `body`. `rendered`, `editableReviewText` and
@@ -57,7 +57,7 @@ button. Keep `SyncStatusDetailView` as it is.
 The calendar day plan (ADR-0034 Amendment 1), sync status accuracy, and the other candidates in `open-questions.md`.
 
 **Verification:** `scripts/check-drift.sh`, the generic device build, and `YesChefTests` on a simulator, because this touches
-app code ([`verification.md`](../verification.md)). Threads 1 and 3 have no automated coverage, so the device gate is their
+app code ([`verification.md`](../../verification.md)). Threads 1 and 3 have no automated coverage, so the device gate is their
 evidence. State that in the PR body.
 
 **Done when:** all three threads are in one PR, the tests pass, and closeout runs (ADR-0005 D16), appending the device gate below.
