@@ -36,6 +36,19 @@ builds its model once in `@State` and the cover has no `.id`, unlike the split-v
 From" links use the same handler, so they probably fail too. If that's the cause, the fix may be one line
 (`.id(presentation.id)`), so this is a small dispatch rather than an effort.
 
+**Calendar complements lose their reason (found 2026-11-05, `handoff-menu` device pass).** ChatGPT explained why each dish
+fit the meal, but the staged complement held only the dish name, because the prompt asks for "exactly two lines each". It's
+the calendar's copy of the bug [ADR-0012 Amendment 2](decisions/ADR-0012-menu-actionable-chat.md) fixed for Menu in July.
+The change is small and schema-free: `MealPlanItem.notes` exists and the calendar row already shows it. It touches the
+prompt, a `body` on `MealPlanComplementSuggestion`, the parser (extra lines now land under "Couldn't parse"), the hard-coded
+`notes: nil` in `addComplementItem`, and Ask now's JSON format. Menu's prompt asks only for "ingredient and method detail",
+so word both to ask for the reason too.
+
+**A calendar day gets a real plan (decided 2026-11-05, not scheduled).** Replaces the make-ahead note that saves the whole
+strategy as one block of text. Jon chose a new date-keyed synced table that shares Menu's bands and views, and expects light
+use, so keep it cheap. The design and the questions for a brief are in
+[ADR-0034 Amendment 1](decisions/ADR-0034-prep-plan-work-session-timeline.md#amendment-1--a-calendar-day-gets-a-real-plan-2026-11-05).
+
 From the old Next Up:
 
 - **"Up to date" can't see inbound records that never arrived (found 2026-10-27, PROD-CUTOVER Step 4 audit).**
