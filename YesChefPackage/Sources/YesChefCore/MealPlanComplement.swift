@@ -23,23 +23,30 @@ public struct MealPlanComplementHandoffParseResult: Equatable, Sendable {
 public struct MealPlanComplementSuggestion: Equatable, Sendable {
   public var kind: MealPlanItemKind
   public var title: String
+  public var body: String?
   public var mealSlot: MealPlanItemSlot
 
   public init(
     kind: MealPlanItemKind = .note,
     title: String,
+    body: String? = nil,
     mealSlot: MealPlanItemSlot
   ) {
     self.kind = kind
     self.title = title
+    self.body = body
     self.mealSlot = mealSlot
   }
 
   public func rendered(dayTitle: String) -> String {
-    """
-    Note: \(title)
-    \(dayTitle) - \(mealSlot.title)
-    """
+    var text = """
+      Note: \(title)
+      \(dayTitle) - \(mealSlot.title)
+      """
+    if let body = body?.cleanedMealPlanComplementText {
+      text += "\n\(body)"
+    }
+    return text
   }
 
   public func editableReviewText(dayTitle: String) -> String {
@@ -58,6 +65,7 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
       suggestion.mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine) ?? suggestion.mealSlot
     }
 
+    suggestion.body = lines.dropFirst(2).joined(separator: "\n").cleanedMealPlanComplementText
     return suggestion
   }
 
@@ -108,9 +116,6 @@ public extension MealPlanComplementPlan {
         continue
       }
       items.append(suggestion)
-      if lines.count > 2 {
-        unparsedBlocks.append(lines.dropFirst(2).joined(separator: "\n"))
-      }
     }
     return MealPlanComplementHandoffParseResult(
       plan: MealPlanComplementPlan(items: items),
@@ -175,10 +180,11 @@ extension MealPlanComplementClient: DependencyKey {
   static let instructions = """
     You distill a cooking conversation into concrete dish suggestions that complement one meal plan day.
     Return ONLY strict JSON:
-    {"items":[{"kind":"note","title":"short dish name","mealSlot":"dinner"}]}.
+    {"items":[{"kind":"note","title":"short dish name","body":"reason and useful detail","mealSlot":"dinner"}]}.
     Allowed kind values are "note" and "recipe"; use "note" for freeform suggested dishes that are not already
     represented by an existing recipe row. The date is fixed by the meal plan context; do not invent or return
-    dates. Allowed mealSlot values are "breakfast", "lunch", "dinner", and "snack".
+    dates. Optional "body" gives a short reason the dish fits this meal, plus any useful ingredient or method detail.
+    Omit it or use "" when there is no detail. Allowed mealSlot values are "breakfast", "lunch", "dinner", and "snack".
     Return {"items":[]} when there is no concrete dish to add.
     """
 
@@ -225,6 +231,7 @@ extension MealPlanComplementClient: DependencyKey {
         return MealPlanComplementSuggestion(
           kind: .note,
           title: title,
+          body: (element["body"] as? String)?.cleanedMealPlanComplementText,
           mealSlot: mealSlot
         )
       }

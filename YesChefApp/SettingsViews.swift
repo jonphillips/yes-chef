@@ -8,6 +8,8 @@ struct SettingsView: View {
   let groceryModel: GroceryLibraryModel
   private let selectedPane: Binding<SettingsPane?>?
   @State private var syncHealth = SyncHealthModel()
+  @State private var showingSyncDetail = false
+  @Environment(SyncActivityRecorder.self) private var activityRecorder
   @State private var backupExport = DatabaseBackupExportModel(
     configuration: YesChefCloudSync.databaseBackupConfiguration
   )
@@ -51,7 +53,7 @@ struct SettingsView: View {
     Form {
       // Above Library so "am I actually syncing?" is the first thing Settings answers
       // — silent degradation is fine for dev, not for cross-device use (ADR-0003).
-      SyncStatusSection(model: syncHealth)
+      SyncStatusSection(model: syncHealth) { showingSyncDetail = true }
 
       Section("Library") {
         categoryRow
@@ -171,6 +173,9 @@ struct SettingsView: View {
         }
         .disabled(model.isImporting)
       }
+    }
+    .sheet(isPresented: $showingSyncDetail) {
+      SyncStatusDetailView(model: syncHealth, activityRecorder: activityRecorder)
     }
     .toolbar(removing: .sidebarToggle)
     // Refresh the sync signals on appear, on scene activation (the same hook that
