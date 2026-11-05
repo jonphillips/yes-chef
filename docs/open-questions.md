@@ -29,6 +29,13 @@ and everything downstream move forward without waiting on it.
 `replaceModelSuggestions` deletes it. ADR-0048 meant regeneration to keep the cook's work. ADR-0062 protects linked rows
 only. Decide whether an edit should protect a row too, without misusing provenance as "touched".
 
+**Recipe links don't navigate inside the full-screen recipe cover (found 2026-11-04, ADR-0062 device pass).** On Menu, a
+linked Serve With chip closes and reopens the cover on the parent recipe, and the linked recipe never shows. Likely
+cause, from reading the code and not yet tested: `RecipeFullScreenCover` swaps `presentedRecipe`, but `RecipeDetailView`
+builds its model once in `@State` and the cover has no `.id`, unlike the split-view path. Related Recipes and "Drafted
+From" links use the same handler, so they probably fail too. If that's the cause, the fix may be one line
+(`.id(presentation.id)`), so this is a small dispatch rather than an effort.
+
 From the old Next Up:
 
 - **"Up to date" can't see inbound records that never arrived (found 2026-10-27, PROD-CUTOVER Step 4 audit).**
