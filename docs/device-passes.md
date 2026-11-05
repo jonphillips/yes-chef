@@ -14,11 +14,9 @@ points here. The executor never reads this file; it only appends its own gate th
 Dev, on CloudKit Development.
 
 ## Owed now
-- **serve-with-recipe-links:** Before release, deploy the two new CloudKit Production fields, then link a Serve With row on iPad, confirm navigation and editing, sync to iPhone, regenerate, and verify archive and restore behavior. ([brief](efforts/archive/serve-with-recipe-links.md))
 
 ## Held
 
-- **serve-with-recipe-links (held ops, before the first TestFlight build containing ADR-0062):** In the CloudKit console (Development), add `linkedRecipeID` and `sqlitedata_icloud_userModificationTime_linkedRecipeID` to `recipeServeWith`, matching the types of the record's existing fields of the same kind. Re-export, confirm the diff against `cloudkit-expected-fields.txt` is only those two fields, and deploy Development → Production. The deploy is one-way.
 - **Cockpit Find handoff — the two-app round trip ([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md), PRs [#322](https://github.com/jonphillips/yes-chef/pull/322) + [#325](https://github.com/jonphillips/yes-chef/pull/325)), no schema.** This is Cockpit's S-join, so it is owed **after Cockpit S-c2** (verdict drain) lands; until then, Yes
   Chef's half can only be seen in `AppLog.handoff`. On device:
   - Send a multi-recipe email from Cockpit; Create Recipe opens with its provenance.

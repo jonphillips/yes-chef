@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-04 — Serve With device pass cleared (`plan/serve-with-device-pass`)
+
+- **Result:** The CloudKit deploy and the device gate for Serve With recipe links are done, and their lines are gone from `device-passes.md`. `linkedRecipeID` (Encrypted String) and `sqlitedata_icloud_userModificationTime_linkedRecipeID` (Encrypted Int64) are in Production.
+- **Verification:** The Production and Development exports matched on 2026-11-04, and nothing in `cloudkit-expected-fields.txt` was missing from Production. Jon's device report the same day covered linking, sync to the other device, opening the linked recipe, and the rest of the gate.
+- **Known gap:** A linked chip doesn't open the recipe from inside the full-screen recipe cover, as on Menu. It's tracked in `open-questions.md`.
+
+---
 ## 2026-11-04 — Serve With recipe links (`effort/serve-with-recipe-links`)
 
 - **Result:** Added optional synced recipe links to Serve With rows, preserving text and links through editing, regeneration, cloning, deletion and import convergence.
