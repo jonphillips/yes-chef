@@ -42,6 +42,11 @@ final class ChatAccessInboxModel {
     self.defaults = defaults
   }
 
+  isolated deinit {
+    watcher?.stop()
+    watcherTask?.cancel()
+  }
+
   func prepare() async {
     guard !isPreparing else { return }
     isPreparing = true
@@ -156,6 +161,11 @@ final class ChatAccessInboxModel {
     rowErrors[row.id] = nil
   }
 
+  func receiveSnapshots(_ snapshots: [ChatInboxSnapshot]) {
+    latestSnapshots = snapshots
+    rebuildRows()
+  }
+
   private func rebuildRows() {
     let snapshots = latestSnapshots.map { snapshot in
       if !snapshot.isCurrent { rowErrors[snapshot.url.path] = snapshot.downloadError }
@@ -171,7 +181,7 @@ final class ChatAccessInboxModel {
 
   func updateRows(from snapshots: [ChatAccessInbox.MetadataSnapshot]) {
     rows = ChatAccessInbox.rows(from: snapshots)
-    let visibleIDs = Set(rows.map(\.id) + returnRows.map(\.id))
+    let visibleIDs = Set(snapshots.map { $0.url.path } + returnRows.map(\.id))
     rowErrors = rowErrors.filter { visibleIDs.contains($0.key) }
   }
 
@@ -228,8 +238,7 @@ final class ChatAccessInboxModel {
       watcherTask = Task { [weak self] in
         for await snapshots in watcher.snapshots {
           guard let self else { return }
-          self.latestSnapshots = snapshots
-          self.rebuildRows()
+          self.receiveSnapshots(snapshots)
         }
       }
     }

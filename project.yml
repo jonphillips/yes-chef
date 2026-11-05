@@ -187,8 +187,6 @@ targets:
     dependencies:
       - package: YesChefPackage
         product: YesChefCore
-      - package: ChatAccessKit
-        product: ChatAccessKit
       - package: Dependencies
         product: Dependencies
       - package: SQLiteData

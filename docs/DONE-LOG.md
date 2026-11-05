@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-05 — Adopt ChatAccessKit (`effort/chat-access-kit-adoption`)
+
+- **Result:** Yes Chef uses the shared inbox transport from jon-platform [#123](https://github.com/jonphillips/jon-platform/pull/123); Debug and `--variant dev` use separate inbox and export folders.
+- **Verification:** Drift gate, generic iOS build, YesChefTests, and helper tests.
+- **Owed:** On TestFlight, a staged recipe and a staged hand-off return both still open and discard; Yes Chef Dev on the same device does not list them.
+
+---
 ## 2026-11-05 — Polish recipe links, complements, and sync sheet (`effort/polish-batch-2026-11`)
 
 - **Result:** Recipe links refresh the full-screen detail; calendar complement reasons survive review into notes; the Sync sheet is presented by Settings.

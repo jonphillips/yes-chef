@@ -15,6 +15,7 @@ Dev, on CloudKit Development.
 
 ## Owed now
 - **polish-batch-2026-11:** On iPad and iPhone, check linked Serve With, Related Recipes and Drafted From recipes in a Menu cover; calendar and Menu complement reasons through review and insertion; and repeated Sync sheet opening, including during sync. ([brief](efforts/archive/polish-batch-2026-11.md))
+- **ChatAccessKit adoption:** On TestFlight, a staged recipe and a staged hand-off return both still open and discard; Yes Chef Dev on the same device does not list them.
 
 ## Held
 

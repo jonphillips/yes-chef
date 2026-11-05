@@ -160,6 +160,8 @@ This is ADR-0007 D2's second branch, the derived export, chosen here because the
 
 ### D5 — Yes Chef Dev gets its own MCP folder
 
+**2026-11-05:** The inbox transport moved to jon-platform's `ChatAccessKit` (ADR-0009). Debug builds and the helper's `--variant dev` now use `MCP-Dev/`, making D5 effective.
+
 ADR-0059 D4 keeps one iCloud container for both variants, and iCloud Drive has no Development/Production
 split. Without a separate folder, Yes Chef Dev and TestFlight Yes Chef on one device would claim each
 other's staged recipes and overwrite each other's exports. So Yes Chef Dev uses `MCP-Dev/`. The helper takes

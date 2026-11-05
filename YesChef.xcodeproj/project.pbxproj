@@ -47,14 +47,14 @@
 		33DD122054891894F173D788 /* YesChefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DFCF817329BEE674E95B72 /* YesChefApp.swift */; };
 		36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */; };
 		3846277BD575C412195ACF75 /* FocusToolbarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF86C88A023D5D19CDE64102 /* FocusToolbarButton.swift */; };
-		38632A8F2F9B0F5C90683882 /* ChatAccessKit in Frameworks */ = {isa = PBXBuildFile; productRef = 736ECB1FA62286E3DA39A365 /* ChatAccessKit */; };
+		38632A8F2F9B0F5C90683882 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = A8C5256090D9AFFD84E0AD32 /* Dependencies */; };
 		386D42C820E47D4CC0306130 /* RecipeAdjustmentReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D667D9221C270FF5442B4CC8 /* RecipeAdjustmentReviewView.swift */; };
 		3987101D8A2C769EC719BCDC /* LearnedAreaAuditModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E9F0E4818A532AB62F41BA8 /* LearnedAreaAuditModelTests.swift */; };
 		39910D0EBA5752CE0EF217D8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 517D768EFBEA670F5B8416DE /* GRDB */; };
 		3AF6F47B328D293D8DDEB2C5 /* RecipeDetailModel+Enrichment.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */; };
 		3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75337F357939E23B8A594784 /* HandoffIntents.swift */; };
 		405995E434055C9790D6B594 /* EditableRowsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */; };
-		410DE555132BA6ED513C55C6 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = E94FE1F285F6B338A789EE95 /* SQLiteData */; };
+		410DE555132BA6ED513C55C6 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 23B55C4E25C2510FF2AB49D3 /* GRDB */; };
 		44F69263795B85BC859E1591 /* PantryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870CDB16B3140953C11EFDDC /* PantryViews.swift */; };
 		4530607B3DE651BAE0CC6641 /* RecipeListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B9BCF538013B597BB0D401 /* RecipeListRow.swift */; };
 		4713F8207F92734799A501EE /* CreateRecipeModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF820DD380C76A8BFE19ED0E /* CreateRecipeModelTests.swift */; };
@@ -125,7 +125,6 @@
 		92B6078CD3AE6AE5320A87F8 /* RecipeCategoryFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */; };
 		95F7EF5F257AE0CA6D7E2C08 /* ChatAccessExportModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24F87E90DC8286599CB90BED /* ChatAccessExportModel.swift */; };
 		96AEA500A9F6D8D9BE126014 /* RecipeActiveFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0F7538696E770B31AA47A0 /* RecipeActiveFilterBar.swift */; };
-		98EE86F694BB7CFBF6B471D7 /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0C4317F96B028EC9DF03F6AC /* StructuredQueriesCore */; };
 		9ADADC85EDEC6208590FC533 /* YesChefCore in Frameworks */ = {isa = PBXBuildFile; productRef = 13643DFF3682EB50C6B096D2 /* YesChefCore */; };
 		9B8EFD5B3540051D7122B27D /* PaprikaImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E29F682A3093D37071F5A924 /* PaprikaImportReviewView.swift */; };
 		9E3F90581198D1DF4FBBE49D /* ChatAccessExportModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B69D7AF49F0E848F45AE1103 /* ChatAccessExportModelTests.swift */; };
@@ -153,7 +152,7 @@
 		BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */; };
 		BEB3FF474359BA28DEBBE14E /* RecipeVariationInstructionDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 987510FE835260D17DC91CBB /* RecipeVariationInstructionDisplayTests.swift */; };
 		BF178A4429CAEE876FC6E7C6 /* GroceryIngredientChoiceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DEE5DBA0FA2117F357EF82B /* GroceryIngredientChoiceViews.swift */; };
-		BF6E63936FB6FA4E4CFDD8CA /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = A8C5256090D9AFFD84E0AD32 /* Dependencies */; };
+		BF6E63936FB6FA4E4CFDD8CA /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = E94FE1F285F6B338A789EE95 /* SQLiteData */; };
 		BF7BB650BD7D56E300A55EC8 /* RecipeLabelingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57513AB9753FA2230952204C /* RecipeLabelingViews.swift */; };
 		C07AACE1C77C122687CCD656 /* SyncActivityRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3447277FE4CF66438C14724B /* SyncActivityRecorderTests.swift */; };
 		C4460AA94AC3679029FA4CBC /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C469ECE48285073F98E35D10 /* ShareViewController.swift */; };
@@ -190,7 +189,7 @@
 		F98A735478A4F33847D77E85 /* RecipeDetailLabelSuggestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1068DDF81D623B93CC467A /* RecipeDetailLabelSuggestionTests.swift */; };
 		FA75D00279F60B62460CF10D /* RecipeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E450B24DC7459A2108DDFF /* RecipeModels.swift */; };
 		FD0CC72CCC43339855DB9B6A /* RecipeVariationAnchorRepairEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8FDD9BC6E02637B0BCC456 /* RecipeVariationAnchorRepairEditorTests.swift */; };
-		FD623AE7BBC0ADCF5DB42F53 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 23B55C4E25C2510FF2AB49D3 /* GRDB */; };
+		FD623AE7BBC0ADCF5DB42F53 /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0C4317F96B028EC9DF03F6AC /* StructuredQueriesCore */; };
 		FD6F7881ECEA6DC437F9F32C /* PaprikaImportWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F66618C21D85EE42AB4DEB /* PaprikaImportWorkspace.swift */; };
 		FE606BC0F88C1194E58EB940 /* SyncActivityRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E6505888D849BDFAD534E36 /* SyncActivityRecorder.swift */; };
 /* End PBXBuildFile section */
@@ -423,11 +422,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				9ADADC85EDEC6208590FC533 /* YesChefCore in Frameworks */,
-				38632A8F2F9B0F5C90683882 /* ChatAccessKit in Frameworks */,
-				BF6E63936FB6FA4E4CFDD8CA /* Dependencies in Frameworks */,
-				410DE555132BA6ED513C55C6 /* SQLiteData in Frameworks */,
-				FD623AE7BBC0ADCF5DB42F53 /* GRDB in Frameworks */,
-				98EE86F694BB7CFBF6B471D7 /* StructuredQueriesCore in Frameworks */,
+				38632A8F2F9B0F5C90683882 /* Dependencies in Frameworks */,
+				BF6E63936FB6FA4E4CFDD8CA /* SQLiteData in Frameworks */,
+				410DE555132BA6ED513C55C6 /* GRDB in Frameworks */,
+				FD623AE7BBC0ADCF5DB42F53 /* StructuredQueriesCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -727,7 +725,6 @@
 			name = YesChefShareExtension;
 			packageProductDependencies = (
 				13643DFF3682EB50C6B096D2 /* YesChefCore */,
-				736ECB1FA62286E3DA39A365 /* ChatAccessKit */,
 				A8C5256090D9AFFD84E0AD32 /* Dependencies */,
 				E94FE1F285F6B338A789EE95 /* SQLiteData */,
 				23B55C4E25C2510FF2AB49D3 /* GRDB */,
@@ -1486,10 +1483,6 @@
 		59FD7A23309A634CAF8CA2BE /* LLMHandoffUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LLMHandoffUI;
-		};
-		736ECB1FA62286E3DA39A365 /* ChatAccessKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ChatAccessKit;
 		};
 		86859006FF66FAFF04016AA2 /* SQLiteData */ = {
 			isa = XCSwiftPackageProductDependency;

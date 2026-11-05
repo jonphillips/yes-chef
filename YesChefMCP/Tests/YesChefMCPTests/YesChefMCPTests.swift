@@ -38,6 +38,19 @@ struct YesChefMCPTests {
     #expect(try inbox.list().count == 1)
   }
 
+  @Test func developmentVariantStagesSeparately() async throws {
+    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: container) }
+    let server = YesChefMCPServer.make(containerURL: container, isDevelopment: true)
+    let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: validRecipe)))
+    #expect(try object(response)["result"]?.objectValue?["isError"] != .bool(true))
+    let devInbox = ChatAccessFolder(containerURL: container, isDevelopment: true).inboxURL
+    let productionInbox = ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL
+    #expect(try HandoffInbox(root: devInbox, fileExtension: "json").list().count == 1)
+    #expect(!FileManager.default.fileExists(atPath: productionInbox.path))
+  }
+
   @Test func readToolsServeTextOnlyResultsAndRejectOldRefs() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container = temporary.appending(path: "container", directoryHint: .isDirectory)

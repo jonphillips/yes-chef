@@ -10,6 +10,34 @@ import YesChefCore
 @MainActor
 struct ChatAccessInboxModelTests {
   @Test
+  func snapshotsReportDownloadErrorsAndPreserveCurrentRowErrors() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_800_000_000)
+      $0.createRecipeCoordinator = CreateRecipeCoordinator()
+      $0.chatAccessInboxFileClient = .init(read: { _ in "" }, openAndClaim: { _, _ in throw InboxReadFailure.unavailable },
+        claim: { _, _ in }, maintain: { _, _, _ in })
+    } operation: {
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      let url = makeRow(in: folder).url
+      let returnURL = folder.inboxURL.appending(path: "20261022T200000Z-\(UUID().uuidString).ycreturn")
+      model.receiveSnapshots([
+        .init(url: url, name: url.lastPathComponent, isCurrent: false, downloadError: "Download failed"),
+        .init(url: returnURL, name: returnURL.lastPathComponent, isCurrent: false, downloadError: "Return download failed"),
+      ])
+      #expect(model.rowErrors[url.path] == "Download failed")
+      #expect(model.rowErrors[returnURL.path] == "Return download failed")
+      model.receiveSnapshots([.init(url: url, name: url.lastPathComponent, isCurrent: true)])
+      await model.open(try #require(model.rows.first))
+      #expect(model.rowErrors[url.path] == InboxReadFailure.unavailable.localizedDescription)
+      model.receiveSnapshots([.init(url: url, name: url.lastPathComponent, isCurrent: true)])
+      #expect(model.rowErrors[url.path] == InboxReadFailure.unavailable.localizedDescription)
+    }
+  }
+
+  @Test
   func openClaimsTheFileThenStagesItsOriginalText() async throws {
     let (folder, defaults, suiteName, temporary) = try fixture()
     defer {
