@@ -180,7 +180,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
         editorLabel: editorLabel,
         itemText: item[keyPath: itemText],
         editItem: editItem,
-      updateItem: updateItem,
+        updateItem: updateItem,
         deleteItem: deleteItem,
         content: itemContent,
         badge: badge

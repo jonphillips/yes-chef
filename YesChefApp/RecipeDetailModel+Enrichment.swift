@@ -294,6 +294,8 @@ extension RecipeDetailModel {
   func serveWithLinkedRecipeTitle(_ id: Recipe.ID) async -> String? {
     do {
       return try await database.read { db in try Recipe.find(id).fetchOne(db)?.title }
+    } catch is CancellationError {
+      return nil
     } catch {
       errorMessage = error.localizedDescription
       isShowingError = true
