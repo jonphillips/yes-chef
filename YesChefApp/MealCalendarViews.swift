@@ -323,10 +323,6 @@ struct MealCalendarDayAgendaView: View {
   }
 
   var body: some View {
-    agendaContent
-  }
-
-  private var agendaContent: some View {
     VStack(alignment: .leading, spacing: 16) {
       if showsHeader {
         MealCalendarDayHeader(
