@@ -127,6 +127,27 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func mealPlanComplementClientFailsLoudlyWhenAStrictResponseIsTruncated() async {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(
+            text: #"{"items":[{"kind":"note","title":"Salad","body":"Bright.","mealSlot":"dinner"},{"kind":"note","#,
+            stopReason: "length"
+          )
+        }
+      } operation: {
+        await #expect(throws: StructuredModelResponseError.responseTruncated) {
+          _ = try await MealPlanComplementClient.liveValue(
+            selection: "What complements this day?",
+            messages: [],
+            context: "Meal plan context",
+            tier: .frontier(.anthropic)
+          )
+        }
+      }
+    }
+
+    @Test
     func mealPlanComplementClientSendsRequestedModelTierAndDayContext() async throws {
       let recorder = MealPlanComplementRequestRecorder()
       let callRecords = ModelCallRecordCollector()

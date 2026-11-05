@@ -9,6 +9,27 @@ extension RecipeCoreTests {
   @Suite
   struct MenuComplementTests {
     @Test
+    func menuComplementClientFailsLoudlyWhenAStrictResponseIsTruncated() async {
+      await withDependencies {
+        $0.modelClient = StubModelClient { _ in
+          ModelResponse(
+            text: #"{"items":[{"kind":"note","title":"Salad","body":"Bright.","dayOffset":0,"mealSlot":"dinner"},{"kind":"note","#,
+            stopReason: "length"
+          )
+        }
+      } operation: {
+        await #expect(throws: StructuredModelResponseError.responseTruncated) {
+          _ = try await MenuComplementClient.liveValue(
+            selection: "What complements this menu?",
+            messages: [],
+            context: "Menu context",
+            tier: .frontier(.anthropic)
+          )
+        }
+      }
+    }
+
+    @Test
     func menuComplementParsesConcreteMenuItems() {
       let plan = MenuComplementClient.parse(
         """

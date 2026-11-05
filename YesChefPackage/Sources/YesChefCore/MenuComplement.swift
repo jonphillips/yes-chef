@@ -183,11 +183,13 @@ extension MenuComplementClient: DependencyKey {
       tier: tier,
       system: instructions,
       prompt: prompt(selection: selection, messages: messages, context: context),
-      maxTokens: 1536,
+      maxTokens: 4096,
       reasoningEffort: .medium,
       promptPreferenceKey: AIPromptPreferenceKind.complements.rawValue
     )
     let response = try await call.complete(using: modelClient)
+    guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
+    guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
     return parse(response.text)
   }
 
