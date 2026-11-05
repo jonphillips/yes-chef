@@ -81,7 +81,7 @@ another item's. `mealPlanSources` returns nil for an empty day.
 Curate, provenance, chat empty states).
 
 **Verification:** `scripts/check-drift.sh`, the generic device build, and `YesChefTests` on a simulator, because this touches
-app code ([`verification.md`](../verification.md)).
+app code ([`verification.md`](../../verification.md)).
 
 **Done when:** both PRs are in, the tests pass, no `Label("Ask now", systemImage: "sparkles")` remains, and closeout runs
 (ADR-0005 D16), appending the device gate below.

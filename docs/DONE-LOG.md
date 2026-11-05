@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-04 — One shared AI menu (`effort/handoff-menu`)
+
+- **Result:** Adopted LLMHandoffUI across recipe, Playbook, workbench, Compare, and Meal Calendar; added calendar routing coverage and presentation hosts for Compare. Shared prerequisite: jonphillips/jon-platform#118; app branch: effort/handoff-menu.
+- **Verification:** scripts/check-drift.sh passed (766 core tests, 13 MCP tests, and app test build); generic iOS build passed; YesChefTests passed 113 tests.
+- **Owed:** handoff-menu's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-04 — Serve With device pass cleared (`plan/serve-with-device-pass`)
 
 - **Result:** The CloudKit deploy and the device gate for Serve With recipe links are done, and their lines are gone from `device-passes.md`. `linkedRecipeID` (Encrypted String) and `sqlitedata_icloud_userModificationTime_linkedRecipeID` (Encrypted Int64) are in Production.

@@ -1,6 +1,5 @@
-# Next Up — One shared AI menu
+# Next Up — nothing dispatched
 
-**Slices:** effort `handoff-menu`
-**Briefs:** [docs/efforts/handoff-menu.md](efforts/handoff-menu.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)
