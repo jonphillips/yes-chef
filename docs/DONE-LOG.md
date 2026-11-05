@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-05 — One shared AI menu device pass cleared (`plan/polish-batch-2026-11`)
+
+- **Result:** The `handoff-menu` device gate is done, and its line is gone from `device-passes.md`.
+- **Verification:** Jon's device report on 2026-11-05 cleared the gate and said staging back from ChatGPT worked throughout.
+- **Follow-ups from the pass:** Calendar complements lose the model's reason, now in the `polish-batch-2026-11` brief. The calendar make-ahead note becomes a real plan under [ADR-0034 Amendment 1](decisions/ADR-0034-prep-plan-work-session-timeline.md#amendment-1--a-calendar-day-gets-a-real-plan-2026-11-05), not yet scheduled.
+
+---
 ## 2026-11-04 — One shared AI menu (`effort/handoff-menu`)
 
 - **Result:** Adopted LLMHandoffUI across recipe, Playbook, workbench, Compare, and Meal Calendar; added calendar routing coverage and presentation hosts for Compare. Shared prerequisite: jonphillips/jon-platform#118; app branch: effort/handoff-menu.
