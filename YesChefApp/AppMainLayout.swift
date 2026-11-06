@@ -7,8 +7,6 @@ import YesChefCore
 struct AppMainLayout: View {
   @AppStorage("app-shell-tab-customization") private var customization: TabViewCustomization
 
-  // Kept as an input so AppContainer retains its existing ownership shape. The per-tab split views
-  // adapt automatically as their available width changes.
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
   let powerBrowserModel: PowerBrowserModel
@@ -30,130 +28,170 @@ struct AppMainLayout: View {
 
   var body: some View {
     TabView(selection: $selectedSection) {
-      Tab(
-        AppSection.recipes.title,
-        systemImage: AppSection.recipes.systemImage,
-        value: AppSection.recipes
-      ) {
-        RecipesTab(
-          model: recipeModel,
-          mealCalendarModel: mealCalendarModel,
-          groceryModel: groceryModel,
-          onArchivedRecipesRequested: {
-            selectedSection = .settings
-            selectedSettingsPane = .archivedRecipes
-          }
-        )
+      if UIDevice.current.userInterfaceIdiom == .phone {
+        recipesTab
+        groceriesTab
+        mealCalendarTab
+        menusTab
+        createRecipeTab
+        powerBrowserTab
+        browserTab
+        workbenchesTab
+        settingsTab
+      } else {
+        recipesTab
+        powerBrowserTab
+        menusTab
+        mealCalendarTab
+        groceriesTab
+        browserTab
+        workbenchesTab
+        createRecipeTab
+        settingsTab
       }
-
-      Tab(
-        AppSection.powerBrowser.title,
-        systemImage: AppSection.powerBrowser.systemImage,
-        value: AppSection.powerBrowser
-      ) {
-        if selectedSection == .powerBrowser {
-          PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected)
-        }
-      }
-      .defaultVisibility(.hidden, for: .tabBar)
-
-      Tab(
-        AppSection.menus.title,
-        systemImage: AppSection.menus.systemImage,
-        value: AppSection.menus
-      ) {
-        MenusTab(
-          model: menuModel,
-          recipeModel: recipeModel,
-          onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested
-        )
-      }
-
-      Tab(
-        AppSection.mealCalendar.title,
-        systemImage: AppSection.mealCalendar.systemImage,
-        value: AppSection.mealCalendar
-      ) {
-        MealCalendarTab(
-          model: mealCalendarModel,
-          onMenuSelected: openMenuFromCalendar,
-          onRecipeSelected: onRecipeSelected,
-          onCookSessionRequested: onCookSessionRequested
-        )
-      }
-
-      Tab(
-        AppSection.groceries.title,
-        systemImage: AppSection.groceries.systemImage,
-        value: AppSection.groceries
-      ) {
-        GroceriesTab(
-          model: groceryModel,
-          mealCalendarModel: mealCalendarModel,
-          usesCompactTabLayout: horizontalSizeClass == .compact
-        )
-      }
-
-      Tab(
-        AppSection.browser.title,
-        systemImage: AppSection.browser.systemImage,
-        value: AppSection.browser
-      ) {
-        NavigationStack {
-          BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
-        }
-      }
-      .defaultVisibility(.hidden, for: .tabBar)
-
-      Tab(
-        AppSection.workbenches.title,
-        systemImage: AppSection.workbenches.systemImage,
-        value: AppSection.workbenches
-      ) {
-        WorkbenchesTab(
-          model: workbenchModel,
-          onRecipeSelected: onRecipeSelected,
-          usesCompactTabLayout: horizontalSizeClass == .compact
-        )
-      }
-      .defaultVisibility(.hidden, for: .tabBar)
-
-      Tab(
-        AppSection.createRecipe.title,
-        systemImage: AppSection.createRecipe.systemImage,
-        value: AppSection.createRecipe
-      ) {
-        NavigationStack {
-          CreateRecipeView(
-            model: createRecipeModel,
-            chatAccessInboxModel: chatAccessInboxModel,
-            onSaved: onRecipeCreated
-          )
-        }
-      }
-      .badge(chatAccessInboxModel.inboxCount)
-      .defaultVisibility(.hidden, for: .tabBar)
-
-      Tab(
-        AppSection.settings.title,
-        systemImage: AppSection.settings.systemImage,
-        value: AppSection.settings
-      ) {
-        SettingsTab(
-          recipeModel: recipeModel,
-          groceryModel: groceryModel,
-          automaticBackupModel: automaticBackupModel,
-          chatAccessExportModel: chatAccessExportModel,
-          chatAccessInboxModel: chatAccessInboxModel,
-          selectedPane: $selectedSettingsPane,
-          usesCompactTabLayout: horizontalSizeClass == .compact
-        )
-      }
-      .defaultVisibility(.hidden, for: .tabBar)
     }
     .tabViewStyle(.sidebarAdaptable)
     .tabViewCustomization($customization)
+  }
+
+  private var recipesTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.recipes.title,
+      systemImage: AppSection.recipes.systemImage,
+      value: AppSection.recipes
+    ) {
+      RecipesTab(
+        model: recipeModel,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel,
+        onArchivedRecipesRequested: {
+          selectedSection = .settings
+          selectedSettingsPane = .archivedRecipes
+        }
+      )
+    }
+  }
+
+  private var groceriesTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.groceries.title,
+      systemImage: AppSection.groceries.systemImage,
+      value: AppSection.groceries
+    ) {
+      GroceriesTab(
+        model: groceryModel,
+        mealCalendarModel: mealCalendarModel,
+        usesCompactTabLayout: horizontalSizeClass == .compact
+      )
+    }
+  }
+
+  private var mealCalendarTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.mealCalendar.title,
+      systemImage: AppSection.mealCalendar.systemImage,
+      value: AppSection.mealCalendar
+    ) {
+      MealCalendarTab(
+        model: mealCalendarModel,
+        onMenuSelected: openMenuFromCalendar,
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
+      )
+    }
+  }
+
+  private var menusTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.menus.title,
+      systemImage: AppSection.menus.systemImage,
+      value: AppSection.menus
+    ) {
+      MenusTab(
+        model: menuModel,
+        recipeModel: recipeModel,
+        onRecipeSelected: onRecipeSelected,
+        onCookSessionRequested: onCookSessionRequested
+      )
+    }
+  }
+
+  private var createRecipeTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.createRecipe.title,
+      systemImage: AppSection.createRecipe.systemImage,
+      value: AppSection.createRecipe
+    ) {
+      NavigationStack {
+        CreateRecipeView(
+          model: createRecipeModel,
+          chatAccessInboxModel: chatAccessInboxModel,
+          onSaved: onRecipeCreated
+        )
+      }
+    }
+    .badge(chatAccessInboxModel.inboxCount)
+    .defaultVisibility(.hidden, for: .tabBar)
+  }
+
+  private var powerBrowserTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.powerBrowser.title,
+      systemImage: AppSection.powerBrowser.systemImage,
+      value: AppSection.powerBrowser
+    ) {
+      if selectedSection == .powerBrowser {
+        PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected)
+      }
+    }
+    .defaultVisibility(.hidden, for: .tabBar)
+  }
+
+  private var browserTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.browser.title,
+      systemImage: AppSection.browser.systemImage,
+      value: AppSection.browser
+    ) {
+      NavigationStack {
+        BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
+      }
+    }
+    .defaultVisibility(.hidden, for: .tabBar)
+  }
+
+  private var workbenchesTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.workbenches.title,
+      systemImage: AppSection.workbenches.systemImage,
+      value: AppSection.workbenches
+    ) {
+      WorkbenchesTab(
+        model: workbenchModel,
+        onRecipeSelected: onRecipeSelected,
+        usesCompactTabLayout: horizontalSizeClass == .compact
+      )
+    }
+    .defaultVisibility(.hidden, for: .tabBar)
+  }
+
+  private var settingsTab: some TabContent<AppSection?> {
+    Tab(
+      AppSection.settings.title,
+      systemImage: AppSection.settings.systemImage,
+      value: AppSection.settings
+    ) {
+      SettingsTab(
+        recipeModel: recipeModel,
+        groceryModel: groceryModel,
+        automaticBackupModel: automaticBackupModel,
+        chatAccessExportModel: chatAccessExportModel,
+        chatAccessInboxModel: chatAccessInboxModel,
+        selectedPane: $selectedSettingsPane,
+        usesCompactTabLayout: horizontalSizeClass == .compact
+      )
+    }
+    .defaultVisibility(.hidden, for: .tabBar)
   }
 
   private func openMenuFromCalendar(_ menuID: CoreMenu.ID) {
