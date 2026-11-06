@@ -37,6 +37,9 @@ struct RecipeEditorView: View {
           focusedIngredientSectionNameID: $focusedIngredientSectionNameID
         )
       }
+      .navigationDestination(isPresented: $model.isSourceDestinationPresented) {
+        RecipeSourceEditorView(model: model)
+      }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         if let focusedIngredientSectionID {
           IngredientFractionPillRow { fraction in
@@ -137,8 +140,8 @@ struct RecipeEditorFields: View {
       }
 
       Section("Source") {
-        NavigationLink {
-          RecipeSourceEditorView(model: model)
+        Button {
+          model.sourceButtonTapped()
         } label: {
           RecipeSourceSummaryRow(
             title: model.draft.sourceSummaryTitle,
@@ -146,6 +149,9 @@ struct RecipeEditorFields: View {
             hasSource: model.draft.hasVisibleSourceData
           )
         }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
       }
 
       Section("Timing and Yield") {
@@ -539,12 +545,16 @@ private struct RecipeSourceSummaryRow: View {
               .lineLimit(2)
           }
         }
+        Spacer()
+        Image(systemName: "chevron.right")
+          .font(.footnote.weight(.semibold))
+          .foregroundStyle(.tertiary)
       }
     }
   }
 }
 
-private struct RecipeSourceEditorView: View {
+struct RecipeSourceEditorView: View {
   let model: RecipeEditorModel
 
   var body: some View {

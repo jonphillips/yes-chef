@@ -45,10 +45,11 @@ extension HandoffReviewCoordinator {
         commitTitle: "Add to Meal Plan",
         committingTitle: "Adding to Meal Plan…",
         committedTitle: "Added to Meal Plan",
+        validateText: { suggestion.editableReviewValidationMessage($0, dayTitle: dayTitle) },
         commit: { [weak self] approvedText in
           let approved = approvedText == originalEditableText
             ? suggestion
-            : suggestion.applyingEditableReviewText(approvedText)
+            : suggestion.applyingEditableReviewText(approvedText, dayTitle: dayTitle)
           try self?.commitMealPlanComplement(approved, on: review.scheduledDate)
         }
       )

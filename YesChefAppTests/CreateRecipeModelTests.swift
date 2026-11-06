@@ -47,6 +47,41 @@ struct CreateRecipeModelTests {
   }
 
   @Test
+  func sourceRouteDismissalKeepsEditsAndDraftReplacementOrResetClearsTheRoute() throws {
+    try withDependencies {
+      try $0.bootstrapDatabase()
+    } operation: {
+      var originalDraft = RecipeEditorDraft()
+      originalDraft.sourceName = "Family cookbook"
+      let editor = RecipeEditorModel(seededDraft: originalDraft)
+
+      editor.sourceButtonTapped()
+      editor.draft.sourceAuthor = "A. Cook"
+      editor.isSourceDestinationPresented = false
+
+      #expect(editor.destination == nil)
+      #expect(editor.draft.sourceName == "Family cookbook")
+      #expect(editor.draft.sourceAuthor == "A. Cook")
+
+      editor.sourceButtonTapped()
+      var replacementDraft = RecipeEditorDraft()
+      replacementDraft.title = "New extraction"
+      editor.applyExtractedDraft(replacementDraft)
+
+      #expect(editor.destination == nil)
+      #expect(editor.draft.title == "New extraction")
+
+      let createRecipe = CreateRecipeModel()
+      createRecipe.editorModel.sourceButtonTapped()
+      createRecipe.reset()
+
+      #expect(createRecipe.editorModel.destination == nil)
+      #expect(createRecipe.editorModel.draft.title.isEmpty)
+      #expect(createRecipe.editorModel.draft.sourceName.isEmpty)
+    }
+  }
+
+  @Test
   func pastedImageDataCreatesPendingHeroPhotoWithPastedSourcePath() async throws {
     try await withDependencies {
       try $0.bootstrapDatabase()

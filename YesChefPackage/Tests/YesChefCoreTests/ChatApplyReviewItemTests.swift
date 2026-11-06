@@ -31,6 +31,24 @@ extension RecipeCoreTests {
       expectNoDifference(inlineItem.unmodifiedApprovedText, "Rendered summary")
     }
 
+    @Test
+    @MainActor
+    func editableReviewValidationMessageTracksTheCurrentApprovedText() {
+      let item = ChatApplyReviewItem(
+        title: "Review",
+        summary: "Rendered summary",
+        editableText: "Editable source",
+        commitTitle: "Save",
+        committingTitle: "Saving",
+        committedTitle: "Saved",
+        validateText: { $0 == "Editable source" ? nil : "Fix the header." },
+        commit: { _ in }
+      )
+
+      expectNoDifference(item.validationMessage(for: "Editable source"), nil)
+      expectNoDifference(item.validationMessage(for: "Malformed text"), "Fix the header.")
+    }
+
     /// Accept All commits in bulk with `usingSecondaryCommit: false`, so an unedited approval must
     /// reach the primary destination carrying the presentation's own unmodified text — never the
     /// alternate destination, which is a deliberate per-item choice (ADR-0023) and must not be

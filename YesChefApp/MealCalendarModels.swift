@@ -437,10 +437,11 @@ final class MealCalendarModel {
             commitTitle: complementAction.commitTitle,
             committingTitle: complementAction.committingTitle,
             committedTitle: complementAction.committedTitle,
+            validateText: { suggestion.editableReviewValidationMessage($0, dayTitle: dayTitle) },
             commit: { editedText in
               let approved = editedText == originalEditableText
                 ? suggestion
-                : suggestion.applyingEditableReviewText(editedText)
+                : suggestion.applyingEditableReviewText(editedText, dayTitle: dayTitle)
               try self?.commitComplementSuggestion(
                 approved,
                 on: scheduledDate

@@ -6,7 +6,7 @@ Summary: Fix three reported defects in one schema-free dispatch: From Chat Open 
 Jon requested architect planning on 2026-11-06 and confirmed the Calendar edits were made in proposal review before adding.
 This is one dispatch with three acceptance tracks; it is not a redesign of chat or the recipe editor.
 
-Related: [Chat access](archive/chat-access-mcp.md), [previous complement-body fix](archive/polish-batch-2026-11.md#2-calendar-complements-keep-their-reason), [ADR-0024](../decisions/ADR-0024-editable-proposal-preview.md), [ADR-0026](../decisions/ADR-0026-review-collection-sheet.md), [standing guards](../standing-guards.md).
+Related: [Chat access](chat-access-mcp.md), [previous complement-body fix](polish-batch-2026-11.md#2-calendar-complements-keep-their-reason), [ADR-0024](../../decisions/ADR-0024-editable-proposal-preview.md), [ADR-0026](../../decisions/ADR-0026-review-collection-sheet.md), [standing guards](../../standing-guards.md).
 
 ## S1 — From Chat Open must never invoke Discard
 
@@ -81,7 +81,7 @@ No schema, migration, sync-engine, extraction-strategy, or persistent-model chan
 Do not attempt recovery of previously lost text without a surviving source and a separate decision.
 
 - Run the focused regression tests, then `scripts/check-drift.sh`, the generic device build, and the `YesChefTests`
-  app target per [verification.md](../verification.md), elevated from the first attempt.
+  app target per [verification.md](../../verification.md), elevated from the first attempt.
 - Explain each demonstrated cause and correction in the PR, distinguishing model evidence from UI evidence.
 - Closeout (ADR-0005 D16), with one owed device gate covering all three acceptance tracks on iPad and iPhone:
   independent From Chat actions; edited complement text visible after adding and reopening Calendar Edit; and Source
@@ -90,4 +90,4 @@ Do not attempt recovery of previously lost text without a surviving source and a
 
 ## Dispatch ledger
 
-- [ ] Dispatch 1 — S1 + S2 + S3, one implementation PR.
+- [x] Dispatch 1 — S1 + S2 + S3, one implementation PR.

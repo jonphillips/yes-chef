@@ -435,4 +435,126 @@ struct HandoffSectionRoutingTests {
     #expect(returned.deliverable == "Brown the butter before creaming it so the cookies have more nutty depth.")
     #expect(returned.learnings == ["Bacon was rejected because it would overpower the cookie."])
   }
+
+  @Test
+  @MainActor
+  func mealCalendarChatCollectionCommitPreservesEditedComplementsThroughEditDraft() async throws {
+    let day = Calendar.autoupdatingCurrent.startOfDay(for: Date(timeIntervalSinceReferenceDate: 900_123_456))
+    let now = day.addingTimeInterval(60)
+    let plan = MealPlanComplementPlan(items: [
+      MealPlanComplementSuggestion(title: "Cucumber herb salad", mealSlot: .dinner),
+      MealPlanComplementSuggestion(
+        title: "Garlic flatbread",
+        body: "Original garlic note.",
+        mealSlot: .lunch
+      ),
+    ])
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.mealPlanComplementClient = .init { _, _, _, _ in plan }
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      _ = try await database.write { db in
+        try MealCalendarRepository.addNoteItem(
+          title: "Existing meal",
+          notes: "Keep this row.",
+          on: day,
+          mealSlot: .breakfast,
+          in: db,
+          now: now,
+          uuid: { UUID(uuidString: "00000000-0000-0000-0000-000000009001")! }
+        )
+      }
+
+      let calendar = MealCalendarModel(selectedDate: day)
+      let chat = RecipeChatModel(context: .mealPlan(MealPlanChatContext(title: "Tuesday", subjectDate: day)))
+      let action = try #require(calendar.applyActionCatalog(for: chat).first)
+      let items = try await action.run("Balance the meal", [])
+      #expect(items.count == 2)
+
+      let firstApprovedText = items[0].unmodifiedApprovedText
+        + "\n\nDistinctive cucumber note.\n\nKeep this as a second paragraph."
+      let secondApprovedText = items[1].unmodifiedApprovedText
+        + "\n\nDistinctive flatbread addition."
+      try await items[0].commit(firstApprovedText, usingSecondaryCommit: false)
+      try await items[1].commit(secondApprovedText, usingSecondaryCommit: false)
+
+      let rows = try await database.read { db in try MealCalendarRequest().fetch(db) }
+      let cucumber = try #require(rows.first { $0.item.title == "Cucumber herb salad" })
+      let flatbread = try #require(rows.first { $0.item.title == "Garlic flatbread" })
+      #expect(cucumber.item.scheduledDate == day)
+      #expect(cucumber.item.mealSlot == .dinner)
+      #expect(cucumber.item.notes == "Distinctive cucumber note.\n\nKeep this as a second paragraph.")
+      #expect(flatbread.item.scheduledDate == day)
+      #expect(flatbread.item.mealSlot == .lunch)
+      #expect(flatbread.item.notes == "Original garlic note.\n\nDistinctive flatbread addition.")
+      #expect(rows.first { $0.item.title == "Existing meal" }?.item.notes == "Keep this row.")
+
+      let freshCalendar = MealCalendarModel(selectedDate: day)
+      await freshCalendar.reloadAfterExternalChange()
+      for (row, expectedNotes) in [
+        (cucumber, "Distinctive cucumber note.\n\nKeep this as a second paragraph."),
+        (flatbread, "Original garlic note.\n\nDistinctive flatbread addition."),
+      ] {
+        freshCalendar.editButtonTapped(itemID: row.item.id)
+        guard case let .itemEditor(context)? = freshCalendar.destination else {
+          Issue.record("Expected Calendar Edit to open for \(row.item.title).")
+          return
+        }
+        #expect(context.title == row.item.title)
+        #expect(context.date == day)
+        #expect(context.mealSlot == row.item.mealSlot)
+        #expect(context.notes == expectedNotes)
+        freshCalendar.destination = nil
+      }
+    }
+  }
+
+  @Test
+  @MainActor
+  func externalMealPlanHandoffCommitPreservesEditedComplementThroughEditDraft() async throws {
+    let day = Calendar.autoupdatingCurrent.startOfDay(for: Date(timeIntervalSinceReferenceDate: 900_223_456))
+    let now = day.addingTimeInterval(60)
+    let coordinator = HandoffReviewCoordinator()
+    let suggestion = MealPlanComplementSuggestion(title: "Roasted squash", mealSlot: .snack)
+    let review = AIHandoffMealPlanComplementReview(
+      handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000009011")!,
+      mealPlanItemID: UUID(uuidString: "00000000-0000-0000-0000-000000009012")!,
+      scheduledDate: day,
+      plan: MealPlanComplementPlan(items: [suggestion]),
+      unparsedBlocks: []
+    )
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let item = try #require(coordinator.mealPlanComplementReviewItems(for: review).first)
+      let approvedText = item.unmodifiedApprovedText + "\n\nDistinctive external addition."
+      try await item.commit(approvedText, usingSecondaryCommit: false)
+
+      let rows = try await database.read { db in try MealCalendarRequest().fetch(db) }
+      let row = try #require(rows.first { $0.item.title == "Roasted squash" })
+      #expect(row.item.scheduledDate == day)
+      #expect(row.item.mealSlot == .snack)
+      #expect(row.item.notes == "Distinctive external addition.")
+
+      let freshCalendar = MealCalendarModel(selectedDate: day)
+      await freshCalendar.reloadAfterExternalChange()
+      freshCalendar.editButtonTapped(itemID: row.item.id)
+      guard case let .itemEditor(context)? = freshCalendar.destination else {
+        Issue.record("Expected Calendar Edit to open for the external complement.")
+        return
+      }
+      #expect(context.title == "Roasted squash")
+      #expect(context.date == day)
+      #expect(context.mealSlot == .snack)
+      #expect(context.notes == "Distinctive external addition.")
+    }
+  }
 }

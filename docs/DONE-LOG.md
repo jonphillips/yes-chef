@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-06 — Create Recipe, Calendar, and Source review fixes (`effort/create-recipe-calendar-review-fixes`)
+
+- **Result:** Separated From Chat action targets, preserved Calendar complement edits and paragraphs through commit, and made Source navigation an explicit editor route that closes on Back and draft replacement.
+- **Verification:** scripts/check-drift.sh passed with zero lint violations and 766 package tests; generic iOS build passed; YesChefTests passed with 122 tests; focused complement tests passed with 9 tests.
+- **Owed:** create-recipe-calendar-review-fixes S1 + S2 + S3 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-05 — ChatAccessKit device pass cleared (`plan/chat-access-kit-device-pass`)
 
 - **Result:** The device gate for the ChatAccessKit adoption passed, and its line is gone from `device-passes.md`.

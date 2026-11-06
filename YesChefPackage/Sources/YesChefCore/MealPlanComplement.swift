@@ -53,20 +53,58 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
     rendered(dayTitle: dayTitle)
   }
 
-  public func applyingEditableReviewText(_ text: String) -> MealPlanComplementSuggestion {
-    let lines = text.editableMealPlanComplementLines
+  public func applyingEditableReviewText(
+    _ text: String,
+    dayTitle: String? = nil
+  ) -> MealPlanComplementSuggestion {
+    let editableText = EditableMealPlanComplementText(text)
     var suggestion = self
 
-    if let titleLine = lines.first {
-      suggestion.kind = Self.kind(fromEditableReviewTitleLine: titleLine) ?? suggestion.kind
-      suggestion.title = Self.title(fromEditableReviewTitleLine: titleLine) ?? suggestion.title
-    }
-    if let placementLine = lines.dropFirst().first {
-      suggestion.mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine) ?? suggestion.mealSlot
+    guard let titleLine = editableText.titleLine,
+      let titleLineIndex = editableText.titleLineIndex,
+      let kind = Self.kind(fromEditableReviewTitleLine: titleLine),
+      let title = Self.title(fromEditableReviewTitleLine: titleLine)
+    else {
+      suggestion.body = text.cleanedMealPlanComplementText
+      return suggestion
     }
 
-    suggestion.body = lines.dropFirst(2).joined(separator: "\n").cleanedMealPlanComplementText
+    suggestion.kind = kind
+    suggestion.title = title
+
+    if let placementLine = editableText.placementLine,
+      let placementLineIndex = editableText.placementLineIndex,
+      let mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine),
+      dayTitle == nil || Self.dayTitle(fromEditableReviewPlacementLine: placementLine) == dayTitle
+    {
+      suggestion.mealSlot = mealSlot
+      suggestion.body = editableText.body(afterLine: placementLineIndex)
+    } else {
+      // A malformed placement line stays visible in the body instead of consuming the first line
+      // of the cook's notes. The review validates this header before allowing a commit.
+      suggestion.body = editableText.body(afterLine: titleLineIndex)
+    }
     return suggestion
+  }
+
+  public func editableReviewValidationMessage(_ text: String, dayTitle: String) -> String? {
+    let editableText = EditableMealPlanComplementText(text)
+    guard let titleLine = editableText.titleLine,
+      let title = Self.title(fromEditableReviewTitleLine: titleLine),
+      !title.isEmpty,
+      Self.kind(fromEditableReviewTitleLine: titleLine) != nil
+    else {
+      return "Keep a labeled title on the first line, such as “Note: Herb salad.”"
+    }
+
+    guard let placementLine = editableText.placementLine,
+      Self.mealSlot(fromEditableReviewPlacementLine: placementLine) != nil,
+      Self.dayTitle(fromEditableReviewPlacementLine: placementLine) == dayTitle
+    else {
+      return "Keep \(dayTitle) and a meal slot on the second line, such as “\(dayTitle) - Dinner.”"
+    }
+
+    return nil
   }
 
   private static func kind(fromEditableReviewTitleLine line: String) -> MealPlanItemKind? {
@@ -89,6 +127,12 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
         || $0.title.normalizedMealPlanComplementEnumValue == slotText.normalizedMealPlanComplementEnumValue
     }
   }
+
+  private static func dayTitle(fromEditableReviewPlacementLine line: String) -> String? {
+    let components = line.components(separatedBy: " - ")
+    guard components.count >= 2 else { return nil }
+    return components.dropLast().joined(separator: " - ").cleanedMealPlanComplementText
+  }
 }
 
 public extension MealPlanComplementPlan {
@@ -96,15 +140,17 @@ public extension MealPlanComplementPlan {
   /// hand-off. The date remains out of the response: the hand-off's source
   /// day is the only valid destination.
   static func parsingHandoffText(_ text: String) -> MealPlanComplementHandoffParseResult {
-    let blocks = text.labeledHandoffBlocks(startingWith: "note:")
+    let normalizedText = EditableMealPlanComplementText.normalizedLineEndings(in: text)
+    let blocks = normalizedText.labeledHandoffBlocks(startingWith: "note:")
 
     var items: [MealPlanComplementSuggestion] = []
     var unparsedBlocks: [String] = []
     for block in blocks {
-      let lines = block.editableMealPlanComplementLines
-      guard lines.count >= 2,
-        lines[0].lowercased().hasPrefix("note:"),
-        MealPlanItemSlot(handoffPlacementLine: lines[1]) != nil
+      let editableText = EditableMealPlanComplementText(block)
+      guard let titleLine = editableText.titleLine,
+        titleLine.lowercased().hasPrefix("note:"),
+        let placementLine = editableText.placementLine,
+        MealPlanItemSlot(handoffPlacementLine: placementLine) != nil
       else {
         unparsedBlocks.append(block)
         continue
@@ -123,6 +169,48 @@ public extension MealPlanComplementPlan {
     )
   }
 
+}
+
+private struct EditableMealPlanComplementText {
+  private let lines: [String]
+  private let nonEmptyLineIndices: [Int]
+
+  init(_ text: String) {
+    let normalizedText = Self.normalizedLineEndings(in: text)
+    let lines = normalizedText.components(separatedBy: "\n")
+    self.lines = lines
+    nonEmptyLineIndices = lines.indices.filter {
+      !lines[$0].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+  }
+
+  var titleLineIndex: Int? { nonEmptyLineIndices.first }
+
+  var placementLineIndex: Int? {
+    guard nonEmptyLineIndices.count > 1 else { return nil }
+    return nonEmptyLineIndices[1]
+  }
+
+  var titleLine: String? {
+    titleLineIndex.map { trimmedLine(at: $0) }
+  }
+
+  var placementLine: String? {
+    placementLineIndex.map { trimmedLine(at: $0) }
+  }
+
+  func body(afterLine lineIndex: Int) -> String? {
+    lines.dropFirst(lineIndex + 1).joined(separator: "\n").cleanedMealPlanComplementText
+  }
+
+  static func normalizedLineEndings(in text: String) -> String {
+    text.replacingOccurrences(of: "\r\n", with: "\n")
+      .replacingOccurrences(of: "\r", with: "\n")
+  }
+
+  private func trimmedLine(at index: Int) -> String {
+    lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+  }
 }
 
 public struct MealPlanComplementClient: Sendable {
@@ -276,12 +364,6 @@ private extension RecipeChatMessage.Role {
 }
 
 private extension String {
-  var editableMealPlanComplementLines: [String] {
-    components(separatedBy: .newlines)
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-  }
-
   var cleanedMealPlanComplementText: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed

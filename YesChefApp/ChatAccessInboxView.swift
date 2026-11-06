@@ -36,11 +36,13 @@ struct ChatAccessInboxSection: View {
                 Task { await model.open(row) }
               }
               .disabled(row.downloadState != .current || model.workingIDs.contains(row.id))
+              .buttonStyle(.bordered)
 
               Button("Discard", role: .destructive) {
                 Task { await model.discard(row) }
               }
               .disabled(model.workingIDs.contains(row.id))
+              .buttonStyle(.bordered)
             }
           }
           .accessibilityElement(children: .contain)
@@ -82,12 +84,15 @@ struct ChatAccessInboxSection: View {
         if case .openable = row.destination {
           Button("Open") { Task { await model.open(row) } }
             .disabled(row.downloadState != .current || model.workingIDs.contains(row.id))
+            .buttonStyle(.bordered)
         }
         Button("Copy") { Task { await model.copy(row) } }
           .disabled(row.downloadState != .current || model.workingIDs.contains(row.id))
+          .buttonStyle(.bordered)
         if case .openable = row.destination {
           Button("Discard", role: .destructive) { Task { await model.discard(row) } }
             .disabled(model.workingIDs.contains(row.id))
+            .buttonStyle(.bordered)
         }
       }
     }
