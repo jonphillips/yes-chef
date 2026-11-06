@@ -228,6 +228,8 @@ targets:
         product: CloudSyncKit
       - package: LLMHandoffKit
         product: LLMHandoffKit
+      - package: ChatAccessKit
+        product: ChatAccessKit
       # NOT DependenciesTestSupport. Xcode builds every other package product in
       # this graph as a dynamic framework, but DependenciesTestSupport only ever
       # builds static ("DependenciesTestSupport-product", never
@@ -241,8 +243,6 @@ targets:
       # silently did nothing and the live dependency ran instead: 11 of the 26
       # tests failed for that reason alone. Nothing here uses its API — the
       # `.test` context is detected by Dependencies at runtime without it.
-      - package: ChatAccessKit
-        product: ChatAccessKit
       - package: Dependencies
         product: Dependencies
       - package: SQLiteData

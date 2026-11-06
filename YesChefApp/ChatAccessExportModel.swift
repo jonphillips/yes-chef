@@ -7,7 +7,7 @@ import YesChefCore
 @Observable
 @MainActor
 final class ChatAccessExportModel {
-  private static let installationIDKey = "chatAccessInstallationID"
+  static let installationIDKey = "chatAccessInstallationID"
   private static let lastExportDateKey = "chatAccessLastExportDate"
   private static let lastExportSizeKey = "chatAccessLastExportSize"
 

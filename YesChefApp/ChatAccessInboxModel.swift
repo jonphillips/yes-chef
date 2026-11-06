@@ -10,6 +10,7 @@ import YesChefCore
 @MainActor
 final class ChatAccessInboxModel {
   static let probeCleanupDefaultsKey = "chatAccessProbeCleanupCompleted"
+  static let legacyDevExportCleanupDefaultsKey = "chatAccessLegacyDevExportCleanupCompleted"
 
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.chatAccessFolderClient) private var folderClient
@@ -19,9 +20,10 @@ final class ChatAccessInboxModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored weak var toastCenter: AppToastCenter?
   @ObservationIgnored private let defaults: UserDefaults
-  @ObservationIgnored private var watcher: ChatInboxWatcher?
+  @ObservationIgnored private(set) var watcher: ChatInboxWatcher?
   @ObservationIgnored private var watcherTask: Task<Void, Never>?
   @ObservationIgnored private var latestSnapshots: [ChatInboxSnapshot] = []
+  @ObservationIgnored private var claimedIDs: Set<String> = []
   @ObservationIgnored private var isPreparing = false
   @ObservationIgnored private var recipeNamesByID: [String: String] = [:]
   @ObservationIgnored private var nameReadIDs: Set<String> = []
@@ -53,13 +55,27 @@ final class ChatAccessInboxModel {
     defer { isPreparing = false }
     do {
       let folder = try await resolveFolderIfNeeded()
-      let shouldRemoveProbe = !defaults.bool(forKey: Self.probeCleanupDefaultsKey)
-      try await fileClient.maintain(folder, now, shouldRemoveProbe)
-      if shouldRemoveProbe {
-        defaults.set(true, forKey: Self.probeCleanupDefaultsKey)
-      }
       startWatcher(for: folder)
       message = nil
+      let shouldRemoveProbe = !defaults.bool(forKey: Self.probeCleanupDefaultsKey)
+      do {
+        try await fileClient.maintain(folder, now, shouldRemoveProbe)
+        if shouldRemoveProbe { defaults.set(true, forKey: Self.probeCleanupDefaultsKey) }
+      } catch {
+        message = error.localizedDescription
+      }
+      #if DEBUG
+      if !defaults.bool(forKey: Self.legacyDevExportCleanupDefaultsKey) {
+        do {
+          if let id = defaults.string(forKey: ChatAccessExportModel.installationIDKey) {
+            try await fileClient.cleanupLegacyDevExport(folder, id)
+          }
+          defaults.set(true, forKey: Self.legacyDevExportCleanupDefaultsKey)
+        } catch {
+          message = error.localizedDescription
+        }
+      }
+      #endif
     } catch {
       message = error.localizedDescription
     }
@@ -74,10 +90,12 @@ final class ChatAccessInboxModel {
     defer { workingIDs.remove(row.id) }
     do {
       let text = try await fileClient.openAndClaim(folder, row.url)
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
       await createRecipeCoordinator.stage(text: text)
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -91,9 +109,11 @@ final class ChatAccessInboxModel {
     defer { workingIDs.remove(row.id) }
     do {
       try await fileClient.claim(folder, row.url)
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -117,6 +137,7 @@ final class ChatAccessInboxModel {
       if case .recipeNew = staged.review { toastCenter?.postSuccess("New recipe sent to Create Recipe.") }
       try await claim(row, in: folder)
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url] + row.superseded)
       returnRows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -131,6 +152,7 @@ final class ChatAccessInboxModel {
     do {
       try await claim(row, in: folder)
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url] + row.superseded)
       returnRows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -154,15 +176,24 @@ final class ChatAccessInboxModel {
   private func claim(_ row: ChatAccessInbox.ReturnRow, in folder: ChatAccessFolder) async throws {
     for url in [row.url] + row.superseded {
       do { try await fileClient.claim(folder, url) }
-      catch HandoffInboxError.alreadyClaimed { continue }
+      catch HandoffInboxError.alreadyClaimed { }
+      forget([url])
     }
     metadataGeneration += 1
     returnRows.removeAll { $0.id == row.id }
     rowErrors[row.id] = nil
   }
 
+  private func forget(_ urls: [URL]) {
+    let ids = Set(urls.map(\.path))
+    claimedIDs.formUnion(ids)
+    latestSnapshots.removeAll { ids.contains($0.url.path) }
+    metadataGeneration += 1
+  }
+
   func receiveSnapshots(_ snapshots: [ChatInboxSnapshot]) {
-    latestSnapshots = snapshots
+    claimedIDs.formIntersection(Set(snapshots.map { $0.url.path }))
+    latestSnapshots = snapshots.filter { !claimedIDs.contains($0.url.path) }
     rebuildRows()
   }
 

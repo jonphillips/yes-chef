@@ -216,6 +216,102 @@ struct ChatAccessInboxModelTests {
     }
   }
 
+  @Test func liveMaintenancePreservesOldUnclaimedRecipesAndDatesReturnsByClaim() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let now = Date()
+    let old = now.addingTimeInterval(-31 * 24 * 60 * 60)
+    let recipeInbox = HandoffInbox(root: folder.inboxURL, fileExtension: "json")
+    let returnInbox = HandoffInbox(root: folder.inboxURL, fileExtension: "ycreturn")
+    let recipe = try recipeInbox.stage("recipe", slug: "recipe", now: old)
+    let expiredReturn = try returnInbox.stage("return", slug: "old", now: old)
+    let claimedReturn = try returnInbox.stage("return", slug: "claimed", now: old)
+    let client = ChatAccessInboxFileClient.liveValue
+    try await client.claim(folder, claimedReturn.url)
+    try await client.maintain(folder, now, false)
+    #expect(FileManager.default.fileExists(atPath: recipe.url.path))
+    #expect(!FileManager.default.fileExists(atPath: expiredReturn.url.path))
+    for staged in [expiredReturn, claimedReturn] {
+      let processed = folder.processedURL.appending(path: staged.url.lastPathComponent)
+      let modified = try #require(processed.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+      #expect(abs(modified.timeIntervalSince(now)) < 5)
+    }
+  }
+
+  @Test func watcherStartsWhenMaintenanceFails() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_800_000_000)
+      $0.chatAccessInboxFileClient = .init(read: { _ in "" }, openAndClaim: { _, _ in "" },
+        claim: { _, _ in }, maintain: { _, _, _ in throw InboxReadFailure.unavailable })
+    } operation: {
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      await model.prepare()
+      #expect(model.watcher != nil)
+      #expect(model.message == InboxReadFailure.unavailable.localizedDescription)
+    }
+  }
+
+  @Test func prepareRemovesThisDevInstallLegacyExport() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let id = UUID()
+    defaults.set(id.uuidString, forKey: ChatAccessExportModel.installationIDKey)
+    let legacy = folder.exportsURL.appending(path: "\(id.uuidString).json")
+    try FileManager.default.createDirectory(at: folder.exportsURL, withIntermediateDirectories: true)
+    try Data("legacy".utf8).write(to: legacy)
+    let dev = ChatAccessFolder(containerURL: temporary, isDevelopment: true)
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_800_000_000)
+      $0.chatAccessInboxFileClient = .liveValue
+    } operation: {
+      let model = ChatAccessInboxModel(folder: dev, defaults: defaults)
+      await model.prepare()
+      #expect(!FileManager.default.fileExists(atPath: legacy.path))
+      #expect(defaults.bool(forKey: ChatAccessInboxModel.legacyDevExportCleanupDefaultsKey))
+    }
+  }
+
+  @Test func legacyDevCleanupOnlyRemovesThisInstall() async throws {
+    let (_, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let id = UUID(), other = UUID()
+    let production = ChatAccessFolder(containerURL: temporary, isDevelopment: false)
+    let dev = ChatAccessFolder(containerURL: temporary, isDevelopment: true)
+    try FileManager.default.createDirectory(at: production.exportsURL, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: dev.exportsURL, withIntermediateDirectories: true)
+    let old = production.exportsURL.appending(path: "\(id.uuidString).json")
+    let otherExport = production.exportsURL.appending(path: "\(other.uuidString).json")
+    let devExport = dev.exportsURL.appending(path: "\(id.uuidString).json")
+    for url in [old, otherExport, devExport] { try Data("export".utf8).write(to: url) }
+    try await ChatAccessInboxFileClient.liveValue.cleanupLegacyDevExport(dev, id.uuidString)
+    try await ChatAccessInboxFileClient.liveValue.cleanupLegacyDevExport(dev, id.uuidString)
+    #expect(!FileManager.default.fileExists(atPath: old.path))
+    #expect(FileManager.default.fileExists(atPath: otherExport.path))
+    #expect(FileManager.default.fileExists(atPath: devExport.path))
+  }
+
+  @Test func discardedRecipeDoesNotReturnFromCachedOrStaleSnapshots() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_800_000_000)
+      $0.chatAccessInboxFileClient = .init(read: { _ in "" }, openAndClaim: { _, _ in "" }, claim: { _, _ in }, maintain: { _, _, _ in })
+    } operation: {
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      let url = makeRow(in: folder).url
+      let snapshot = ChatInboxSnapshot(url: url, name: url.lastPathComponent, isCurrent: true)
+      model.receiveSnapshots([snapshot])
+      await model.discard(try #require(model.rows.first))
+      model.receiveSnapshots([snapshot])
+      #expect(model.rows.isEmpty)
+    }
+  }
+
   @Test func liveClaimKeepsReturnExtension() async throws {
     let (folder, defaults, suiteName, temporary) = try fixture()
     defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
