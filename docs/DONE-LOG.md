@@ -18,9 +18,10 @@ Newest first.
 ---
 ## 2026-11-06 — Create Recipe, Calendar, and Source review fixes (`effort/create-recipe-calendar-review-fixes`)
 
-- **Result:** Separated From Chat action targets, preserved Calendar complement edits and paragraphs through commit, and made Source navigation an explicit editor route that closes on Back and draft replacement.
-- **Verification:** scripts/check-drift.sh passed with zero lint violations and 766 package tests; generic iOS build passed; YesChefTests passed with 122 tests; focused complement tests passed with 9 tests.
+- **Result:** Separated From Chat action targets. Calendar complement review now preserves paragraph breaks, keeps a malformed header visible and blocks saving until it's fixed, and has regression coverage through both app commit paths. The original report, all added text disappearing under an intact generated header, is unconfirmed: this work did not reproduce it, and the device pass has to check Jon's exact sequence before it's called resolved. Source navigation is now an explicit editor route that closes on Back and draft replacement.
+- **Verification:** scripts/check-drift.sh passed with zero lint violations and 768 package tests; generic iOS build passed; YesChefTests passed with 122 tests; focused complement tests passed with 11 tests.
 - **Owed:** create-recipe-calendar-review-fixes S1 + S2 + S3 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+- **Corrected after merge:** the closeout ran before the last fix commit, so this entry first gave the older test counts (766 and 9) and said Calendar edits were preserved through commit without noting the unconfirmed report.
 
 ---
 ## 2026-11-05 — ChatAccessKit device pass cleared (`plan/chat-access-kit-device-pass`)

@@ -165,6 +165,18 @@ selection (per-bubble `UITextView` caps the payload).
 Live ambiguities and recently-resolved decisions. Resolved items stay here briefly
 (dated) so the reasoning is durable, then graduate into the relevant doc or ADR.
 
+## Live — Calendar complement review validation has no test through the real builders (2026-11-06)
+
+`validateText` decides whether Add is enabled in Calendar complement review, but no test calls it on an item from
+either real builder (`MealCalendarModel.makeApplyActions`, `HandoffReviewCoordinator.mealPlanComplementReviewItems`).
+If it ever rejected a generated header, Add would be disabled on every complement review, and a test run wouldn't
+show it. Reading the code, a generated header validates today, because both sides use the same `dayTitle`.
+
+The small fix: in `mealCalendarChatCollectionCommitPreservesEditedComplementsThroughEditDraft` and
+`externalMealPlanHandoffCommitPreservesEditedComplementThroughEditDraft`, assert that
+`validationMessage(for: unmodifiedApprovedText)` is `nil` and that the text with its placement line removed returns a
+message. It needs a dispatch; PR 457 merged without it.
+
 ## Dormant — variation ↔ Workbench overlap (watch)
 
 The 2026-07-11 two-device pass raised three variation/Workbench-overlap forks; all three were answered by
