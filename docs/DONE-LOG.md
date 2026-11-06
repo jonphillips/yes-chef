@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-05 — ChatAccessKit device pass cleared (`plan/chat-access-kit-device-pass`)
+
+- **Result:** The device gate for the ChatAccessKit adoption passed, and its line is gone from `device-passes.md`.
+- **Verification:** Jon's device report on 2026-11-05: on TestFlight, a staged recipe and a staged hand-off return both opened and discarded, and Yes Chef Dev on the same device didn't list them.
+
+---
 ## 2026-11-05 — Adopt ChatAccessKit (`effort/chat-access-kit-adoption`)
 
 - **Result:** Yes Chef uses the shared inbox transport from jon-platform [#123](https://github.com/jonphillips/jon-platform/pull/123); Debug and `--variant dev` use separate inbox and export folders.
