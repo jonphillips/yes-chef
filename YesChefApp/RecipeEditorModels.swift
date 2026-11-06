@@ -6,6 +6,10 @@ import YesChefCore
 @Observable
 @MainActor
 final class RecipeEditorModel {
+  enum Destination: Equatable {
+    case source
+  }
+
   let recipeID: Recipe.ID?
 
   @ObservationIgnored
@@ -22,6 +26,7 @@ final class RecipeEditorModel {
   @Fetch(FacetListRequest(), animation: .default) var facets: [Facet] = []
 
   var draft = RecipeEditorDraft()
+  var destination: Destination?
   var errorMessage: String?
   var isShowingError = false
   var isSaving = false
@@ -35,6 +40,16 @@ final class RecipeEditorModel {
     } else {
       _detail = Fetch(wrappedValue: nil)
     }
+  }
+
+  /// NavigationStack binds its push lifetime to this one route in the editor model.
+  var isSourceDestinationPresented: Bool {
+    get { destination == .source }
+    set { destination = newValue ? .source : nil }
+  }
+
+  func sourceButtonTapped() {
+    destination = .source
   }
 
   /// Seeds a brand-new recipe's structured half with an already-populated draft — the Create Recipe
@@ -52,6 +67,7 @@ final class RecipeEditorModel {
   /// open. The source material that produced it lives on `CreateRecipeModel`, so a re-extraction
   /// re-seeds the form without losing what the cook supplied (ADR-0053 D4).
   func applyExtractedDraft(_ extracted: RecipeEditorDraft) {
+    destination = nil
     draft = extracted
     hasLoadedDraft = true
   }

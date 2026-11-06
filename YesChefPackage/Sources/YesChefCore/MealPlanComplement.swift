@@ -53,20 +53,56 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
     rendered(dayTitle: dayTitle)
   }
 
-  public func applyingEditableReviewText(_ text: String) -> MealPlanComplementSuggestion {
-    let lines = text.editableMealPlanComplementLines
+  public func applyingEditableReviewText(
+    _ text: String,
+    dayTitle: String? = nil
+  ) -> MealPlanComplementSuggestion {
+    let lines = text.components(separatedBy: .newlines)
     var suggestion = self
 
-    if let titleLine = lines.first {
-      suggestion.kind = Self.kind(fromEditableReviewTitleLine: titleLine) ?? suggestion.kind
-      suggestion.title = Self.title(fromEditableReviewTitleLine: titleLine) ?? suggestion.title
-    }
-    if let placementLine = lines.dropFirst().first {
-      suggestion.mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine) ?? suggestion.mealSlot
+    guard let titleLine = lines.first,
+      let kind = Self.kind(fromEditableReviewTitleLine: titleLine),
+      let title = Self.title(fromEditableReviewTitleLine: titleLine)
+    else {
+      suggestion.body = text.cleanedMealPlanComplementText
+      return suggestion
     }
 
-    suggestion.body = lines.dropFirst(2).joined(separator: "\n").cleanedMealPlanComplementText
+    suggestion.kind = kind
+    suggestion.title = title
+
+    if let placementLine = lines.dropFirst().first,
+      let mealSlot = Self.mealSlot(fromEditableReviewPlacementLine: placementLine),
+      dayTitle == nil || Self.dayTitle(fromEditableReviewPlacementLine: placementLine) == dayTitle
+    {
+      suggestion.mealSlot = mealSlot
+      suggestion.body = lines.dropFirst(2).joined(separator: "\n").cleanedMealPlanComplementText
+    } else {
+      // A malformed placement line stays visible in the body instead of consuming the first line
+      // of the cook's notes. The review validates this header before allowing a commit.
+      suggestion.body = lines.dropFirst().joined(separator: "\n").cleanedMealPlanComplementText
+    }
     return suggestion
+  }
+
+  public func editableReviewValidationMessage(_ text: String, dayTitle: String) -> String? {
+    let lines = text.components(separatedBy: .newlines)
+    guard let titleLine = lines.first,
+      let title = Self.title(fromEditableReviewTitleLine: titleLine),
+      !title.isEmpty,
+      Self.kind(fromEditableReviewTitleLine: titleLine) != nil
+    else {
+      return "Keep a labeled title on the first line, such as “Note: Herb salad.”"
+    }
+
+    guard let placementLine = lines.dropFirst().first,
+      Self.mealSlot(fromEditableReviewPlacementLine: placementLine) != nil,
+      Self.dayTitle(fromEditableReviewPlacementLine: placementLine) == dayTitle
+    else {
+      return "Keep \(dayTitle) and a meal slot on the second line, such as “\(dayTitle) - Dinner.”"
+    }
+
+    return nil
   }
 
   private static func kind(fromEditableReviewTitleLine line: String) -> MealPlanItemKind? {
@@ -88,6 +124,12 @@ public struct MealPlanComplementSuggestion: Equatable, Sendable {
       $0.rawValue == slotText.normalizedMealPlanComplementEnumValue
         || $0.title.normalizedMealPlanComplementEnumValue == slotText.normalizedMealPlanComplementEnumValue
     }
+  }
+
+  private static func dayTitle(fromEditableReviewPlacementLine line: String) -> String? {
+    let components = line.components(separatedBy: " - ")
+    guard components.count >= 2 else { return nil }
+    return components.dropLast().joined(separator: " - ").cleanedMealPlanComplementText
   }
 }
 

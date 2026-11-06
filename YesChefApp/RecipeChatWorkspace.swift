@@ -865,6 +865,11 @@ struct ChatApplyReviewSheet: View {
                 .textInputAutocapitalization(.sentences)
                 .autocorrectionDisabled(false)
                 .frame(height: ChatApplyReviewLayout.minimumEditableTextHeight)
+              if let validationMessage = item.validationMessage(for: draftText) {
+                Label(validationMessage, systemImage: "exclamationmark.triangle")
+                  .font(.footnote)
+                  .foregroundStyle(.orange)
+              }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -942,6 +947,10 @@ struct ChatApplyReviewSheet: View {
     draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
+  private var approvedTextHasValidationIssue: Bool {
+    item.validationMessage(for: draftText) != nil
+  }
+
   private func discardButtonTapped() {
     if hasUnsavedEdits {
       isShowingDiscardConfirmation = true
@@ -967,7 +976,7 @@ struct ChatApplyReviewSheet: View {
         Text(title)
       }
     }
-    .disabled(isCommitting || approvedTextIsEmpty)
+    .disabled(isCommitting || approvedTextIsEmpty || approvedTextHasValidationIssue)
   }
 }
 

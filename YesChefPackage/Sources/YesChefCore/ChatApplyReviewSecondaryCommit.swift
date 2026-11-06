@@ -12,6 +12,7 @@ public struct ChatApplyReviewItem: Identifiable {
   public var commitTitle: String
   public var committingTitle: String
   public var committedTitle: String
+  public var validateText: (@MainActor (_ approvedText: String) -> String?)?
   public var commit: @MainActor (_ approvedText: String) async throws -> Void
   public var secondaryCommit: ChatApplyReviewSecondaryCommit?
 
@@ -28,6 +29,7 @@ public struct ChatApplyReviewItem: Identifiable {
     committingTitle: String,
     committedTitle: String,
     secondaryCommit: ChatApplyReviewSecondaryCommit? = nil,
+    validateText: (@MainActor (_ approvedText: String) -> String?)? = nil,
     commit: @escaping @MainActor () async throws -> Void
   ) {
     self.id = id
@@ -42,6 +44,7 @@ public struct ChatApplyReviewItem: Identifiable {
     self.committingTitle = committingTitle
     self.committedTitle = committedTitle
     self.secondaryCommit = secondaryCommit
+    self.validateText = validateText
     self.commit = { _ in try await commit() }
   }
 
@@ -58,6 +61,7 @@ public struct ChatApplyReviewItem: Identifiable {
     committingTitle: String,
     committedTitle: String,
     secondaryCommit: ChatApplyReviewSecondaryCommit? = nil,
+    validateText: (@MainActor (_ approvedText: String) -> String?)? = nil,
     commit: @escaping @MainActor (_ approvedText: String) async throws -> Void
   ) {
     self.id = id
@@ -72,6 +76,7 @@ public struct ChatApplyReviewItem: Identifiable {
     self.committingTitle = committingTitle
     self.committedTitle = committedTitle
     self.secondaryCommit = secondaryCommit
+    self.validateText = validateText
     self.commit = commit
   }
 
@@ -95,6 +100,11 @@ public struct ChatApplyReviewItem: Identifiable {
     case .sheet:
       editableText ?? summary
     }
+  }
+
+  @MainActor
+  public func validationMessage(for approvedText: String) -> String? {
+    validateText?(approvedText)
   }
 }
 

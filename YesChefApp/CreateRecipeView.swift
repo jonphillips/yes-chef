@@ -18,6 +18,7 @@ struct CreateRecipeView: View {
 
   var body: some View {
     @Bindable var model = model
+    @Bindable var editorModel = model.editorModel
 
     ScrollViewReader { proxy in
       Form {
@@ -84,11 +85,14 @@ struct CreateRecipeView: View {
         }
 
         RecipeEditorFields(
-          model: model.editorModel,
+          model: editorModel,
           proxy: proxy,
           focusedIngredientSectionID: $focusedIngredientSectionID,
           focusedIngredientSectionNameID: $focusedIngredientSectionNameID
         )
+      }
+      .navigationDestination(isPresented: $editorModel.isSourceDestinationPresented) {
+        RecipeSourceEditorView(model: editorModel)
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         if let focusedIngredientSectionID {

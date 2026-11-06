@@ -77,6 +77,49 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func editableReviewTextPreservesParagraphBreaksAndDoesNotConsumeMalformedPlacementAsBody() {
+      let suggestion = MealPlanComplementSuggestion(
+        title: "Cucumber herb salad",
+        body: "Existing note.",
+        mealSlot: .dinner
+      )
+
+      let editedText = """
+      Note: Cucumber herb salad
+      Tuesday, July 8 - Dinner
+      Existing note.
+
+      Distinctive added paragraph.
+      """
+      let edited = suggestion.applyingEditableReviewText(
+        editedText,
+        dayTitle: "Tuesday, July 8"
+      )
+      expectNoDifference(
+        edited.body,
+        "Existing note.\n\nDistinctive added paragraph."
+      )
+      #expect(suggestion.editableReviewValidationMessage(editedText, dayTitle: "Tuesday, July 8") == nil)
+
+      let malformedText = """
+      Note: Cucumber herb salad
+      Distinctive first body line.
+      A second body line.
+      """
+      let malformedPlacement = suggestion.applyingEditableReviewText(
+        malformedText,
+        dayTitle: "Tuesday, July 8"
+      )
+      expectNoDifference(malformedPlacement.title, "Cucumber herb salad")
+      expectNoDifference(malformedPlacement.mealSlot, .dinner)
+      expectNoDifference(
+        malformedPlacement.body,
+        "Distinctive first body line.\nA second body line."
+      )
+      #expect(suggestion.editableReviewValidationMessage(malformedText, dayTitle: "Tuesday, July 8") != nil)
+    }
+
+    @Test
     func handoffParserUsesNoteLabelsWhenBlankLinesAreCollapsed() {
       let parsed = MealPlanComplementPlan.parsingHandoffText(
         """
