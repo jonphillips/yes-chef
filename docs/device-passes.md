@@ -16,6 +16,7 @@ Dev, on CloudKit Development.
 ## Owed now
 - **polish-batch-2026-11:** On iPad and iPhone, check linked Serve With, Related Recipes and Drafted From recipes in a Menu cover; calendar and Menu complement reasons through review and insertion; and repeated Sync sheet opening, including during sync. ([brief](efforts/archive/polish-batch-2026-11.md))
 - **create-recipe-calendar-review-fixes S1 + S2 + S3 (one PR):** On iPad Pro 13-inch (M5) (16GB) and iPhone 17 Pro, confirm From Chat Open, Copy, Discard, and whitespace isolation; save edited multi-paragraph Calendar complements with the keyboard up and reopen Edit; edit Source in Create Recipe and an existing recipe, return using Back and swipe-back, and confirm the editor stays put with edits intact. ([brief](efforts/archive/create-recipe-calendar-review-fixes.md))
+- **ChatAccessKit export adoption:** Reinstall the helper and restart the tunnel. In Settings, Refresh updates the export time and size. Backgrounding within 15 minutes doesn't write a new export. From ChatGPT, `search_recipes` and `get_recipe` return content with the export's age. An evicted export reads back inside the 60-second bound, and the helper log shows `chat-access export materialize=…`. After a forced Refresh on the other device, the tools use the newer export and refuse the older ref as stale.
 
 ## Held
 

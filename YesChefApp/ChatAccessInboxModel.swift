@@ -67,7 +67,7 @@ final class ChatAccessInboxModel {
       #if DEBUG
       if !defaults.bool(forKey: Self.legacyDevExportCleanupDefaultsKey) {
         do {
-          if let id = defaults.string(forKey: ChatAccessExportModel.installationIDKey) {
+          if let id = defaults.string(forKey: ChatAccessExportWriter.installationIDKey) {
             try await fileClient.cleanupLegacyDevExport(folder, id)
           }
           defaults.set(true, forKey: Self.legacyDevExportCleanupDefaultsKey)

@@ -12,138 +12,57 @@ private struct ExportSnapshot: Sendable {
 }
 
 private actor ChatAccessExportStore {
-  let directory: URL
+  private let reader: ChatAccessExportReader
   let now: @Sendable () -> Date
-  let materialize: @Sendable (URL) async throws -> Data
-  let materializationDeadline: Duration
-  private var cachedKey: String?
+  private var cachedModifiedAt: Date?
+  private var cachedData: Data?
   private var cachedSnapshot: ExportSnapshot?
 
-  init(containerURL: URL, isDevelopment: Bool, now: @escaping @Sendable () -> Date, materialize: @escaping @Sendable (URL) async throws -> Data, materializationDeadline: Duration) {
-    self.directory = ChatAccessFolder(containerURL: containerURL, isDevelopment: isDevelopment).exportsURL
+  init(
+    containerURL: URL,
+    isDevelopment: Bool,
+    now: @escaping @Sendable () -> Date,
+    materialize: ChatAccessExportReader.Materializer?,
+    materializationDeadline: Duration
+  ) {
+    self.reader = ChatAccessExportReader(
+      folder: ChatAccessFolder(containerURL: containerURL, isDevelopment: isDevelopment),
+      materializationDeadline: materializationDeadline,
+      materialize: materialize
+    )
     self.now = now
-    self.materialize = materialize
-    self.materializationDeadline = materializationDeadline
   }
 
   func load() async throws -> ExportSnapshot {
-    let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-    let candidates = files.compactMap { url -> (URL, Date)? in
-      guard url.pathExtension == "json",
-        let date = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-      else { return nil }
-      return (url, date)
-    }.sorted { $0.1 > $1.1 }
-    guard let (url, modified) = candidates.first else {
+    let file: ChatAccessExportFile
+    do {
+      file = try await reader.readLatest()
+    } catch ChatAccessExportReaderError.noExport {
       throw ReadToolError("No Yes Chef export yet. Open Yes Chef on the iPhone or iPad, or tap Refresh in Settings → Chat Access.")
+    } catch ChatAccessExportReaderError.materializationTimedOut {
+      throw ReadToolError("The Yes Chef export is still downloading from iCloud. Try again in a minute.")
     }
-    let key = "\(url.path)|\(modified.timeIntervalSince1970)"
-    if key == cachedKey, let cachedSnapshot {
+
+    if file.modifiedAt == cachedModifiedAt, file.data == cachedData, let cachedSnapshot {
       var refreshed = cachedSnapshot
       refreshed.ageMinutes = max(0, Int(now().timeIntervalSince(refreshed.generatedAt) / 60))
       self.cachedSnapshot = refreshed
       return refreshed
     }
 
-    let materialize = self.materialize
-    let deadline = self.materializationDeadline
-    let data = try await readWithDeadline(url, deadline: deadline, materialize: materialize)
-    let export = try ChatAccessExportCoding.decode(data)
+    let export = try ChatAccessExportCoding.decode(file.data)
     let age = max(0, Int(now().timeIntervalSince(export.generatedAt) / 60))
-    let snapshot = ExportSnapshot(value: export, generatedAt: export.generatedAt, ageMinutes: age, device: export.device, generation: Int64(modified.timeIntervalSince1970 * 1_000_000))
-    cachedKey = key
+    let snapshot = ExportSnapshot(
+      value: export,
+      generatedAt: export.generatedAt,
+      ageMinutes: age,
+      device: export.device,
+      generation: Int64(file.modifiedAt.timeIntervalSince1970 * 1_000_000)
+    )
+    cachedModifiedAt = file.modifiedAt
+    cachedData = file.data
     cachedSnapshot = snapshot
     return snapshot
-  }
-
-  fileprivate static func coordinatedRead(_ url: URL) throws -> Data {
-    let clock = ContinuousClock()
-    let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-    if let status = values?.ubiquitousItemDownloadingStatus, status != URLUbiquitousItemDownloadingStatus.current {
-      try FileManager.default.startDownloadingUbiquitousItem(at: url)
-    }
-    let coordinator = NSFileCoordinator(filePresenter: nil)
-    var coordinationError: NSError?
-    var data: Data?
-    var readError: Error?
-    let coordinationStart = clock.now
-    var materializationDuration: Duration = .zero
-    var readDuration: Duration = .zero
-    coordinator.coordinate(readingItemAt: url, options: .withoutChanges, error: &coordinationError) { readURL in
-      let accessorStart = clock.now
-      materializationDuration = coordinationStart.duration(to: accessorStart)
-      let start = clock.now
-      do {
-        data = try Data(contentsOf: readURL)
-      } catch {
-        readError = error
-      }
-      readDuration = start.duration(to: clock.now)
-    }
-    if let coordinationError { throw coordinationError }
-    if let readError { throw readError }
-    guard let data else { throw CocoaError(.fileReadUnknown) }
-    fputs("yeschef-mcp export materialize=\(materializationDuration) read=\(readDuration)\n", stderr)
-    return data
-  }
-
-  private func readWithDeadline(
-    _ url: URL,
-    deadline: Duration,
-    materialize: @escaping @Sendable (URL) async throws -> Data
-  ) async throws -> Data {
-    try await withCheckedThrowingContinuation { continuation in
-      let gate = ReadRaceGate(continuation)
-      let work = Task.detached(priority: .utility) {
-        do { gate.resolve(.success(try await materialize(url))) }
-        catch { gate.resolve(.failure(error)) }
-      }
-      let timer = Task.detached(priority: .utility) {
-        do {
-          try await Task.sleep(for: deadline)
-          gate.resolve(.failure(ReadToolError("The Yes Chef export is still downloading from iCloud. Try again in a minute.")))
-        } catch {}
-      }
-      gate.setTasks(work: work, timer: timer)
-    }
-  }
-}
-
-private final class ReadRaceGate: @unchecked Sendable {
-  private let lock = NSLock()
-  private var continuation: CheckedContinuation<Data, any Error>?
-  private var work: Task<Void, Never>?
-  private var timer: Task<Void, Never>?
-
-  init(_ continuation: CheckedContinuation<Data, any Error>) {
-    self.continuation = continuation
-  }
-
-  func setTasks(work: Task<Void, Never>, timer: Task<Void, Never>) {
-    lock.lock()
-    if continuation == nil {
-      lock.unlock()
-      work.cancel()
-      timer.cancel()
-    } else {
-      self.work = work
-      self.timer = timer
-      lock.unlock()
-    }
-  }
-
-  func resolve(_ result: Result<Data, any Error>) {
-    lock.lock()
-    guard let continuation else { lock.unlock(); return }
-    self.continuation = nil
-    let timer = self.timer
-    let work = self.work
-    self.timer = nil
-    self.work = nil
-    lock.unlock()
-    timer?.cancel()
-    if case .failure = result { work?.cancel() }
-    continuation.resume(with: result)
   }
 }
 
@@ -165,8 +84,7 @@ enum ChatAccessReadTools {
     materialize: (@Sendable (URL) async throws -> Data)? = nil,
     materializationDeadline: Duration = .seconds(60)
   ) -> [MCPTool] {
-    let reader = materialize ?? { url in try await Task.detached(priority: .utility) { try ChatAccessExportStore.coordinatedRead(url) }.value }
-    let store = ChatAccessExportStore(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: reader, materializationDeadline: materializationDeadline)
+    let store = ChatAccessExportStore(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: materialize, materializationDeadline: materializationDeadline)
     return [
       tool("search_recipes", "Search recipes by name, ingredients, categories, and notes.", schema: objectSchema(["query": stringSchema, "limit": integerSchema], required: ["query"])) { input in
         let args = arguments(input)
