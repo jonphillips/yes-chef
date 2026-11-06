@@ -25,4 +25,5 @@ discoverable"):
 
 ## Live
 
+- [Create Recipe actions, Calendar review edits, and Source navigation](create-recipe-calendar-review-fixes.md) — **Ready**. Fix From Chat action isolation, preserve edited Calendar complement notes, and stop Source reopening after Back.
 
