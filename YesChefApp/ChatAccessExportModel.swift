@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Dependencies
 import Foundation
 import Observation
@@ -7,15 +8,11 @@ import YesChefCore
 @Observable
 @MainActor
 final class ChatAccessExportModel {
-  static let installationIDKey = "chatAccessInstallationID"
-  private static let lastExportDateKey = "chatAccessLastExportDate"
-  private static let lastExportSizeKey = "chatAccessLastExportSize"
-
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
-  @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.chatAccessFolderClient) private var folderClient
   @ObservationIgnored private let defaults: UserDefaults
+  @ObservationIgnored private let writer: ChatAccessExportWriter
 
   private(set) var lastExportDate: Date?
   private(set) var lastExportSize: Int?
@@ -24,12 +21,15 @@ final class ChatAccessExportModel {
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
-    self.lastExportDate = defaults.object(forKey: Self.lastExportDateKey) as? Date
-    self.lastExportSize = defaults.object(forKey: Self.lastExportSizeKey) as? Int
+    let makeUUID = DependencyValues._current.uuid
+    let writer = ChatAccessExportWriter(defaults: defaults, makeUUID: { makeUUID() })
+    self.writer = writer
+    self.lastExportDate = writer.lastExport?.date
+    self.lastExportSize = writer.lastExport?.size
   }
 
   func exportIfDue() async {
-    if let lastExportDate, now.timeIntervalSince(lastExportDate) < 15 * 60 { return }
+    guard writer.isDue(at: now) else { return }
     await refresh()
   }
 
@@ -48,36 +48,16 @@ final class ChatAccessExportModel {
       let folder = try await folderClient.resolveFolder()
       let generatedAt = now
       let device = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
-      let installationID: String
-      if let savedInstallationID = defaults.string(forKey: Self.installationIDKey) {
-        installationID = savedInstallationID
-      } else {
-        installationID = uuid().uuidString
-        defaults.set(installationID, forKey: Self.installationIDKey)
-      }
       let export = try await database.read { db in
         try ChatAccessExportBuilder.build(in: db, generatedAt: generatedAt, device: device)
       }
       let data = try await Task.detached(priority: .utility) {
         try ChatAccessExportCoding.encode(export)
       }.value
-      let destination = folder.exportsURL
-        .appending(path: "\(installationID).json")
-      try await Task.detached(priority: .utility) {
-        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let coordinator = NSFileCoordinator(filePresenter: nil)
-        var coordinationError: NSError?
-        var writeError: Error?
-        coordinator.coordinate(writingItemAt: destination, options: .forReplacing, error: &coordinationError) { coordinatedURL in
-          do { try data.write(to: coordinatedURL, options: .atomic) } catch { writeError = error }
-        }
-        if let coordinationError { throw coordinationError }
-        if let writeError { throw writeError }
-      }.value
-      lastExportDate = generatedAt
-      lastExportSize = data.count
-      defaults.set(generatedAt, forKey: Self.lastExportDateKey)
-      defaults.set(data.count, forKey: Self.lastExportSizeKey)
+      if case let .written(date, size) = try await writer.write(data, to: folder, generatedAt: generatedAt, force: true) {
+        lastExportDate = date
+        lastExportSize = size
+      }
     } catch {
       errorMessage = error.localizedDescription
     }

@@ -7,6 +7,25 @@ import YesChefCore
 import YesChefMCPServer
 
 struct YesChefMCPTests {
+  @Test func unchangedExportKeepsRecipeRefsAcrossToolCalls() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let exports = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
+    try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let date = Date(timeIntervalSince1970: 1_800_000_000)
+    let bundle = RecipeBundleCoding.RecipeBundle(recipe: Recipe(id: UUID(), title: "Stable Soup", dateCreated: date, dateModified: date))
+    let export = ChatAccessExport(generatedAt: date, device: "iPhone", recipes: [bundle], menus: [], mealPlan: [])
+    try ChatAccessExportCoding.encode(export).write(to: exports.appending(path: "install.json"))
+    let server = YesChefMCPServer.make(home: temporary) { date }
+
+    let first = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
+    let second = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
+    let firstRef = try #require(object(toolText(first))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let secondRef = try #require(object(toolText(second))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    #expect(firstRef == secondRef)
+  }
+
   @Test func listsToolsAndStagesAValidatedColonFreeRecipe() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)

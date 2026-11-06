@@ -258,7 +258,7 @@ struct ChatAccessInboxModelTests {
     let (folder, defaults, suiteName, temporary) = try fixture()
     defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
     let id = UUID()
-    defaults.set(id.uuidString, forKey: ChatAccessExportModel.installationIDKey)
+    defaults.set(id.uuidString, forKey: ChatAccessExportWriter.installationIDKey)
     let legacy = folder.exportsURL.appending(path: "\(id.uuidString).json")
     try FileManager.default.createDirectory(at: folder.exportsURL, withIntermediateDirectories: true)
     try Data("legacy".utf8).write(to: legacy)

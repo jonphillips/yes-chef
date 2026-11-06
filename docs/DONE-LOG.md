@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-06 — Adopt ChatAccessKit export in Yes Chef (`effort/chat-access-export-adoption`)
+
+- **Result:** Yes Chef's export reader, writer, and helper setup now use jon-platform [#128](https://github.com/jonphillips/jon-platform/pull/128), preserving the decoded cache, tool messages, 15-minute background throttle, and export references.
+- **Verification:** `scripts/check-drift.sh` passed; generic iOS build passed; YesChefTests passed (123 tests); `swift test --package-path YesChefMCP` passed (15 tests); `check-handoff --strict` passed after this entry was added.
+- **Owed:** ChatAccessKit export adoption's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-06 — Create Recipe, Calendar, and Source review fixes (`effort/create-recipe-calendar-review-fixes`)
 
 - **Result:** Separated From Chat action targets, preserved Calendar complement edits and paragraphs through commit, and made Source navigation an explicit editor route that closes on Back and draft replacement.
