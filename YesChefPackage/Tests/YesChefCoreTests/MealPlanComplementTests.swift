@@ -141,6 +141,47 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func handoffParserUsesTheFirstTwoNonemptyHeaderLinesWhenSeparatedByBlankLines() {
+      let parsed = MealPlanComplementPlan.parsingHandoffText(
+        """
+        Note: Toast
+
+        Tuesday, July 8 - Breakfast
+        Add herbs.
+
+        Finish with lemon.
+        """
+      )
+
+      expectNoDifference(
+        parsed.plan.items,
+        [MealPlanComplementSuggestion(
+          title: "Toast",
+          body: "Add herbs.\n\nFinish with lemon.",
+          mealSlot: .breakfast
+        )]
+      )
+      expectNoDifference(parsed.unparsedBlocks, [])
+    }
+
+    @Test
+    func handoffParserNormalizesCRLFBeforeReadingHeadersAndBody() {
+      let parsed = MealPlanComplementPlan.parsingHandoffText(
+        "Note: Toast\r\nTuesday, July 8 - Breakfast\r\nAdd herbs.\r\n\r\nFinish with lemon."
+      )
+
+      expectNoDifference(
+        parsed.plan.items,
+        [MealPlanComplementSuggestion(
+          title: "Toast",
+          body: "Add herbs.\n\nFinish with lemon.",
+          mealSlot: .breakfast
+        )]
+      )
+      expectNoDifference(parsed.unparsedBlocks, [])
+    }
+
+    @Test
     func handoffParserKeepsBodyAndUnknownSlotsAsReviewEvidence() {
       let parsed = MealPlanComplementPlan.parsingHandoffText(
         """
