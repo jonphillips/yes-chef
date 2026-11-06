@@ -16,14 +16,17 @@ struct YesChefMCPTests {
     let date = Date(timeIntervalSince1970: 1_800_000_000)
     let bundle = RecipeBundleCoding.RecipeBundle(recipe: Recipe(id: UUID(), title: "Stable Soup", dateCreated: date, dateModified: date))
     let export = ChatAccessExport(generatedAt: date, device: "iPhone", recipes: [bundle], menus: [], mealPlan: [])
-    try ChatAccessExportCoding.encode(export).write(to: exports.appending(path: "install.json"))
-    let server = YesChefMCPServer.make(home: temporary) { date }
+    let data = try ChatAccessExportCoding.encode(export)
+    try data.write(to: exports.appending(path: "install.json"))
+    let materializer = ExportMaterializationCounter(data: data)
+    let server = YesChefMCPServer.make(home: temporary, now: { date }, exportMaterializer: { _ in await materializer.materialize() })
 
     let first = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
     let second = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
     let firstRef = try #require(object(toolText(first))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
     let secondRef = try #require(object(toolText(second))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
     #expect(firstRef == secondRef)
+    #expect(await materializer.count == 1)
   }
 
   @Test func listsToolsAndStagesAValidatedColonFreeRecipe() async throws {
@@ -403,6 +406,18 @@ struct YesChefMCPTests {
 
   private func object(_ json: String) throws -> [String: MCPValue] {
     try JSONDecoder().decode(MCPValue.self, from: Data(json.utf8)).objectValue ?? [:]
+  }
+}
+
+private actor ExportMaterializationCounter {
+  private let data: Data
+  private(set) var count = 0
+
+  init(data: Data) { self.data = data }
+
+  func materialize() -> Data {
+    count += 1
+    return data
   }
 }
 

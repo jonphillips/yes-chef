@@ -11,7 +11,6 @@ final class ChatAccessExportModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.chatAccessFolderClient) private var folderClient
-  @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private let writer: ChatAccessExportWriter
 
   private(set) var lastExportDate: Date?
@@ -20,9 +19,8 @@ final class ChatAccessExportModel {
   var errorMessage: String?
 
   init(defaults: UserDefaults = .standard) {
-    self.defaults = defaults
-    let makeUUID = DependencyValues._current.uuid
-    let writer = ChatAccessExportWriter(defaults: defaults, makeUUID: { makeUUID() })
+    @Dependency(\.uuid) var uuid
+    let writer = ChatAccessExportWriter(defaults: defaults, makeUUID: { uuid() })
     self.writer = writer
     self.lastExportDate = writer.lastExport?.date
     self.lastExportSize = writer.lastExport?.size
@@ -54,9 +52,15 @@ final class ChatAccessExportModel {
       let data = try await Task.detached(priority: .utility) {
         try ChatAccessExportCoding.encode(export)
       }.value
-      if case let .written(date, size) = try await writer.write(data, to: folder, generatedAt: generatedAt, force: true) {
+      let result = try await writer.write(data, to: folder, generatedAt: generatedAt, force: true)
+      switch result {
+      case let .written(date, size):
         lastExportDate = date
         lastExportSize = size
+      case .throttled:
+        errorMessage = "The Yes Chef export wasn't written because this refresh was throttled. Try Refresh again."
+      case .alreadyWriting:
+        errorMessage = "A Yes Chef export is already being written. Try Refresh again."
       }
     } catch {
       errorMessage = error.localizedDescription

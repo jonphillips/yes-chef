@@ -15,12 +15,10 @@ struct ChatAccessExportModelTests {
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     let installationID = UUID()
     let generatedAt = Date(timeIntervalSince1970: 1_800_000_000)
-    defaults.set(installationID.uuidString, forKey: ChatAccessExportWriter.installationIDKey)
-    defaults.set(generatedAt.addingTimeInterval(-14 * 60), forKey: "chatAccessLastExportDate")
-    defaults.set(7, forKey: "chatAccessLastExportSize")
-    try FileManager.default.createDirectory(at: folder.exportsURL, withIntermediateDirectories: true)
+    let seedWriter = ChatAccessExportWriter(defaults: defaults, makeUUID: { installationID })
+    let previousData = Data("previous export".utf8)
+    _ = try await seedWriter.write(previousData, to: folder, generatedAt: generatedAt.addingTimeInterval(-14 * 60), force: true)
     let exportURL = folder.exportsURL.appending(path: "\(installationID.uuidString).json")
-    try Data("previous export".utf8).write(to: exportURL)
     let resolver = FolderResolveCounter()
     defer {
       defaults.removePersistentDomain(forName: suiteName)
@@ -40,10 +38,10 @@ struct ChatAccessExportModelTests {
 
       await model.exportIfDue()
       #expect(await resolver.count == 0)
-      let previousData = try Data(contentsOf: exportURL)
-      #expect(previousData == Data("previous export".utf8))
+      let unchangedData = try Data(contentsOf: exportURL)
+      #expect(unchangedData == previousData)
 
-      defaults.set(generatedAt.addingTimeInterval(-15 * 60), forKey: "chatAccessLastExportDate")
+      _ = try await seedWriter.write(previousData, to: folder, generatedAt: generatedAt.addingTimeInterval(-15 * 60), force: true)
       await model.exportIfDue()
 
       #expect(await resolver.count == 1)

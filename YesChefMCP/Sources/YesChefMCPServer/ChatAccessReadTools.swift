@@ -15,6 +15,7 @@ private actor ChatAccessExportStore {
   private let reader: ChatAccessExportReader
   let now: @Sendable () -> Date
   private var cachedModifiedAt: Date?
+  private var cachedData: Data?
   private var cachedSnapshot: ExportSnapshot?
 
   init(
@@ -42,7 +43,7 @@ private actor ChatAccessExportStore {
       throw ReadToolError("The Yes Chef export is still downloading from iCloud. Try again in a minute.")
     }
 
-    if file.modifiedAt == cachedModifiedAt, let cachedSnapshot {
+    if file.modifiedAt == cachedModifiedAt, file.data == cachedData, let cachedSnapshot {
       var refreshed = cachedSnapshot
       refreshed.ageMinutes = max(0, Int(now().timeIntervalSince(refreshed.generatedAt) / 60))
       self.cachedSnapshot = refreshed
@@ -59,6 +60,7 @@ private actor ChatAccessExportStore {
       generation: Int64(file.modifiedAt.timeIntervalSince1970 * 1_000_000)
     )
     cachedModifiedAt = file.modifiedAt
+    cachedData = file.data
     cachedSnapshot = snapshot
     return snapshot
   }
