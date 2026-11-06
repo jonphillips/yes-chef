@@ -19,7 +19,7 @@
 		0E82B1425855BBD9736BDFD7 /* RecipeFilterPickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DD44679AA1444215DC743E /* RecipeFilterPickerViews.swift */; };
 		0FC786DD6158C0277309423D /* AIHandoffRecipePasteRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E178BA63F9FC305703A8061E /* AIHandoffRecipePasteRoutingTests.swift */; };
 		107B90CD03C25B8D40433561 /* WorkbenchReferenceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D5D51E71889140798985EB /* WorkbenchReferenceViews.swift */; };
-		11260C9068EFE0F7BA8A6A32 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = B7E40F24FD0304CCEA6A9777 /* CustomDump */; };
+		11260C9068EFE0F7BA8A6A32 /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = AC99988BCD47F72E8D1E43A6 /* StructuredQueriesCore */; };
 		143D0594FDEA8800409997C3 /* RecipePlaybookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C3AE6422BC004DC084E05B /* RecipePlaybookView.swift */; };
 		14E37061E039F075AE64FE31 /* HandoffReviewCoordinator+AdjustmentDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2595BD656B447EC9519CE389 /* HandoffReviewCoordinator+AdjustmentDraft.swift */; };
 		153B6C0EC04DBC8BE5EAD324 /* RecipeVariationBaseWriteGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE4284C2FB4F46CA20889B5B /* RecipeVariationBaseWriteGuard.swift */; };
@@ -39,6 +39,7 @@
 		2B97B82EC2543ECE9D3F325F /* RecipeDeliberationLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B809424555C42DEB0318A9 /* RecipeDeliberationLogView.swift */; };
 		2BF3F98B2662E5DD4617B6DF /* ModelCallInventoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C507E80F42B4348BC5E3472 /* ModelCallInventoryView.swift */; };
 		2C0DCDE2A1119185E53B6540 /* ChatAccessInboxModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5CF2E4CD06DD145A24B8CA4 /* ChatAccessInboxModel.swift */; };
+		2C9B2C2F8E1FADB87904A486 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = B7E40F24FD0304CCEA6A9777 /* CustomDump */; };
 		2E34817DD5653BC61AFF9BB1 /* BrowserReaderFeedbackRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E2858E5F7AA38D95511ACB /* BrowserReaderFeedbackRoutingTests.swift */; };
 		2E3EF48D69647FA72738F2D2 /* RecipeImportSummaries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366ED59A5E8E94F4A9C1D8B5 /* RecipeImportSummaries.swift */; };
 		2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF6D7AE0E516607E7C801612 /* HandoffReviewCoordinator.swift */; };
@@ -49,7 +50,7 @@
 		38632A8F2F9B0F5C90683882 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = A8C5256090D9AFFD84E0AD32 /* Dependencies */; };
 		386D42C820E47D4CC0306130 /* RecipeAdjustmentReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D667D9221C270FF5442B4CC8 /* RecipeAdjustmentReviewView.swift */; };
 		3987101D8A2C769EC719BCDC /* LearnedAreaAuditModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E9F0E4818A532AB62F41BA8 /* LearnedAreaAuditModelTests.swift */; };
-		39910D0EBA5752CE0EF217D8 /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = C7BEE9F7CA89D087F20759A9 /* StructuredQueriesCore */; };
+		39910D0EBA5752CE0EF217D8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 517D768EFBEA670F5B8416DE /* GRDB */; };
 		3AF6F47B328D293D8DDEB2C5 /* RecipeDetailModel+Enrichment.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */; };
 		3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75337F357939E23B8A594784 /* HandoffIntents.swift */; };
 		405995E434055C9790D6B594 /* EditableRowsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */; };
@@ -70,7 +71,7 @@
 		5802E0EACFD7C085AB84EB77 /* LLMHandoffUI in Frameworks */ = {isa = PBXBuildFile; productRef = 59FD7A23309A634CAF8CA2BE /* LLMHandoffUI */; };
 		587E4FEB200F87C5D6A066B1 /* BrowserViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6695544EB0BE23557D34BFA5 /* BrowserViews.swift */; };
 		58947ACE0A30F7F3182C5833 /* AISettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F3ADFFD14E222AAFF380E6 /* AISettingsModel.swift */; };
-		58B476049EF18F0BB559F3DB /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 09D0A75A465598EE79E0441F /* ZIPFoundation */; };
+		58B476049EF18F0BB559F3DB /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
 		5920C9B55AA4DAC2F6E317BA /* RecipeLensViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 289F4F1E15F85B8BBEA31785 /* RecipeLensViews.swift */; };
 		5A3CE29C1018A68874A977A2 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76906E88E579D71619461798 /* RecipeEditorView.swift */; };
 		5AEE3F3E204FC790030FD55B /* MenuPrepPlanEditingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3B7B8B0BBC62599125F27 /* MenuPrepPlanEditingViews.swift */; };
@@ -86,8 +87,8 @@
 		641F8FE43EF2B47776888D52 /* CreateRecipeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABA8B3B92230D4E89CB2CE34 /* CreateRecipeCoordinator.swift */; };
 		64503D62955C10171B345347 /* PowerBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7833F9C2BE7D5EE3F3099090 /* PowerBrowserView.swift */; };
 		64A2147BA244A92AD003A696 /* LLMHandoffKit in Frameworks */ = {isa = PBXBuildFile; productRef = 37A09873E7422D72FA8D9161 /* LLMHandoffKit */; };
-		6506971951AC784BCA68EFD5 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = E526F7B4800D1EBE4D8A2A3E /* Dependencies */; };
-		6545F06519BFDEA9F13357D9 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 3576C349C92C3F1CA77B4BC5 /* GRDB */; };
+		6506971951AC784BCA68EFD5 /* ChatAccessKit in Frameworks */ = {isa = PBXBuildFile; productRef = DEFF59487D6F05ACF17C5775 /* ChatAccessKit */; };
+		6545F06519BFDEA9F13357D9 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 86859006FF66FAFF04016AA2 /* SQLiteData */; };
 		6588EBC345BB11E65929F52F /* MenuPlaybookColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A1F368F34241CAF035C9CA /* MenuPlaybookColumnView.swift */; };
 		68A79CAF1B3EDB56758F1CC1 /* MealCalendarHandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EEED601CE748216744F3637 /* MealCalendarHandoffSource.swift */; };
 		69B8E2AD921E41D8B38D14C7 /* YesChefShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 396029D84F6F6E49A17C47D2 /* YesChefShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -95,13 +96,13 @@
 		6BB951B199059B6F99196B26 /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64ABAAA0A5F20303F4C50314 /* AISettingsView.swift */; };
 		6BD32E4F7B749C9DAF15C168 /* RecipeDraftPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E638B01358C72D596DE68B48 /* RecipeDraftPreviewView.swift */; };
 		6C1C71084D613E53351AEFAF /* CaptureRecipeFromTextIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F3FB6D8C8FD19015628767 /* CaptureRecipeFromTextIntent.swift */; };
-		6DA879B39E3EDAD274830CFD /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 86859006FF66FAFF04016AA2 /* SQLiteData */; };
+		6DA879B39E3EDAD274830CFD /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = E526F7B4800D1EBE4D8A2A3E /* Dependencies */; };
 		6DBBE364EC2B4CA8410CEEDB /* ChatAccessInboxModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4F1C5A6DBD76ED3478EC75 /* ChatAccessInboxModelTests.swift */; };
 		6DF0536E54947C79612E136C /* ServeWithRepairTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F15D49623F313B0DFD76178 /* ServeWithRepairTests.swift */; };
 		6E4C21A5E580147F1C8A1B94 /* AppExternalDatabaseChangeReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */; };
 		6EA932A0C074C0342AFD01E4 /* HandoffComplementReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB8E39BFB7BEB3E6A0DA515 /* HandoffComplementReview.swift */; };
 		70367DA49A5A79CABD32C9C4 /* RecipePhotoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BB04447CDD6B75A1CD330A /* RecipePhotoViews.swift */; };
-		721D92469EB9B701CBBB2BE8 /* SwiftUINavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AD2559042536058C97728A19 /* SwiftUINavigation */; };
+		721D92469EB9B701CBBB2BE8 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
 		745EB823B218D91E3AA60FC8 /* AppToastCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851ED481B27014D93BC3E92F /* AppToastCenter.swift */; };
 		747D152238B98A57F6390E26 /* RecipeCollectionReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A24C21F9F96CE16EB2F8A /* RecipeCollectionReviewSheet.swift */; };
 		754138B487846E702D9E769E /* LLMClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = 466487297E618AB02C1103AB /* LLMClientKit */; };
@@ -112,8 +113,8 @@
 		781332AA4D4937AEFB8A5A19 /* SyncTableListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E432B7D95C0957845D562BDC /* SyncTableListTests.swift */; };
 		79EB117D8A2F3B3945E31C03 /* RecipeChatPanelSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F5CC1002FE379723FA1363E /* RecipeChatPanelSupport.swift */; };
 		7C57B8AB73C6BE68948F80F7 /* RecipePlaybookColumnLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492BC4D75288EEB6446263F7 /* RecipePlaybookColumnLayout.swift */; };
-		81D2D9D82209A65C59F7D435 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 517D768EFBEA670F5B8416DE /* GRDB */; };
-		82F654FFC164D689EBCA4D94 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = F6DB8F903598A87E2AA0443F /* CasePaths */; };
+		81D2D9D82209A65C59F7D435 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 87DE389964638E7777ABB383 /* SQLiteData */; };
+		82F654FFC164D689EBCA4D94 /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = C7BEE9F7CA89D087F20759A9 /* StructuredQueriesCore */; };
 		866C7FBB7E3079ECED997DEB /* MealCalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */; };
 		86E285EF8664CE66215DBDF0 /* RecipeVariationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5AE2D975575189A0B728A1 /* RecipeVariationEditor.swift */; };
 		8AF2276403D75D201F835BC1 /* PowerBrowserModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9BFE509F2353C5A21A5819 /* PowerBrowserModel.swift */; };
@@ -132,11 +133,12 @@
 		A588A64D8DC3C98AE1FABF6A /* RecipeReaderRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42C6393B132228BA0329E4A7 /* RecipeReaderRows.swift */; };
 		A649C9165C7E76B9D2868241 /* HandoffInAppTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0424EE313AB25F0AD46E963E /* HandoffInAppTransport.swift */; };
 		A7663D81E209037F796813A4 /* CategoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA4CA05A4077E714D63D297 /* CategoryModels.swift */; };
+		A87B2DA2728AE711D5B57F14 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 09D0A75A465598EE79E0441F /* ZIPFoundation */; };
 		A8CFCA1AA97D00A5DEB1BE7D /* WorkbenchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A809D8DA30A2274B2B0E1982 /* WorkbenchViews.swift */; };
 		A988E3254E3FCB7C8001B787 /* HandoffEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55509395111AAC5A4B7E5AB /* HandoffEntities.swift */; };
 		A9FBE5AA277DCBB1A66A417E /* GroceryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FA69A8957E5DC8A49A9E3F /* GroceryViews.swift */; };
 		AC5E169D7FD4E2A968FE17C3 /* AppMainLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D076ED31F43B8378E0DFA2F /* AppMainLayout.swift */; };
-		ADDF8E556B8570CC0D68D5A0 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 94BD562408492AC6E81B0035 /* Dependencies */; };
+		ADDF8E556B8570CC0D68D5A0 /* ChatAccessKit in Frameworks */ = {isa = PBXBuildFile; productRef = D76D7E5E9D117DC14C4AAE0F /* ChatAccessKit */; };
 		AE11AE8D6A7D9F8E06642477 /* GroceryPantryReviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C2EE75870C5C9AAD099505 /* GroceryPantryReviewViews.swift */; };
 		AEC289EFB725BB6BF91258AB /* MissingICloudRowsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3893F864052C16388BABE48 /* MissingICloudRowsStoreTests.swift */; };
 		AEEFD13CB08E83C9958ACC8E /* AppDestinationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10717DBD3251B160509FD4E9 /* AppDestinationPresentation.swift */; };
@@ -162,7 +164,7 @@
 		CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */; };
 		CD5717B4A411916DC9E7499F /* RecipeChatWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */; };
 		CFF56064D51651C94E6B80FE /* YesChefIssueReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0519351452207C1D12B121C4 /* YesChefIssueReporterTests.swift */; };
-		D003D8A77ADA1FFBA40262D2 /* StructuredQueriesCore in Frameworks */ = {isa = PBXBuildFile; productRef = AC99988BCD47F72E8D1E43A6 /* StructuredQueriesCore */; };
+		D003D8A77ADA1FFBA40262D2 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 3576C349C92C3F1CA77B4BC5 /* GRDB */; };
 		D20B0260FC41D720A3A8DFAF /* CloudSyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 96A2848E0E6BDF33D3F3BD1B /* CloudSyncKit */; };
 		D38F8BF6A2B76B48D4E9F6FF /* ServeWithRepairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071FE50DFC8E303A1C2F824E /* ServeWithRepairSheet.swift */; };
 		D4ECC1340963D28E217E0727 /* RecipeListPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E48B9ACFF26E71C15146E3E9 /* RecipeListPresets.swift */; };
@@ -174,7 +176,7 @@
 		E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */; };
 		E3281DDA81614C3985E3BB8E /* LLMHandoffKit in Frameworks */ = {isa = PBXBuildFile; productRef = 42BE58EBE04C2AC392B65489 /* LLMHandoffKit */; };
 		E77C08B9BCAF9793D990E92C /* RecipeReaderSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6721F311B6A5A262E46C30 /* RecipeReaderSupportingViews.swift */; };
-		E8641F57EEFE217A67AD299E /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 87DE389964638E7777ABB383 /* SQLiteData */; };
+		E8641F57EEFE217A67AD299E /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 94BD562408492AC6E81B0035 /* Dependencies */; };
 		E949FAA78D66883CA3DFAC6B /* RecipeUnfiledReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F07B9DA9D96D043ACF1337C6 /* RecipeUnfiledReviewSheet.swift */; };
 		E9B700F7600DB2A95017E9B8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = BCD1FADF980D78977F069A1D /* AppIcon.icon */; };
 		EB63D8755383729654D000AC /* SeedCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */; };
@@ -272,6 +274,7 @@
 		4E98DAAE2876452488D71CD0 /* WideLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WideLayout.swift; sourceTree = "<group>"; };
 		4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeTextViews.swift; sourceTree = "<group>"; };
 		524747E80606624B20663AC9 /* HandoffReviewCoordinator+RecipeReturn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+RecipeReturn.swift"; sourceTree = "<group>"; };
+		54AC9C0D3BA4DD46B83A2A83 /* ChatAccessKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChatAccessKit; path = "../../jon-platform/packages/ChatAccessKit"; sourceTree = SOURCE_ROOT; };
 		556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedCoverageView.swift; sourceTree = "<group>"; };
 		56E450B24DC7459A2108DDFF /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeModels.swift; sourceTree = "<group>"; };
 		56F66618C21D85EE42AB4DEB /* PaprikaImportWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaprikaImportWorkspace.swift; sourceTree = "<group>"; };
@@ -405,11 +408,12 @@
 				ECE0E06AEF0B9DCD549F077E /* LLMClientKit in Frameworks */,
 				D20B0260FC41D720A3A8DFAF /* CloudSyncKit in Frameworks */,
 				64A2147BA244A92AD003A696 /* LLMHandoffKit in Frameworks */,
-				6506971951AC784BCA68EFD5 /* Dependencies in Frameworks */,
-				6DA879B39E3EDAD274830CFD /* SQLiteData in Frameworks */,
-				6545F06519BFDEA9F13357D9 /* GRDB in Frameworks */,
-				D003D8A77ADA1FFBA40262D2 /* StructuredQueriesCore in Frameworks */,
-				11260C9068EFE0F7BA8A6A32 /* CustomDump in Frameworks */,
+				6506971951AC784BCA68EFD5 /* ChatAccessKit in Frameworks */,
+				6DA879B39E3EDAD274830CFD /* Dependencies in Frameworks */,
+				6545F06519BFDEA9F13357D9 /* SQLiteData in Frameworks */,
+				D003D8A77ADA1FFBA40262D2 /* GRDB in Frameworks */,
+				11260C9068EFE0F7BA8A6A32 /* StructuredQueriesCore in Frameworks */,
+				2C9B2C2F8E1FADB87904A486 /* CustomDump in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -435,13 +439,14 @@
 				0448097B16770EDEA54D2BE8 /* CloudSyncKit in Frameworks */,
 				E3281DDA81614C3985E3BB8E /* LLMHandoffKit in Frameworks */,
 				5802E0EACFD7C085AB84EB77 /* LLMHandoffUI in Frameworks */,
-				ADDF8E556B8570CC0D68D5A0 /* Dependencies in Frameworks */,
-				E8641F57EEFE217A67AD299E /* SQLiteData in Frameworks */,
-				81D2D9D82209A65C59F7D435 /* GRDB in Frameworks */,
-				39910D0EBA5752CE0EF217D8 /* StructuredQueriesCore in Frameworks */,
-				82F654FFC164D689EBCA4D94 /* CasePaths in Frameworks */,
-				721D92469EB9B701CBBB2BE8 /* SwiftUINavigation in Frameworks */,
-				58B476049EF18F0BB559F3DB /* ZIPFoundation in Frameworks */,
+				ADDF8E556B8570CC0D68D5A0 /* ChatAccessKit in Frameworks */,
+				E8641F57EEFE217A67AD299E /* Dependencies in Frameworks */,
+				81D2D9D82209A65C59F7D435 /* SQLiteData in Frameworks */,
+				39910D0EBA5752CE0EF217D8 /* GRDB in Frameworks */,
+				82F654FFC164D689EBCA4D94 /* StructuredQueriesCore in Frameworks */,
+				721D92469EB9B701CBBB2BE8 /* CasePaths in Frameworks */,
+				58B476049EF18F0BB559F3DB /* SwiftUINavigation in Frameworks */,
+				A87B2DA2728AE711D5B57F14 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -451,6 +456,7 @@
 		1D3E0177231CCFB29FC1DC06 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
+				54AC9C0D3BA4DD46B83A2A83 /* ChatAccessKit */,
 				723650C08EE6D537EBEA0253 /* CloudSyncKit */,
 				771C2C4368450EDD66EC5E77 /* LLMClientKit */,
 				985301473FA815A45B50BF66 /* LLMHandoffKit */,
@@ -693,6 +699,7 @@
 				2CA1F8E404895981FD32307C /* LLMClientKit */,
 				96A2848E0E6BDF33D3F3BD1B /* CloudSyncKit */,
 				37A09873E7422D72FA8D9161 /* LLMHandoffKit */,
+				DEFF59487D6F05ACF17C5775 /* ChatAccessKit */,
 				E526F7B4800D1EBE4D8A2A3E /* Dependencies */,
 				86859006FF66FAFF04016AA2 /* SQLiteData */,
 				3576C349C92C3F1CA77B4BC5 /* GRDB */,
@@ -749,6 +756,7 @@
 				206B15F35921C468940B34DC /* CloudSyncKit */,
 				42BE58EBE04C2AC392B65489 /* LLMHandoffKit */,
 				59FD7A23309A634CAF8CA2BE /* LLMHandoffUI */,
+				D76D7E5E9D117DC14C4AAE0F /* ChatAccessKit */,
 				94BD562408492AC6E81B0035 /* Dependencies */,
 				87DE389964638E7777ABB383 /* SQLiteData */,
 				517D768EFBEA670F5B8416DE /* GRDB */,
@@ -798,6 +806,7 @@
 				0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */,
 				8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */,
 				8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				B468534CECE43469A50F161D /* XCLocalSwiftPackageReference "../../jon-platform/packages/ChatAccessKit" */,
 				31B99064C169F69BEBFDCDFC /* XCLocalSwiftPackageReference "../../jon-platform/packages/CloudSyncKit" */,
 				177E535AE1B360E716AFAF8E /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMClientKit" */,
 				30F1A320403584BEBC511745 /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMHandoffKit" */,
@@ -1344,6 +1353,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../jon-platform/packages/WebExtractorKit";
 		};
+		B468534CECE43469A50F161D /* XCLocalSwiftPackageReference "../../jon-platform/packages/ChatAccessKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../jon-platform/packages/ChatAccessKit";
+		};
 		FBAB5C8635244B7925C0418E /* XCLocalSwiftPackageReference "YesChefPackage" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = YesChefPackage;
@@ -1512,6 +1525,14 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */;
 			productName = StructuredQueriesCore;
+		};
+		D76D7E5E9D117DC14C4AAE0F /* ChatAccessKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChatAccessKit;
+		};
+		DEFF59487D6F05ACF17C5775 /* ChatAccessKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChatAccessKit;
 		};
 		E526F7B4800D1EBE4D8A2A3E /* Dependencies */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Dependencies
 import Foundation
 import LLMHandoffKit
@@ -9,6 +10,7 @@ import YesChefCore
 @MainActor
 final class ChatAccessInboxModel {
   static let probeCleanupDefaultsKey = "chatAccessProbeCleanupCompleted"
+  static let legacyDevExportCleanupDefaultsKey = "chatAccessLegacyDevExportCleanupCompleted"
 
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.chatAccessFolderClient) private var folderClient
@@ -18,8 +20,10 @@ final class ChatAccessInboxModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored weak var toastCenter: AppToastCenter?
   @ObservationIgnored private let defaults: UserDefaults
-  @ObservationIgnored private var query: NSMetadataQuery?
-  @ObservationIgnored private var observers: [NSObjectProtocol] = []
+  @ObservationIgnored private(set) var watcher: ChatInboxWatcher?
+  @ObservationIgnored private var watcherTask: Task<Void, Never>?
+  @ObservationIgnored private var latestSnapshots: [ChatInboxSnapshot] = []
+  @ObservationIgnored private var claimedIDs: Set<String> = []
   @ObservationIgnored private var isPreparing = false
   @ObservationIgnored private var recipeNamesByID: [String: String] = [:]
   @ObservationIgnored private var nameReadIDs: Set<String> = []
@@ -40,20 +44,38 @@ final class ChatAccessInboxModel {
     self.defaults = defaults
   }
 
+  isolated deinit {
+    watcher?.stop()
+    watcherTask?.cancel()
+  }
+
   func prepare() async {
     guard !isPreparing else { return }
     isPreparing = true
     defer { isPreparing = false }
     do {
       let folder = try await resolveFolderIfNeeded()
-      let shouldRemoveProbe = !defaults.bool(forKey: Self.probeCleanupDefaultsKey)
-      try await fileClient.maintain(folder, now, shouldRemoveProbe)
-      if shouldRemoveProbe {
-        defaults.set(true, forKey: Self.probeCleanupDefaultsKey)
-      }
-      startQueryIfNeeded(for: folder)
-      metadataQueryDidChange()
+      startWatcher(for: folder)
       message = nil
+      let shouldRemoveProbe = !defaults.bool(forKey: Self.probeCleanupDefaultsKey)
+      do {
+        try await fileClient.maintain(folder, now, shouldRemoveProbe)
+        if shouldRemoveProbe { defaults.set(true, forKey: Self.probeCleanupDefaultsKey) }
+      } catch {
+        message = error.localizedDescription
+      }
+      #if DEBUG
+      if !defaults.bool(forKey: Self.legacyDevExportCleanupDefaultsKey) {
+        do {
+          if let id = defaults.string(forKey: ChatAccessExportModel.installationIDKey) {
+            try await fileClient.cleanupLegacyDevExport(folder, id)
+          }
+          defaults.set(true, forKey: Self.legacyDevExportCleanupDefaultsKey)
+        } catch {
+          message = error.localizedDescription
+        }
+      }
+      #endif
     } catch {
       message = error.localizedDescription
     }
@@ -68,10 +90,12 @@ final class ChatAccessInboxModel {
     defer { workingIDs.remove(row.id) }
     do {
       let text = try await fileClient.openAndClaim(folder, row.url)
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
       await createRecipeCoordinator.stage(text: text)
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -85,9 +109,11 @@ final class ChatAccessInboxModel {
     defer { workingIDs.remove(row.id) }
     do {
       try await fileClient.claim(folder, row.url)
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url])
       rows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -111,6 +137,7 @@ final class ChatAccessInboxModel {
       if case .recipeNew = staged.review { toastCenter?.postSuccess("New recipe sent to Create Recipe.") }
       try await claim(row, in: folder)
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url] + row.superseded)
       returnRows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -125,6 +152,7 @@ final class ChatAccessInboxModel {
     do {
       try await claim(row, in: folder)
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url] + row.superseded)
       returnRows.removeAll { $0.id == row.id }
       rowErrors[row.id] = nil
     } catch {
@@ -148,42 +176,32 @@ final class ChatAccessInboxModel {
   private func claim(_ row: ChatAccessInbox.ReturnRow, in folder: ChatAccessFolder) async throws {
     for url in [row.url] + row.superseded {
       do { try await fileClient.claim(folder, url) }
-      catch HandoffInboxError.alreadyClaimed { continue }
+      catch HandoffInboxError.alreadyClaimed { }
+      forget([url])
     }
     metadataGeneration += 1
     returnRows.removeAll { $0.id == row.id }
     rowErrors[row.id] = nil
   }
 
-  func metadataQueryDidChange() {
-    guard let query, let folder else { return }
-    query.disableUpdates()
-    defer { query.enableUpdates() }
+  private func forget(_ urls: [URL]) {
+    let ids = Set(urls.map(\.path))
+    claimedIDs.formUnion(ids)
+    latestSnapshots.removeAll { ids.contains($0.url.path) }
+    metadataGeneration += 1
+  }
 
-    let snapshots = query.results.compactMap { value -> ChatAccessInbox.MetadataSnapshot? in
-      guard let item = value as? NSMetadataItem,
-        let path = item.value(forAttribute: NSMetadataItemPathKey) as? String
-      else { return nil }
-      let url = URL(fileURLWithPath: path)
-      guard url.deletingLastPathComponent().standardizedFileURL == folder.inboxURL.standardizedFileURL else { return nil }
-      let name = (item.value(forAttribute: NSMetadataItemFSNameKey) as? String) ?? url.lastPathComponent
-      guard name != "Processed" else { return nil }
-      let status = item.value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String
-      let isCurrent = status == NSMetadataUbiquitousItemDownloadingStatusCurrent
-      if !isCurrent {
-        do {
-          try FileManager.default.startDownloadingUbiquitousItem(at: url)
-          rowErrors[url.path] = nil
-        } catch {
-          rowErrors[url.path] = error.localizedDescription
-        }
-      }
-      return ChatAccessInbox.MetadataSnapshot(
-        url: url,
-        name: name,
-        isCurrent: isCurrent,
-        recipeName: recipeNamesByID[url.path]
-      )
+  func receiveSnapshots(_ snapshots: [ChatInboxSnapshot]) {
+    claimedIDs.formIntersection(Set(snapshots.map { $0.url.path }))
+    latestSnapshots = snapshots.filter { !claimedIDs.contains($0.url.path) }
+    rebuildRows()
+  }
+
+  private func rebuildRows() {
+    let snapshots = latestSnapshots.map { snapshot in
+      if !snapshot.isCurrent { rowErrors[snapshot.url.path] = snapshot.downloadError }
+      return ChatAccessInbox.MetadataSnapshot(url: snapshot.url, name: snapshot.name,
+        isCurrent: snapshot.isCurrent, recipeName: recipeNamesByID[snapshot.url.path])
     }
     updateRows(from: snapshots)
     metadataGeneration += 1
@@ -194,7 +212,7 @@ final class ChatAccessInboxModel {
 
   func updateRows(from snapshots: [ChatAccessInbox.MetadataSnapshot]) {
     rows = ChatAccessInbox.rows(from: snapshots)
-    let visibleIDs = Set(rows.map(\.id) + returnRows.map(\.id))
+    let visibleIDs = Set(snapshots.map { $0.url.path } + returnRows.map(\.id))
     rowErrors = rowErrors.filter { visibleIDs.contains($0.key) }
   }
 
@@ -231,7 +249,7 @@ final class ChatAccessInboxModel {
       if let name = ChatAccessInbox.recipeName(from: text) {
         recipeNamesByID[id] = name
       }
-      metadataQueryDidChange()
+      rebuildRows()
     } catch {
       // Keep the slug-derived label. A later metadata update can retry the coordinated read.
     }
@@ -244,25 +262,17 @@ final class ChatAccessInboxModel {
     return folder
   }
 
-  private func startQueryIfNeeded(for folder: ChatAccessFolder) {
-    guard query == nil else { return }
-    let query = NSMetadataQuery()
-    query.searchScopes = [NSMetadataQueryUbiquitousDataScope]
-    query.predicate = NSPredicate(
-      format: "%K BEGINSWITH %@",
-      NSMetadataItemPathKey,
-      folder.inboxURL.path + "/"
-    )
-    query.sortDescriptors = [NSSortDescriptor(key: NSMetadataItemFSNameKey, ascending: false)]
-    self.query = query
-    let center = NotificationCenter.default
-    for name in [Notification.Name.NSMetadataQueryDidFinishGathering, Notification.Name.NSMetadataQueryDidUpdate] {
-      observers.append(center.addObserver(forName: name, object: query, queue: .main) { [weak self] _ in
-        Task { @MainActor [weak self] in
-          self?.metadataQueryDidChange()
+  private func startWatcher(for folder: ChatAccessFolder) {
+    if watcher == nil {
+      let watcher = ChatInboxWatcher(folder: folder)
+      self.watcher = watcher
+      watcherTask = Task { [weak self] in
+        for await snapshots in watcher.snapshots {
+          guard let self else { return }
+          self.receiveSnapshots(snapshots)
         }
-      })
+      }
     }
-    query.start()
+    watcher?.start()
   }
 }

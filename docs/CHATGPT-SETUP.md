@@ -48,6 +48,21 @@ On the Mac, build and install the local helper with `scripts/install-yeschef-mcp
 - `stage_handoff_return` stages a return from a conversation that began with a Yes Chef hand-off prompt.
 - `search_recipes`, `get_recipe`, `list_menus`, `get_menu` and `get_meal_plan` read the library export that the app writes to iCloud (Settings → **Chat Access**).
 
+### Using Yes Chef Dev
+
+The existing `yeschef` profile runs the production helper and sends returns to TestFlight. A hand-off started in Yes Chef Dev must use a separate Dev tunnel and plugin; otherwise a reported success goes to the production inbox and Dev will not show it. When a Dev helper is needed, create an executable wrapper that passes the exact variant:
+
+```sh
+mkdir -p ~/.local/bin
+cat > ~/.local/bin/yeschef-mcp-dev <<'SCRIPT'
+#!/bin/sh
+exec "$HOME/.local/bin/yeschef-mcp" --variant dev
+SCRIPT
+chmod 755 ~/.local/bin/yeschef-mcp-dev
+```
+
+Create a separate tunnel in Platform, then run `~/code/jon-platform/scripts/mcp-tunnel init yeschef-dev <dev-tunnel-id> "$HOME/.local/bin/yeschef-mcp-dev" --health-port 8083` and `~/code/jon-platform/scripts/mcp-tunnel install-agent yeschef-dev`. Add that tunnel as a separately named Yes Chef Dev plugin in ChatGPT. Use the Dev plugin for Dev hand-offs and the existing Yes Chef plugin for TestFlight; do not enable both in the same chat. Use the general tunnel setup in jon-platform's `docs/ios/mcp-access.md` for key and plugin setup. The Dev app removes its own legacy export from the production folder once on launch; exports from old installations cannot be identified safely by another install.
+
 ### After a helper update
 
 The helper doesn't update itself. After any merge that touches `YesChefMCP/` or the export code in `YesChefCore`, reinstall it, or ChatGPT keeps the old tool list. The tunnel also keeps one helper process running, so restart it after installing a new binary:

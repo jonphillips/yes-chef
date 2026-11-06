@@ -1,132 +1,61 @@
+import ChatAccessKit
 import Dependencies
 import Foundation
-import LLMHandoffKit
-import YesChefCore
 
 struct ChatAccessInboxFileClient: Sendable {
   var read: @Sendable (URL) async throws -> String
   var openAndClaim: @Sendable (ChatAccessFolder, URL) async throws -> String
   var claim: @Sendable (ChatAccessFolder, URL) async throws -> Void
   var maintain: @Sendable (ChatAccessFolder, Date, Bool) async throws -> Void
-}
-
-private enum ChatAccessInboxFileError: LocalizedError {
-  case invalidStagedName
-  case coordinatedReadFailed
-
-  var errorDescription: String? {
-    switch self {
-    case .invalidStagedName:
-      "This staged recipe has an unreadable filename."
-    case .coordinatedReadFailed:
-      "The staged recipe could not be read from iCloud Drive."
-    }
-  }
+  var cleanupLegacyDevExport: @Sendable (ChatAccessFolder, String) async throws -> Void = { _, _ in }
 }
 
 extension ChatAccessInboxFileClient: DependencyKey {
   static var liveValue: Self {
-    Self(
-      read: { url in
-        try await Task.detached(priority: .utility) {
-          try coordinatedRead(at: url)
-        }.value
-      },
+    let client = ChatInboxFileClient.live
+    let recipe = ChatInboxItemKind(fileExtension: "json", expiresUnclaimed: false, datesProcessedByClaim: false)
+    let handoff = ChatInboxItemKind(fileExtension: "ycreturn", expiresUnclaimed: true, datesProcessedByClaim: true)
+    return Self(
+      read: client.read,
       openAndClaim: { folder, url in
-        try await Task.detached(priority: .utility) {
-          let handoff = try stagedHandoff(at: url)
-          let text = try coordinatedRead(at: url)
-          _ = try HandoffInbox(root: folder.inboxURL, fileExtension: "json").markProcessed(handoff)
-          return text
-        }.value
+        let text = try await client.read(url)
+        try await client.claim(folder, url, recipe)
+        return text
       },
-      claim: { folder, url in
-        try await Task.detached(priority: .utility) {
-          let processed = try HandoffInbox(root: folder.inboxURL, fileExtension: url.pathExtension).markProcessed(stagedHandoff(at: url))
-          if url.pathExtension == "ycreturn" {
-            try coordinatedTouch(at: processed.url, date: Date())
-          }
-        }.value
-      },
+      claim: { folder, url in try await client.claim(folder, url, url.pathExtension == "ycreturn" ? handoff : recipe) },
       maintain: { folder, now, removesProbe in
+        try await client.maintain(folder, [recipe, handoff], now)
+        if removesProbe {
+          try await Task.detached(priority: .utility) {
+            let url = folder.url.appending(path: "Probe", directoryHint: .isDirectory)
+            guard FileManager.default.fileExists(atPath: url.path) else { return }
+            var coordinationError: NSError?
+            var deletionError: Error?
+            NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { url in
+              do { try FileManager.default.removeItem(at: url) } catch { deletionError = error }
+            }
+            if let deletionError { throw deletionError }
+            if let coordinationError { throw coordinationError }
+          }.value
+        }
+      },
+      cleanupLegacyDevExport: { folder, installationID in
+        guard let id = UUID(uuidString: installationID) else { return }
         try await Task.detached(priority: .utility) {
-          if FileManager.default.fileExists(atPath: folder.inboxURL.path) {
-            let urls = try FileManager.default.contentsOfDirectory(at: folder.inboxURL, includingPropertiesForKeys: nil)
-            for url in ChatAccessInbox.expiredReturns(urls, inbox: folder.inboxURL, now: now) {
-              do {
-                let processed = try HandoffInbox(root: folder.inboxURL, fileExtension: "ycreturn").markProcessed(stagedHandoff(at: url))
-                try coordinatedTouch(at: processed.url, date: now)
-              } catch HandoffInboxError.alreadyClaimed {
-                continue
-              }
-            }
+          let container = folder.url.deletingLastPathComponent()
+          let url = ChatAccessFolder(containerURL: container, isDevelopment: false)
+            .exportsURL.appending(path: "\(id.uuidString).json")
+          guard FileManager.default.fileExists(atPath: url.path) else { return }
+          var coordinationError: NSError?
+          var deletionError: Error?
+          NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { url in
+            do { try FileManager.default.removeItem(at: url) } catch { deletionError = error }
           }
-          let processedItems: [ChatAccessInbox.ProcessedSnapshot]
-          if FileManager.default.fileExists(atPath: folder.processedURL.path) {
-            let urls = try FileManager.default.contentsOfDirectory(
-              at: folder.processedURL,
-              includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
-              options: [.skipsHiddenFiles]
-            )
-            processedItems = try urls.compactMap { url in
-              guard (try url.resourceValues(forKeys: [.isDirectoryKey])).isDirectory != true else { return nil }
-              let modifiedAt = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-              return ChatAccessInbox.ProcessedSnapshot(url: url, modifiedAt: modifiedAt)
-            }
-          } else {
-            processedItems = []
-          }
-          for url in ChatAccessInbox.expired(processedItems, now: now) {
-            try coordinatedDeleteIfPresent(at: url)
-          }
-          if removesProbe {
-            let probeURL = folder.url.appending(path: "Probe", directoryHint: .isDirectory)
-            try coordinatedDeleteIfPresent(at: probeURL)
-          }
+          if let deletionError { throw deletionError }
+          if let coordinationError { throw coordinationError }
         }.value
       }
     )
-  }
-
-  private static func stagedHandoff(at url: URL) throws -> StagedHandoff {
-    guard let handoff = StagedHandoff(url: url) else { throw ChatAccessInboxFileError.invalidStagedName }
-    return handoff
-  }
-
-  private static func coordinatedRead(at url: URL) throws -> String {
-    var coordinationError: NSError?
-    var result: Result<String, Error>?
-    NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-      result = Result { try String(contentsOf: coordinatedURL, encoding: .utf8) }
-    }
-    if let coordinationError { throw coordinationError }
-    guard let result else { throw ChatAccessInboxFileError.coordinatedReadFailed }
-    return try result.get()
-  }
-
-  private static func coordinatedTouch(at url: URL, date: Date) throws {
-    var coordinationError: NSError?
-    var result: Result<Void, Error>?
-    NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-      result = Result { try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: coordinatedURL.path) }
-    }
-    if let coordinationError { throw coordinationError }
-    try result?.get()
-  }
-
-  private static func coordinatedDeleteIfPresent(at url: URL) throws {
-    guard FileManager.default.fileExists(atPath: url.path) else { return }
-    var coordinationError: NSError?
-    var deletionError: Error?
-    NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { coordinatedURL in
-      do {
-        try FileManager.default.removeItem(at: coordinatedURL)
-      } catch {
-        deletionError = error
-      }
-    }
-    if let deletionError { throw deletionError }
-    if let coordinationError { throw coordinationError }
   }
 }
 

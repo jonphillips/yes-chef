@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Foundation
 import LLMHandoffKit
 import MCPServerKit
@@ -23,8 +24,9 @@ private struct StageRecipeResult: Encodable, Sendable {
 }
 
 private struct StageContext: Sendable {
-  let containerURL: URL
+  let home: URL
   let now: @Sendable () -> Date
+  let isDevelopment: Bool
 
   func stage(_ recipe: MCPValue) throws -> StageRecipeResult {
     let data = try JSONEncoder().encode(recipe)
@@ -65,11 +67,9 @@ private struct StageContext: Sendable {
   }
 
   private func stagingFolder() throws -> ChatAccessFolder {
-    var isDirectory: ObjCBool = false
-    guard FileManager.default.fileExists(atPath: containerURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-      throw StageContainerUnavailable(path: containerURL.path)
-    }
-    return ChatAccessFolder(containerURL: containerURL)
+    try ChatAccessHelperFolder.existing(
+      containerIdentifier: "iCloud.com.jonphillips.yeschef", isDevelopment: isDevelopment, home: home
+    )
   }
 }
 
@@ -90,20 +90,16 @@ private enum StageReturnError: LocalizedError {
   }
 }
 
-private struct StageContainerUnavailable: LocalizedError {
-  let path: String
-  var errorDescription: String? { "The Yes Chef iCloud container is not present at \(path). The helper will not create it." }
-}
-
 public enum YesChefMCPServer {
   public static func make(
-    containerURL: URL = FileManager.default.homeDirectoryForCurrentUser
-      .appending(path: "Library/Mobile Documents/iCloud~com~jonphillips~yeschef", directoryHint: .isDirectory),
+    home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    isDevelopment: Bool = false,
     now: @escaping @Sendable () -> Date = { Date() },
     exportMaterializer: (@Sendable (URL) async throws -> Data)? = nil,
     materializationDeadline: Duration = .seconds(60)
   ) -> MCPServer {
-    let context = StageContext(containerURL: containerURL, now: now)
+    let context = StageContext(home: home, now: now, isDevelopment: isDevelopment)
+    let containerURL = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: home)
     let recipeSchema: MCPValue = .object([
       "type": .string("object"),
       "additionalProperties": .bool(true),
@@ -162,7 +158,7 @@ public enum YesChefMCPServer {
             return .error(error.localizedDescription)
           }
         },
-      ] + ChatAccessReadTools.make(containerURL: containerURL, now: now, materialize: exportMaterializer, materializationDeadline: materializationDeadline)
+      ] + ChatAccessReadTools.make(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: exportMaterializer, materializationDeadline: materializationDeadline)
     )
   }
 }

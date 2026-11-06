@@ -1,3 +1,4 @@
+import ChatAccessKit
 import Foundation
 import LLMHandoffKit
 import MCPServerKit
@@ -8,12 +9,12 @@ import YesChefMCPServer
 struct YesChefMCPTests {
   @Test func listsToolsAndStagesAValidatedColonFreeRecipe() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
     try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
 
     let fixedDate = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
-    let server = YesChefMCPServer.make(containerURL: container) { fixedDate }
+    let server = YesChefMCPServer.make(home: temporary) { fixedDate }
     let list = try #require(await server.handle(line: request("tools/list")))
     let tools = try object(list)["result"]?.objectValue?["tools"]?.arrayValue ?? []
     #expect(Set(tools.compactMap { $0.objectValue?["name"]?.stringValue }) == Set(["stage_recipe", "stage_handoff_return", "search_recipes", "get_recipe", "list_menus", "get_menu", "get_meal_plan"]))
@@ -26,7 +27,7 @@ struct YesChefMCPTests {
     #expect(content?.contains("\"next\":\"Jon reviews and saves it in Yes Chef → Create Recipe.\"") == true)
     #expect(!content.orEmpty.contains(container.path))
 
-    let inboxURL = ChatAccessFolder(containerURL: container).inboxURL
+    let inboxURL = ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL
     let inbox = HandoffInbox(root: inboxURL, fileExtension: "json")
     let staged = try #require(try inbox.list().first)
     #expect(!staged.url.lastPathComponent.contains(":"))
@@ -37,10 +38,40 @@ struct YesChefMCPTests {
     #expect(try inbox.list().count == 1)
   }
 
+  @Test func developmentVariantStagesSeparately() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let server = YesChefMCPServer.make(home: temporary, isDevelopment: true)
+    let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: validRecipe)))
+    #expect(try object(response)["result"]?.objectValue?["isError"] != .bool(true))
+    let token = UUID().uuidString
+    let text = "YC-HANDOFF: \(token)\nYC-CONTRACT: v3\nDev return"
+    let returned = try #require(await server.handle(line: genericToolCall("stage_handoff_return", args: ["text": .string(text)])))
+    #expect(try object(returned)["result"]?.objectValue?["isError"] != .bool(true))
+    let devFolder = ChatAccessFolder(containerURL: container, isDevelopment: true)
+    let productionFolder = ChatAccessFolder(containerURL: container, isDevelopment: false)
+    #expect(try HandoffInbox(root: devFolder.inboxURL, fileExtension: "json").list().count == 1)
+    #expect(try HandoffInbox(root: devFolder.inboxURL, fileExtension: "ycreturn").list().count == 1)
+    #expect(!FileManager.default.fileExists(atPath: productionFolder.inboxURL.path))
+
+    let date = Date(timeIntervalSince1970: 1_800_000_000)
+    let recipe = Recipe(id: UUID(), title: "Dev-only beans", dateCreated: date, dateModified: date)
+    let export = ChatAccessExport(generatedAt: date, device: "Dev", recipes: [RecipeBundleCoding.RecipeBundle(recipe: recipe)], menus: [], mealPlan: [])
+    try FileManager.default.createDirectory(at: devFolder.exportsURL, withIntermediateDirectories: true)
+    try ChatAccessExportCoding.encode(export).write(to: devFolder.exportsURL.appending(path: "install.json"))
+    let search = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("beans")])))
+    #expect(try toolText(search).contains("Dev-only beans"))
+    let production = YesChefMCPServer.make(home: temporary)
+    let noExport = try #require(await production.handle(line: genericToolCall("search_recipes", args: ["query": .string("beans")])))
+    #expect(try toolText(noExport).contains("No Yes Chef export yet"))
+  }
+
   @Test func readToolsServeTextOnlyResultsAndRejectOldRefs() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exportFolder = ChatAccessFolder(containerURL: container).exportsURL
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let exportFolder = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exportFolder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
     let fixedDate = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
@@ -65,7 +96,7 @@ struct YesChefMCPTests {
     let exportURL = exportFolder.appending(path: "install.json")
     try ChatAccessExportCoding.encode(export).write(to: exportURL)
     let clock = TestClock(fixedDate.addingTimeInterval(600))
-    let server = YesChefMCPServer.make(containerURL: container) { clock.now() }
+    let server = YesChefMCPServer.make(home: temporary) { clock.now() }
 
     let search = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("beans")])))
     let searchText = try toolText(search)
@@ -127,8 +158,8 @@ struct YesChefMCPTests {
 
   @Test func materializerSeamSuccessResolvesRecipeNamesInMenu() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let exports = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
     let date = Date(timeIntervalSince1970: 1_800_000_000)
@@ -140,7 +171,7 @@ struct YesChefMCPTests {
     let data = try ChatAccessExportCoding.encode(ChatAccessExport(generatedAt: date, device: "iPhone", recipes: [bundle], menus: [menu], mealPlan: []))
     try data.write(to: exports.appending(path: "install.json"))
     let server = YesChefMCPServer.make(
-      containerURL: container,
+      home: temporary,
       now: { date },
       exportMaterializer: { _ in data }
     )
@@ -151,22 +182,22 @@ struct YesChefMCPTests {
   }
 
   @Test func readToolsExplainWhenNoExportExists() async throws {
-    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let server = YesChefMCPServer.make(containerURL: container)
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let server = YesChefMCPServer.make(home: temporary)
     let response = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
     #expect(try toolText(response).contains("No Yes Chef export yet"))
-    try? FileManager.default.removeItem(at: container)
+    try? FileManager.default.removeItem(at: temporary)
   }
 
   @Test func materializerSeamReturnsTimeoutErrorWithoutWaitingSixtySeconds() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let exports = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
     try Data("placeholder".utf8).write(to: exports.appending(path: "install.json"))
     defer { try? FileManager.default.removeItem(at: temporary) }
     let server = YesChefMCPServer.make(
-      containerURL: container,
+      home: temporary,
       exportMaterializer: { _ in try await Task.sleep(for: .seconds(1)); return Data() },
       materializationDeadline: .milliseconds(10)
     )
@@ -176,8 +207,8 @@ struct YesChefMCPTests {
 
   @Test func recipeSearchUsesTwentyDefaultAndFiftyMaximum() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
-    let exports = ChatAccessFolder(containerURL: container).exportsURL
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let exports = ChatAccessFolder(containerURL: container, isDevelopment: false).exportsURL
     try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
     let date = Date(timeIntervalSince1970: 1_800_000_000)
@@ -186,7 +217,7 @@ struct YesChefMCPTests {
     }
     let export = ChatAccessExport(generatedAt: date, device: "iPhone", recipes: bundles, menus: [], mealPlan: [])
     try ChatAccessExportCoding.encode(export).write(to: exports.appending(path: "install.json"))
-    let server = YesChefMCPServer.make(containerURL: container) { date }
+    let server = YesChefMCPServer.make(home: temporary) { date }
 
     let defaults = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("")])))
     #expect(try object(toolText(defaults))["recipes"]?.arrayValue?.count == 20)
@@ -196,21 +227,22 @@ struct YesChefMCPTests {
 
   @Test func invalidRecipeReturnsErrorAndStagesNothing() async throws {
     let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let container = temporary.appending(path: "container", directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
     try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temporary) }
-    let server = YesChefMCPServer.make(containerURL: container)
+    let server = YesChefMCPServer.make(home: temporary)
 
     let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: .object(["@type": .string("Recipe")]))))
     let responseObject = try object(response)["result"]?.objectValue ?? [:]
     #expect(responseObject["isError"] == .bool(true))
     #expect(responseObject["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue?.contains("ingredients and instructions") == true)
-    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container).inboxURL.path))
+    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL.path))
   }
 
   @Test func missingContainerReturnsErrorWithoutCreatingIt() async throws {
-    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let server = YesChefMCPServer.make(containerURL: container)
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let server = YesChefMCPServer.make(home: temporary)
 
     let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: validRecipe)))
     #expect(try object(response)["result"]?.objectValue?["isError"] == .bool(true))
@@ -220,7 +252,7 @@ struct YesChefMCPTests {
 
   @Test func stagingToolDescriptionsCarryTheHandoffRouting() async throws {
     // ChatGPT doesn't put server instructions in front of the model, so the tool descriptions must route on their own.
-    let server = YesChefMCPServer.make(containerURL: FileManager.default.temporaryDirectory)
+    let server = YesChefMCPServer.make(home: FileManager.default.temporaryDirectory)
     let list = try #require(await server.handle(line: request("tools/list")))
     let tools = try object(list)["result"]?.objectValue?["tools"]?.arrayValue ?? []
     func tool(_ name: String) -> [String: MCPValue] {
@@ -239,11 +271,12 @@ struct YesChefMCPTests {
   }
 
   @Test func handoffReturnsPreserveTextAndAllowRepeatedTokens() async throws {
-    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
     try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: container) }
+    defer { try? FileManager.default.removeItem(at: temporary) }
     let date = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00Z")!
-    let server = YesChefMCPServer.make(containerURL: container) { date }
+    let server = YesChefMCPServer.make(home: temporary) { date }
     let id = UUID()
     let text = "YC-HANDOFF: \(id.uuidString)\nYC-CONTRACT: v3\nCrème brûlée\n"
     for _ in 0..<2 {
@@ -253,7 +286,7 @@ struct YesChefMCPTests {
       #expect(result["warning"] == nil)
       #expect(result["next"]?.stringValue == "Staged for review on the device that started this hand-off. Jon opens it from From Chat there.")
     }
-    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container).inboxURL, fileExtension: "ycreturn")
+    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL, fileExtension: "ycreturn")
     let files = try inbox.list()
     #expect(files.count == 2)
     for file in files {
@@ -264,10 +297,11 @@ struct YesChefMCPTests {
   }
 
   @Test func invalidHandoffEnvelopesStageNothing() async throws {
-    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
     try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: container) }
-    let server = YesChefMCPServer.make(containerURL: container)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let server = YesChefMCPServer.make(home: temporary)
     let id = UUID().uuidString
     let cases = [
       ("YC-CONTRACT: v3\nBody", "first line"),
@@ -280,27 +314,29 @@ struct YesChefMCPTests {
       #expect(try object(response)["result"]?.objectValue?["isError"] == .bool(true))
       #expect(try toolText(response).contains(message))
     }
-    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container).inboxURL.path))
+    #expect(!FileManager.default.fileExists(atPath: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL.path))
   }
 
   @Test func olderAndMissingMarkersStageWithWarnings() async throws {
-    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
     try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: container) }
-    let server = YesChefMCPServer.make(containerURL: container)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let server = YesChefMCPServer.make(home: temporary)
     let id = UUID().uuidString
     for text in ["YC-HANDOFF: \(id)\nYC-CONTRACT: v2\nBody", "YC-HANDOFF: \(id)\nBody"] {
       let response = try #require(await server.handle(line: genericToolCall("stage_handoff_return", args: ["text": .string(text)])))
       #expect(try object(response)["result"]?.objectValue?["isError"] != .bool(true))
       #expect(try object(toolText(response))["warning"]?.stringValue != nil)
     }
-    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container).inboxURL, fileExtension: "ycreturn")
+    let inbox = HandoffInbox(root: ChatAccessFolder(containerURL: container, isDevelopment: false).inboxURL, fileExtension: "ycreturn")
     #expect(try inbox.list().count == 2)
   }
 
   @Test func handoffReturnDoesNotCreateMissingContainer() async throws {
-    let container = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    let server = YesChefMCPServer.make(containerURL: container)
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let server = YesChefMCPServer.make(home: temporary)
     let text = "YC-HANDOFF: \(UUID().uuidString)\nYC-CONTRACT: v3\nBody"
     let response = try #require(await server.handle(line: genericToolCall("stage_handoff_return", args: ["text": .string(text)])))
     #expect(try object(response)["result"]?.objectValue?["isError"] == .bool(true))

@@ -14,6 +14,8 @@ packages:
     path: ../../jon-platform/packages/CloudSyncKit
   LLMHandoffKit:
     path: ../../jon-platform/packages/LLMHandoffKit
+  ChatAccessKit:
+    path: ../../jon-platform/packages/ChatAccessKit
   Dependencies:
     url: https://github.com/pointfreeco/swift-dependencies
     from: 1.0.0
@@ -136,6 +138,8 @@ targets:
         product: LLMHandoffKit
       - package: LLMHandoffKit
         product: LLMHandoffUI
+      - package: ChatAccessKit
+        product: ChatAccessKit
       - package: Dependencies
         product: Dependencies
       - package: SQLiteData
@@ -224,6 +228,8 @@ targets:
         product: CloudSyncKit
       - package: LLMHandoffKit
         product: LLMHandoffKit
+      - package: ChatAccessKit
+        product: ChatAccessKit
       # NOT DependenciesTestSupport. Xcode builds every other package product in
       # this graph as a dynamic framework, but DependenciesTestSupport only ever
       # builds static ("DependenciesTestSupport-product", never
