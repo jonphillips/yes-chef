@@ -176,6 +176,7 @@
 		D8FB35A8C0D8195A104EE90D /* RecipeImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE2CEAA7C5D5836E123F474 /* RecipeImageLoader.swift */; };
 		DB71ABBE3820C219FEACAEB4 /* RecipeCaptureModel+Labels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9916E601292DD101C2943916 /* RecipeCaptureModel+Labels.swift */; };
 		DDDFAA0F691253337D66DE0B /* HandoffReviewCoordinator+Variation.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */; };
+		E014E5F098A77190AE997B54 /* MenuPrepPlanModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABEEEF0B390CA946CDA6752B /* MenuPrepPlanModelTests.swift */; };
 		E04A28BE098B255C0B136810 /* AIHandoffMenuPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 792C0EBCFF5BA678E266946D /* AIHandoffMenuPasteTests.swift */; };
 		E3281DDA81614C3985E3BB8E /* LLMHandoffKit in Frameworks */ = {isa = PBXBuildFile; productRef = 42BE58EBE04C2AC392B65489 /* LLMHandoffKit */; };
 		E77C08B9BCAF9793D990E92C /* RecipeReaderSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6721F311B6A5A262E46C30 /* RecipeReaderSupportingViews.swift */; };
@@ -348,6 +349,7 @@
 		A8FDE8F827374CA795E7D125 /* MenuDetailModel+PrepPlanEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuDetailModel+PrepPlanEditing.swift"; sourceTree = "<group>"; };
 		ABA8B3B92230D4E89CB2CE34 /* CreateRecipeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRecipeCoordinator.swift; sourceTree = "<group>"; };
 		ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+Variation.swift"; sourceTree = "<group>"; };
+		ABEEEF0B390CA946CDA6752B /* MenuPrepPlanModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuPrepPlanModelTests.swift; sourceTree = "<group>"; };
 		AF820DD380C76A8BFE19ED0E /* CreateRecipeModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRecipeModelTests.swift; sourceTree = "<group>"; };
 		B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarModels.swift; sourceTree = "<group>"; };
 		B69D7AF49F0E848F45AE1103 /* ChatAccessExportModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccessExportModelTests.swift; sourceTree = "<group>"; };
@@ -488,6 +490,7 @@
 				17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */,
 				9E9F0E4818A532AB62F41BA8 /* LearnedAreaAuditModelTests.swift */,
 				470AD3AA374CF056564E8361 /* MenuBringInModelTests.swift */,
+				ABEEEF0B390CA946CDA6752B /* MenuPrepPlanModelTests.swift */,
 				A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */,
 				C3893F864052C16388BABE48 /* MissingICloudRowsStoreTests.swift */,
 				669BA3E9D8C0F3631F217603 /* OnboardChatFinalizationTests.swift */,
@@ -873,6 +876,7 @@
 				36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */,
 				3987101D8A2C769EC719BCDC /* LearnedAreaAuditModelTests.swift in Sources */,
 				058DCF2421E88012C7EDEB95 /* MenuBringInModelTests.swift in Sources */,
+				E014E5F098A77190AE997B54 /* MenuPrepPlanModelTests.swift in Sources */,
 				2332533F5D83A3EF69B7F960 /* MenuWideColumnLayoutTests.swift in Sources */,
 				AEC289EFB725BB6BF91258AB /* MissingICloudRowsStoreTests.swift in Sources */,
 				24F9A4FFD871728DA7782411 /* OnboardChatFinalizationTests.swift in Sources */,

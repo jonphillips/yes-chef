@@ -80,6 +80,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
   var task: String
   var serves: String
   var sourceDish: MenuItem.ID?
+  var workDayOffset: Int?
   var id: String { stepID?.uuidString ?? "new" }
 
   init() {
@@ -89,6 +90,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
     task = ""
     serves = ""
     sourceDish = nil
+    workDayOffset = nil
   }
 
   init(step: PrepPlanStepRecord) {
@@ -98,6 +100,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
     task = step.task
     serves = step.serves ?? ""
     sourceDish = step.sourceDish
+    workDayOffset = step.workDayOffset
   }
 
   var step: PrepPlanStep {
@@ -105,7 +108,8 @@ struct PrepPlanStepEditorDraft: Identifiable {
       session: sessionBand == .other ? customSession : sessionBand.title,
       task: task,
       serves: serves.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : serves,
-      sourceDish: sourceDish
+      sourceDish: sourceDish,
+      workDayOffset: workDayOffset
     )
   }
 }
@@ -115,11 +119,15 @@ struct PrepPlanStepEditorSheet: View {
   @State private var draft: PrepPlanStepEditorDraft
   private let itemRows: [MenuItemRowData]
   private let suggestedSourceDish: MenuItem.ID?
+  private let dayCount: Int
+  private let placementStartDate: Date?
   let save: (PrepPlanStepEditorDraft) -> Void
 
   init(
     draft: PrepPlanStepEditorDraft,
     itemRows: [MenuItemRowData],
+    dayCount: Int,
+    placementStartDate: Date?,
     save: @escaping (PrepPlanStepEditorDraft) -> Void
   ) {
     let suggestion = draft.sourceDish == nil
@@ -132,6 +140,8 @@ struct PrepPlanStepEditorSheet: View {
     initialDraft.sourceDish = suggestion ?? initialDraft.sourceDish
     _draft = State(initialValue: initialDraft)
     self.itemRows = itemRows
+    self.dayCount = dayCount
+    self.placementStartDate = placementStartDate
     suggestedSourceDish = suggestion
     self.save = save
   }
@@ -142,6 +152,17 @@ struct PrepPlanStepEditorSheet: View {
         VStack(alignment: .leading) { Text("Session"); Picker("Session", selection: $draft.sessionBand) {
           ForEach(PrepPlanSessionBand.allCases) { Text($0.title).tag($0) }
         }.labelsHidden() }
+        if dayCount > 1 {
+          VStack(alignment: .leading) {
+            Text("Day")
+            Picker("Day", selection: $draft.workDayOffset) {
+              Text("Flexible").tag(Int?.none)
+              ForEach(-7..<dayCount, id: \.self) { offset in
+                Text(workDayTitle(offset)).tag(Optional(offset))
+              }
+            }.labelsHidden()
+          }
+        }
         if draft.sessionBand == .other { VStack(alignment: .leading) { Text("Other session"); TextField("e.g. Wednesday evening", text: $draft.customSession) } }
         VStack(alignment: .leading) { Text("Task"); TextField("e.g. Salt the chicken", text: $draft.task, axis: .vertical).lineLimit(2...4) }
         VStack(alignment: .leading) { Text("Serves"); TextField("Optional meal or day", text: $draft.serves) }
@@ -171,6 +192,17 @@ struct PrepPlanStepEditorSheet: View {
     !draft.task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && (draft.sessionBand != .other
         || !draft.customSession.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+  }
+
+  private func workDayTitle(_ offset: Int) -> String {
+    let dayNumber = offset + 1
+    let dayTitle = dayNumber <= 0
+      ? "\(-offset) \(-offset == 1 ? "day" : "days") before Day 1"
+      : "Day \(dayNumber)"
+    guard let placementStartDate,
+      let date = Calendar.autoupdatingCurrent.date(byAdding: .day, value: offset, to: placementStartDate)
+    else { return dayTitle }
+    return "\(dayTitle) · \(date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))"
   }
 }
 

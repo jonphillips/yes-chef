@@ -575,6 +575,10 @@ public enum MenuRepository {
     menu.dayCount = dayCount
     menu.dateModified = now
     try Menu.upsert { menu }.execute(db)
+    try PrepPlanStepRecord
+      .where { $0.menuID.eq(menuID) && $0.workDayOffset.gte(dayCount as Int?) }
+      .update { $0.workDayOffset = #bind(nil as Int?) }
+      .execute(db)
   }
 
   public static func moveItem(

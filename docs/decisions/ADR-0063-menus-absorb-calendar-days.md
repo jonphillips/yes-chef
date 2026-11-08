@@ -6,7 +6,7 @@
 > Cooking history starts counting dishes on placed menus.
 
 Status: **Accepted** — 2026-11-08. Effort:
-[`efforts/menu-absorbs-calendar-days.md`](../efforts/menu-absorbs-calendar-days.md).
+[`efforts/archive/menu-absorbs-calendar-days.md`](../efforts/archive/menu-absorbs-calendar-days.md).
 Origin: Jon, 2026-11-08: *"plan some things on a calendar and then, if I define a menu over a few days, it will pull in
 things from the calendar. Then I'll want to be able to come up with a prep plan from the resulting set of days."* And:
 *"pull a menu (Thanksgiving 2026) into another menu (Thanksgiving Week 2026)."* He accepted this direction the same day.

@@ -189,6 +189,9 @@ struct MenuDetailReader: View {
       menuPlaybookHeader
       MenuPrepPlanSection(
         steps: detail.prepPlanSteps,
+        dayCount: detail.menu.dayCount,
+        placementStartDate: detail.placements.count == 1 ? detail.placements[0].startDate : nil,
+        today: detailModel.now,
         itemRows: detail.itemRows,
         handoffSource: .menu(detailModel.menuID),
         regenerateHandoffSource: .menu(detailModel.menuID, prepPlanIntent: .regenerate),

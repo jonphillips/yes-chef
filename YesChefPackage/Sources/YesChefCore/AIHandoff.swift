@@ -818,12 +818,6 @@ public indirect enum AIHandoffReview: Equatable, Sendable {
 }
 
 public enum AIHandoffReturn {
-  public struct MenuPrepPlanReturn: Equatable, Sendable {
-    public var plan: MenuPrepPlan
-    public var learnings: [String]
-    public var unparsedLines: [String]
-  }
-
   public struct ReaderFeedbackReturn: Equatable, Sendable {
     public var tips: [ReaderFeedbackTip]
     public var unparsedLines: [String]
@@ -839,20 +833,6 @@ public enum AIHandoffReturn {
   }
 
   public static let learningsMarker = "YC-LEARNINGS:"
-
-  public static func menuPrepPlan(
-    from text: String,
-    currentPlan: MenuPrepPlan
-  ) -> MenuPrepPlanReturn {
-    let split = splitting(text)
-    let parsed = currentPlan.parsingEditableReviewText(split.deliverable)
-    let parsedLearnings = learnings(from: split.learnings)
-    return MenuPrepPlanReturn(
-      plan: parsed.plan,
-      learnings: parsedLearnings.learnings,
-      unparsedLines: parsed.unparsedLines
-    )
-  }
 
   public static func omittedCurrentPrepStepEvidence(
     proposedPlan: MenuPrepPlan,
@@ -1093,6 +1073,9 @@ public enum AIHandoffMenuPrepPlanImport {
     now: Date,
     uuid: () -> UUID
   ) throws -> AIHandoffMenuPrepPlanImportResult {
+    guard let menu = try Menu.find(menuID).fetchOne(db) else {
+      throw AIHandoffMenuPrepPlanImportError.wrongMenu
+    }
     let routedText = AIHandoffToken.stripping(from: text)
 
     if let routedText, let handoff = try AIHandoffRepository.handoff(id: routedText.handoffID, in: db) {
@@ -1108,7 +1091,8 @@ public enum AIHandoffMenuPrepPlanImport {
 
       let returned = AIHandoffReturn.menuPrepPlan(
         from: routedText.payload,
-        currentPlan: currentPlan
+        currentPlan: currentPlan,
+        dayCount: menu.dayCount
       )
       try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
       try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
@@ -1117,19 +1101,25 @@ public enum AIHandoffMenuPrepPlanImport {
 
     let returned = AIHandoffReturn.menuPrepPlan(
       from: routedText?.payload ?? text,
-      currentPlan: currentPlan
+      currentPlan: currentPlan,
+      dayCount: menu.dayCount
     )
     try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
     return .applied
   }
 
   private static func apply(
-    _ returned: AIHandoffReturn.MenuPrepPlanReturn,
+    _ returned: AIHandoffMenuPrepPlanReturn,
     to menuID: Menu.ID,
     in db: Database,
     now: Date,
     uuid: () -> UUID
   ) throws {
+    guard returned.outOfRangeDayCount == 0 else {
+      throw AIHandoffMenuPrepPlanImportError.unparsedPlanText([
+        "\(returned.outOfRangeDayCount) prep plan day header(s) fell outside this menu and were left Flexible."
+      ])
+    }
     guard returned.unparsedLines.isEmpty else {
       throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(returned.unparsedLines)
     }

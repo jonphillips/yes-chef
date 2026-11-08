@@ -77,6 +77,32 @@ struct AIHandoffMenuPasteTests {
   }
 
   @Test
+  func pastingOutOfRangeWorkDayShowsWarningAndDoesNotSave() throws {
+    let menuID = UUID(uuidString: "00000000-0000-0000-0000-000000003812")!
+    let now = Date(timeIntervalSinceReferenceDate: 840_120_000)
+
+    try withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try database.write { db in
+        try Menu.insert {
+          Menu(id: menuID, title: "Three Day Menu", dayCount: 3, dateCreated: now, dateModified: now)
+        }.execute(db)
+      }
+
+      let model = MenuDetailModel(menuID: menuID)
+      model.prepPlanPasted("Day 9 · Morning:\n- Prepare the bread")
+
+      #expect(model.isShowingError)
+      #expect(model.errorMessage?.contains("1 prep plan day header") == true)
+      let steps = try database.read { db in try PrepPlanStepRepository.steps(for: menuID, in: db) }
+      #expect(steps.isEmpty)
+    }
+  }
+
+  @Test
   func advisoryNotesStayOutOfEditablePrepTextAndDoNotBlockSaving() async throws {
     let menuID = UUID(uuidString: "00000000-0000-0000-0000-000000003803")!
     let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003804")!

@@ -52,13 +52,21 @@ extension RecipeCoreTests {
           dateCreated: now, dateModified: now, scale: 1.5
         )
         try MenuItem.insert { containedItem }.execute(db)
-        try PrepPlanStepRecord.insert {
-          PrepPlanStepRecord(
-            id: containedStepID, menuID: containedID, sortOrder: 0,
-            session: "The day before", task: "Make gravy base", serves: "Gravy",
-            sourceDish: containedItemID
-          )
-        }.execute(db)
+        for (index, session, task) in [
+          (0, "The day before", "Make gravy base"),
+          (1, "The day of", "Roast turkey"),
+          (2, "At service", "Carve turkey"),
+          (3, "Flexible", "Set out platters"),
+        ] {
+          try PrepPlanStepRecord.insert {
+            PrepPlanStepRecord(
+              id: index == 0 ? containedStepID : SampleUUIDSequence.uuid(61_020 + index),
+              menuID: containedID, sortOrder: index, session: session, task: task,
+              serves: index == 0 ? "Gravy" : nil,
+              sourceDish: index == 0 ? containedItemID : nil
+            )
+          }.execute(db)
+        }
         let looseItem = MealPlanItem(
           id: looseItemID, kind: .reservation, title: "Farmers market",
           scheduledDate: nextDay, mealSlot: .breakfast, notes: "Bring bags", sortOrder: 0,
@@ -100,7 +108,7 @@ extension RecipeCoreTests {
         #expect(offer.looseCalendarItemCount == 2)
         #expect(offer.containedPlacements.map(\.title) == ["Thanksgiving"])
         #expect(offer.containedPlacements.first?.dishCount == 1)
-        #expect(offer.containedPlacements.first?.prepStepCount == 1)
+        #expect(offer.containedPlacements.first?.prepStepCount == 4)
         #expect(offer.partiallyOverlappingMenuTitles == ["Beach Brunch"])
 
         // The write deliberately sees a row added after the offer was computed.
@@ -145,6 +153,11 @@ extension RecipeCoreTests {
         #expect(copiedStep.sourceDish == copied.id)
         #expect(copiedStep.session == "The day before")
         #expect(copiedStep.serves == "Gravy")
+        #expect(copiedStep.workDayOffset == 0)
+        let copiedSteps = try PrepPlanStepRepository.steps(for: targetID, in: db)
+        #expect(copiedSteps.first { $0.task == "Roast turkey" }?.workDayOffset == 1)
+        #expect(copiedSteps.first { $0.task == "Carve turkey" }?.workDayOffset == 1)
+        #expect(copiedSteps.first { $0.task == "Set out platters" }?.workDayOffset == nil)
 
         let sources = try GroceryItemSource.fetchAll(db)
         let looseSource = try #require(sources.first { $0.groceryItemID == looseGroceryID })
@@ -185,6 +198,54 @@ extension RecipeCoreTests {
         #expect(try MenuRepository.bringInOffer(menuID: zeroPlacementsID, in: db) == nil)
         #expect(try MenuRepository.bringInOffer(menuID: onePlacementID, in: db) == nil)
         #expect(try MenuRepository.bringInOffer(menuID: twoPlacementsID, in: db) == nil)
+      }
+    }
+
+    @Test
+    func bringingInDatedStepFromMultiDayMenuShiftsItsWorkDay() throws {
+      @Dependency(\.defaultDatabase) var database
+      var calendar = Calendar(identifier: .gregorian)
+      calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+      let start = calendar.startOfDay(for: Date(timeIntervalSinceReferenceDate: 805_800_000))
+      let sourceStart = try #require(calendar.date(byAdding: .day, value: 3, to: start))
+      let targetID = SampleUUIDSequence.uuid(63_000)
+      let sourceID = SampleUUIDSequence.uuid(63_001)
+      let targetPlacementID = SampleUUIDSequence.uuid(63_002)
+      let sourcePlacementID = SampleUUIDSequence.uuid(63_003)
+      let sourceStepID = SampleUUIDSequence.uuid(63_004)
+      var ids = SampleUUIDSequence(start: 63_100)
+
+      try database.write { db in
+        for menu in [
+          Menu(id: targetID, title: "Week", dayCount: 7, dateCreated: start, dateModified: start),
+          Menu(id: sourceID, title: "Prep weekend", dayCount: 2, dateCreated: start, dateModified: start),
+        ] {
+          try Menu.insert { menu }.execute(db)
+        }
+        for placement in [
+          MenuPlacement(id: targetPlacementID, menuID: targetID, startDate: start, dateCreated: start, dateModified: start),
+          MenuPlacement(id: sourcePlacementID, menuID: sourceID, startDate: sourceStart, dateCreated: start, dateModified: start),
+        ] {
+          try MenuPlacement.insert { placement }.execute(db)
+        }
+        try PrepPlanStepRecord.insert {
+          PrepPlanStepRecord(
+            id: sourceStepID,
+            menuID: sourceID,
+            sortOrder: 0,
+            session: "Morning",
+            task: "Make the dough",
+            workDayOffset: 1
+          )
+        }.execute(db)
+
+        let result = try MenuRepository.bringIn(menuID: targetID, in: db, now: start, uuid: { ids.next() })
+        #expect(result.copiedPlacementCount == 1)
+
+        let copiedStep = try #require(try PrepPlanStepRepository.steps(for: targetID, in: db).first)
+        #expect(copiedStep.task == "Make the dough")
+        #expect(copiedStep.session == "Morning")
+        #expect(copiedStep.workDayOffset == 4)
       }
     }
   }

@@ -1360,6 +1360,10 @@ extension DependencyValues {
       try db.execute(sql: #"ALTER TABLE "recipeServeWith" ADD COLUMN "linkedRecipeID" TEXT"#)
     }
 
+    migrator.registerMigration("Add prep plan work day offset") { db in
+      try db.execute(sql: #"ALTER TABLE "prepPlanSteps" ADD COLUMN "workDayOffset" INTEGER"#)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

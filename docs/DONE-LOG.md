@@ -9,6 +9,20 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-08 — Work-day CloudKit fields deployed (`effort/menu-absorbs-calendar-days-dispatch-2`)
+
+- **Result:** The CloudKit gate for menu-absorbs-calendar-days S3 + S4 + S5 is done, and its line is gone from `device-passes.md`. `prepPlanSteps.workDayOffset` (Encrypted Int64) and `sqlitedata_icloud_userModificationTime_workDayOffset` (Encrypted Int64) are in Production. Following jon-platform `persistence-and-sync.md` § *Adding a synced table or column*, the architect added both fields to a fresh Development export, validated it, and imported it with `cktool` after Jon's OK. Jon then deployed Development to Production in the Console.
+- **Verification:** After the import, Development matched the imported file and Production was unchanged. After the deploy, Production matched Development, its only change was the two fields, and nothing in `cloudkit-expected-fields.txt` was missing from Production.
+- **Owed:** The S3 + S4 + S5 device gate, in [device-passes.md](device-passes.md).
+
+---
+## 2026-11-08 — Menu prep plans run by work day (`effort/menu-absorbs-calendar-days-dispatch-2`)
+
+- **Result:** Added the nullable synced work-day offset, multi-day prep-plan prompting and review, day-based bands and editing, and work-day shifts when a menu is brought in.
+- **Verification:** SwiftLint passed; check-drift passed with 782 package tests and the app test target build; the generic iOS build passed; YesChefTests passed 128 tests on the simulator.
+- **Owed:** menu-absorbs-calendar-days S3 + S4 + S5 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-08 — Menu brings in calendar days (`effort/menu-absorbs-calendar-days`)
 
 - **Result:** Cooking history now counts recipes served on past placed menus, and bring-in moves loose calendar items while copying contained placed menus, prep steps, and grocery provenance in one write transaction. Placement saves and Menu detail present the same offer and confirmation.

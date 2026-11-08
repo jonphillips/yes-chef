@@ -322,13 +322,13 @@ final class HandoffReviewCoordinator {
   }
 
   private func reviewEditablePrepPlanText(_ review: AIHandoffMenuPrepPlanReview) -> String {
-    [review.plan.editableReviewText(), review.unparsedPlanLines.joined(separator: "\n")]
+    [review.plan.editableReviewText(dayCount: review.dayCount), review.unparsedPlanLines.joined(separator: "\n")]
       .filter { !$0.isEmpty }
       .joined(separator: "\n")
   }
 
   func commitPrepPlan(_ review: AIHandoffMenuPrepPlanReview, approvedText: String) throws {
-    let parsed = review.plan.parsingEditableReviewText(approvedText)
+    let parsed = review.plan.parsingEditableReviewText(approvedText, dayCount: review.dayCount)
     guard parsed.unparsedLines.isEmpty else {
       throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(parsed.unparsedLines)
     }

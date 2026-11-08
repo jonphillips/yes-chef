@@ -328,6 +328,9 @@ private extension CookSessionItem {
 
 struct MenuPrepPlanSection: View {
   let steps: [PrepPlanStepRecord]
+  let dayCount: Int
+  let placementStartDate: Date?
+  let today: Date
   let itemRows: [MenuItemRowData]
   let handoffSource: HandoffExportSource
   let regenerateHandoffSource: HandoffExportSource
@@ -339,13 +342,18 @@ struct MenuPrepPlanSection: View {
   var deleteStep: (PrepPlanStepRecord.ID) -> Void
   var reorderStep: (PrepPlanStepRecord.ID, MenuItemMoveDirection) -> Void
   var isInitiallyExpanded: Bool
-  @State private var expandedSessionIDs: Set<MenuPrepPlanSessionBand.ID> = []
+  @State private var expandedSessionIDs: Set<MenuPrepPlanBand.ID> = []
   @State private var editor: PrepPlanStepEditorDraft?
   @State private var expansionOverride: Bool?
   @State private var isClearConfirmationPresented = false
 
-  private var sessionBands: [MenuPrepPlanSessionBand] {
-    MenuPrepPlanSessionBand.grouping(steps)
+  private var sessionBands: [MenuPrepPlanBand] {
+    MenuPrepPlanBanding.bands(
+      steps: steps,
+      dayCount: dayCount,
+      placementStartDate: placementStartDate,
+      today: today
+    )
   }
 
   private var isExpanded: Bool {
@@ -425,11 +433,15 @@ struct MenuPrepPlanSection: View {
               MenuPrepPlanSessionBandView(
                 band: band,
                 itemRows: itemRows,
-                isExpanded: expandedSessionIDs.contains(band.id),
+                isExpanded: expandedSessionIDs.contains(band.id) || (band.isToday && !expandedSessionIDs.contains("collapsed:\(band.id)")),
                 onToggle: {
-                  if expandedSessionIDs.contains(band.id) {
+                  let isExpanded = expandedSessionIDs.contains(band.id)
+                    || (band.isToday && !expandedSessionIDs.contains("collapsed:\(band.id)"))
+                  if isExpanded {
                     expandedSessionIDs.remove(band.id)
+                    if band.isToday { expandedSessionIDs.insert("collapsed:\(band.id)") }
                   } else {
+                    expandedSessionIDs.remove("collapsed:\(band.id)")
                     expandedSessionIDs.insert(band.id)
                   }
                 },
@@ -445,7 +457,12 @@ struct MenuPrepPlanSection: View {
       }
     }
     .sheet(item: $editor) { draft in
-      PrepPlanStepEditorSheet(draft: draft, itemRows: itemRows) { savedDraft in
+      PrepPlanStepEditorSheet(
+        draft: draft,
+        itemRows: itemRows,
+        dayCount: dayCount,
+        placementStartDate: placementStartDate
+      ) { savedDraft in
         if let id = savedDraft.stepID {
           updateStep(savedDraft.step, id)
         } else {
@@ -465,53 +482,8 @@ struct MenuPrepPlanSection: View {
 
 }
 
-private struct MenuPrepPlanSessionBand: Identifiable {
-  struct Step: Identifiable {
-    let id: PrepPlanStepRecord.ID
-    let step: PrepPlanStepRecord
-  }
-
-  let id: String
-  let session: String
-  let steps: [Step]
-
-  var stepCountTitle: String {
-    steps.count == 1 ? "1 step" : "\(steps.count) steps"
-  }
-
-  private var isFlexible: Bool {
-    PrepPlanSessionBand(matching: session) == .flexible
-  }
-
-  static func grouping(_ planSteps: [PrepPlanStepRecord]) -> [MenuPrepPlanSessionBand] {
-    var unprioritizedBands: [(session: String, steps: [PrepPlanStepRecord])] = []
-    for step in planSteps {
-      if let lastBandIndex = unprioritizedBands.indices.last,
-        unprioritizedBands[lastBandIndex].session == step.session
-      {
-        unprioritizedBands[lastBandIndex].steps.append(step)
-      } else {
-        unprioritizedBands.append((session: step.session, steps: [step]))
-      }
-    }
-
-    let bands = unprioritizedBands.enumerated().map { index, band in
-      MenuPrepPlanSessionBand(
-        id: "\(index):\(band.session)",
-        session: band.session,
-        steps: Self.displaySteps(for: band.steps, in: band.session)
-      )
-    }
-    return bands.filter(\.isFlexible) + bands.filter { !$0.isFlexible }
-  }
-
-  private static func displaySteps(for steps: [PrepPlanStepRecord], in session: String) -> [Step] {
-    steps.map { Step(id: $0.id, step: $0) }
-  }
-}
-
 private struct MenuPrepPlanSessionBandView: View {
-  let band: MenuPrepPlanSessionBand
+  let band: MenuPrepPlanBand
   let itemRows: [MenuItemRowData]
   let isExpanded: Bool
   var onToggle: () -> Void
@@ -529,7 +501,7 @@ private struct MenuPrepPlanSessionBandView: View {
             .foregroundStyle(.secondary)
             .frame(width: 12)
 
-          Text(band.session)
+          Text(band.title)
             .font(.headline)
 
           Spacer()
@@ -541,12 +513,18 @@ private struct MenuPrepPlanSessionBandView: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .accessibilityLabel(isExpanded ? "Collapse \(band.session)" : "Expand \(band.session)")
+      .accessibilityLabel(isExpanded ? "Collapse \(band.title)" : "Expand \(band.title)")
       .accessibilityValue(band.stepCountTitle)
 
       if isExpanded {
         VStack(alignment: .leading, spacing: 0) {
-          ForEach(band.steps) { presentation in
+          ForEach(band.steps, id: \.step.id) { presentation in
+            if let sessionLabel = presentation.sessionLabel {
+              Text(sessionLabel)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .padding(.top, 8)
+            }
             MenuPrepPlanStepView(
               step: presentation.step,
               itemRows: itemRows,
@@ -556,7 +534,7 @@ private struct MenuPrepPlanSessionBandView: View {
               reorderStep: reorderStep
             )
 
-            if presentation.id != band.steps.last?.id {
+            if presentation.step.id != band.steps.last?.step.id {
               Divider()
                 .padding(.leading, 44)
             }
