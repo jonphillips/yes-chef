@@ -147,7 +147,7 @@ enum HandoffExportSource: Sendable {
   case mealPlan(MealPlanItem.ID)
   case mealPlanComplement(MealPlanItem.ID)
   case readerFeedback(ReaderFeedbackHandoffContext)
-  case workbench(Workbench.ID, task: WorkbenchHandoffTask)
+  case workbench(Workbench.ID, task: WorkbenchHandoffTask, candidateIDs: [WorkbenchCandidate.ID]? = nil)
 
   init(_ source: HandoffSource) {
     switch source {
@@ -156,6 +156,13 @@ enum HandoffExportSource: Sendable {
     case let .mealPlan(mealPlan): self = .mealPlan(mealPlan.id)
     case let .workbench(workbench): self = .workbench(workbench.id, task: .compare)
     }
+  }
+}
+
+extension HandoffExportSource {
+  func withCandidateIDs(_ candidateIDs: [WorkbenchCandidate.ID]) -> Self {
+    guard case let .workbench(workbenchID, task, _) = self else { return self }
+    return .workbench(workbenchID, task: task, candidateIDs: candidateIDs)
   }
 }
 
@@ -208,7 +215,7 @@ extension HandoffExportSource {
         dayOffset: nil,
         variationID: nil
       )
-    case let .workbench(workbenchID, task):
+    case let .workbench(workbenchID, task, _):
       Metadata(sourceType: .workbench, sourceID: workbenchID, taskType: task.handoffTaskType, dayOffset: nil, variationID: nil)
     }
   }
@@ -709,7 +716,7 @@ enum HandoffAppOperations {
     case let .readerFeedback(context):
       handoff = readerFeedbackHandoff(handoffID: handoffID, metadata: metadata, context: context, mode: mode, now: now)
 
-    case let .workbench(workbenchID, task):
+    case let .workbench(workbenchID, task, candidateIDs):
       guard let workbenchContext = try await database.read({ db in
         try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db)
       }) else {
@@ -719,13 +726,13 @@ enum HandoffAppOperations {
       let deliverableFormat: AIHandoffToken.DeliverableFormat
       switch task {
       case .compare:
-        context = workbenchContext.compareHandoffPrompt()
+        context = workbenchContext.compareHandoffPrompt(candidateIDs: candidateIDs)
         deliverableFormat = .workbenchCompare
       case .experiments:
-        context = workbenchContext.experimentsHandoffPrompt()
+        context = workbenchContext.experimentsHandoffPrompt(candidateIDs: candidateIDs)
         deliverableFormat = .workbenchExperiments
       case .draft:
-        context = workbenchContext.draftHandoffPrompt()
+        context = workbenchContext.draftHandoffPrompt(candidateIDs: candidateIDs)
         deliverableFormat = .workbenchDraft
       }
       let prompt = AIHandoffToken.prompt(

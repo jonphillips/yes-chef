@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-08 — Workbench hand-off candidate choice (`effort/workbench-handoff-recipe-returns-and-candidate-choice`)
+
+- **Result:** Compare, Experiments, and Draft hand-offs now let cooks select candidates. Frontier prompts and chat use the character budget without the on-device candidate cap, and serialization reports included and omitted candidates and references.
+- **Verification:** scripts/check-drift.sh, focused Core tests, the generic iOS build, and the YesChefTests simulator target passed.
+- **Owed:** workbench-handoff-recipe-returns-and-candidate-choice S3 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-06 — Adopt ChatAccessKit export in Yes Chef (`effort/chat-access-export-adoption`)
 
 - **Result:** Yes Chef's export reader, writer, and helper setup now use jon-platform [#128](https://github.com/jonphillips/jon-platform/pull/128), preserving the decoded cache, tool messages, 15-minute background throttle, and export references.

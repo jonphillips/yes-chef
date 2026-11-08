@@ -206,7 +206,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func workbenchChatSerializesFullIncludedCandidatesAndCapsBreadth() {
+    func workbenchChatWithFrontierBudgetIncludesAllCandidates() {
       let now = Date(timeIntervalSinceReferenceDate: 806_300_000)
       let candidates = (0..<6).map { index in
         WorkbenchCandidateChatContext(
@@ -255,12 +255,8 @@ extension RecipeCoreTests {
       #expect(serialized.contains("      - Toast chiles 0."))
       #expect(serialized.contains("      - Braise until tender 0."))
       #expect(serialized.contains("- Candidate 4"))
-      #expect(!serialized.contains("- Candidate 5"))
-      #expect(
-        serialized.contains(
-          "1 lower-priority candidate(s) were omitted so included candidates keep full ingredients and instructions."
-        )
-      )
+      #expect(serialized.contains("- Candidate 5"))
+      #expect(!serialized.contains("lower-priority candidate(s) were omitted"))
       _ = now
     }
 

@@ -970,7 +970,7 @@ path rather than tighten the tolerance.
 
 **Status: Accepted** — Jon's calls on 2026-11-08: replace behind a confirm, and he chooses the candidates. The rest is
 the architect's design. Brief:
-[`efforts/workbench-handoff-recipe-returns-and-candidate-choice.md`](../efforts/workbench-handoff-recipe-returns-and-candidate-choice.md).
+[`efforts/archive/workbench-handoff-recipe-returns-and-candidate-choice.md`](../efforts/archive/workbench-handoff-recipe-returns-and-candidate-choice.md).
 
 **Trigger.** Dogfood: a Compare conversation, finalized through chat access, settled on a recipe and returned
 schema.org JSON-LD. The Compare return path never parses, so the JSON was saved verbatim as a workbench-log

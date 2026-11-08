@@ -112,11 +112,15 @@ public enum RecipeChatContext: Equatable, Sendable {
   }
 
   public var seededContextDescription: String {
+    seededContextDescription(for: .onDevice)
+  }
+
+  public func seededContextDescription(for tier: ModelTier) -> String {
     switch self {
     case let .mealPlan(context): context.seededContextDescription
     case let .menu(context): context.seededContextDescription
     case .recipe: "This conversation can use the recipe on screen."
-    case let .workbench(context): context.seededContextDescription
+    case let .workbench(context): context.seededContextDescription(for: tier)
     }
   }
 
