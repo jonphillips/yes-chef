@@ -833,6 +833,9 @@ struct ChatApplyReviewSheet: View {
 
   @State private var draftText: String
   @State private var isShowingDiscardConfirmation = false
+  @State private var pendingCommitConfirmation: ChatApplyReviewConfirmation?
+  @State private var pendingCommit: PendingReviewCommit?
+  @State private var preparationErrorMessage: String?
 
   init(
     item: ChatApplyReviewItem,
@@ -935,6 +938,38 @@ struct ChatApplyReviewSheet: View {
     } message: {
       Text("Your review edits have not been saved.")
     }
+    .confirmationDialog(
+      pendingCommitConfirmation?.title ?? "Confirm",
+      isPresented: Binding(
+        get: { pendingCommitConfirmation != nil },
+        set: { if !$0 { pendingCommitConfirmation = nil; pendingCommit = nil } }
+      ),
+      titleVisibility: .visible
+    ) {
+      Button(pendingCommitConfirmation?.confirmTitle ?? "Confirm", role: .destructive) {
+        guard let pendingCommit else { return }
+        self.pendingCommitConfirmation = nil
+        self.pendingCommit = nil
+        Task { await commit(pendingCommit.text, pendingCommit.usingSecondaryCommit) }
+      }
+      Button("Cancel", role: .cancel) {
+        pendingCommitConfirmation = nil
+        pendingCommit = nil
+      }
+    } message: {
+      Text(pendingCommitConfirmation?.message ?? "")
+    }
+    .alert(
+      "Could Not Prepare Commit",
+      isPresented: Binding(
+        get: { preparationErrorMessage != nil },
+        set: { if !$0 { preparationErrorMessage = nil } }
+      )
+    ) {
+      Button("OK") { preparationErrorMessage = nil }
+    } message: {
+      Text(preparationErrorMessage ?? "")
+    }
     .presentationDetents([.medium, .large])
   }
 
@@ -967,7 +1002,18 @@ struct ChatApplyReviewSheet: View {
   ) -> some View {
     Button(role: role) {
       Task {
-        await commit(draftText, usingSecondaryCommit)
+        do {
+          if let prepareCommit = item.prepareCommit,
+             let confirmation = try await prepareCommit()
+          {
+            pendingCommit = PendingReviewCommit(text: draftText, usingSecondaryCommit: usingSecondaryCommit)
+            pendingCommitConfirmation = confirmation
+          } else {
+            await commit(draftText, usingSecondaryCommit)
+          }
+        } catch {
+          preparationErrorMessage = error.localizedDescription
+        }
       }
     } label: {
       if isCommitting {
@@ -978,6 +1024,11 @@ struct ChatApplyReviewSheet: View {
     }
     .disabled(isCommitting || approvedTextIsEmpty || approvedTextHasValidationIssue)
   }
+}
+
+private struct PendingReviewCommit {
+  var text: String
+  var usingSecondaryCommit: Bool
 }
 
 private enum ChatApplyReviewLayout {

@@ -21,6 +21,7 @@ final class HandoffReviewCoordinator {
   var adjustmentReview: RecipeAdjustmentReviewState?
   private var pendingAdjustmentReview: RecipeAdjustmentReviewState?
   private var pendingHandoff: AIHandoff?
+  var confirmedWorkbenchRecipeIDs: [Workbench.ID: Recipe.ID] = [:]
   var pendingRecipeReviews: [AIHandoffReview] = []
   var errorMessage: String?
   var errorTitle = "Could Not Save Handoff"
@@ -457,7 +458,7 @@ final class HandoffReviewCoordinator {
     }
   }
 
-  private func commitWorkbenchObservation(
+  func commitWorkbenchObservation(
     workbenchID: Workbench.ID,
     text: String
   ) throws {
@@ -608,87 +609,6 @@ final class HandoffReviewCoordinator {
 // `WorkbenchDraftRecipe` lands in the existing draft review + create-working-recipe path, and the
 // returned learnings/residue deposit to the workbench log (Amd2-D6). Kept in an extension so the
 // coordinator's primary type body stays within the lint budget.
-extension HandoffReviewCoordinator {
-  func workbenchDraftReviewItems(
-    for review: AIHandoffWorkbenchDraftReview
-  ) -> [ChatApplyReviewItem] {
-    var items: [ChatApplyReviewItem] = []
-    let draft = review.draftRecipe
-    // The recipe item stages whenever there is a recipe to make — independent of the rationale,
-    // which the editable prose fields can fill (finding: an argued-in-thread draft omits it).
-    if draft.hasReviewableContent {
-      let originalEditableText = draft.editableProseReviewText()
-      items.append(
-        ChatApplyReviewItem(
-          id: review.handoffID,
-          title: "Review working recipe",
-          summary: draft.renderedReview(),
-          presentation: .sheet,
-          editableTitle: "Draft prose fields",
-          editableText: originalEditableText,
-          commitTitle: "Create Working Recipe",
-          committingTitle: "Creating working recipe…",
-          committedTitle: "Created Working Recipe",
-          commit: { [weak self] editedText in
-            let approved = editedText == originalEditableText
-              ? draft
-              : draft.applyingEditableProseReviewText(editedText)
-            try self?.commitWorkbenchDraftRecipe(approved, workbenchID: review.workbenchID)
-          }
-        )
-      )
-    }
-    // Learnings are the argument residue, staged independently of the recipe and deposited to the
-    // workbench log (Amd2-D6). Same item shape as the compare verb — see the shared helper.
-    if !review.learnings.isEmpty {
-      items.append(
-        workbenchLearningsReviewItem(workbenchID: review.workbenchID, learnings: review.learnings)
-      )
-    }
-    return items
-  }
-
-  /// The workbench-log learnings review item, shared by the compare and draft return verbs.
-  func workbenchLearningsReviewItem(
-    workbenchID: Workbench.ID,
-    learnings: [String]
-  ) -> ChatApplyReviewItem {
-    let editableText = learnings.map { "- \($0)" }.joined(separator: "\n")
-    return ChatApplyReviewItem(
-      title: "Review learnings",
-      summary: editableText,
-      presentation: .sheet,
-      editableTitle: "Learnings",
-      editableText: editableText,
-      commitTitle: "Save to Workbench Log",
-      committingTitle: "Saving learnings…",
-      committedTitle: "Saved to Workbench Log",
-      commit: { [weak self] approvedText in
-        try self?.commitWorkbenchObservation(
-          workbenchID: workbenchID,
-          text: "Learnings:\n\(approvedText)"
-        )
-      }
-    )
-  }
-
-  private func commitWorkbenchDraftRecipe(
-    _ draft: WorkbenchDraftRecipe,
-    workbenchID: Workbench.ID
-  ) throws {
-    guard draft.hasReviewableContent else { throw HandoffReviewError.emptyDeliverable }
-    _ = try commitReviewWrite { db in
-      try WorkbenchRepository.createDraftRecipe(
-        draft,
-        for: workbenchID,
-        in: db,
-        now: now,
-        uuid: { uuid() }
-      )
-    }
-  }
-}
-
 extension HandoffReviewCoordinator {
   func presentAdjustmentReview(_ adjustmentReview: RecipeAdjustmentReviewState) {
     clearError()
@@ -1040,6 +960,7 @@ enum HandoffReviewError: LocalizedError, CustomStringConvertible {
   case variationNeedsRepair([String])
   case invalidVariationReview
   case variationCannotRepresent
+  case workingRecipeChanged
 
   var errorDescription: String? {
     switch self {
@@ -1055,6 +976,8 @@ enum HandoffReviewError: LocalizedError, CustomStringConvertible {
       "The variation review is incomplete. Open it again and try saving."
     case .variationCannotRepresent:
       "This revision includes changes that cannot be kept in a variation yet."
+    case .workingRecipeChanged:
+      "The working recipe changed while you were reviewing. Review the replacement again before saving."
     }
   }
 

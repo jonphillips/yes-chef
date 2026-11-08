@@ -35,7 +35,11 @@ struct RecipeCollectionReviewSheet: View {
             }
             .buttonStyle(.plain)
             .font(.subheadline)
-            .disabled(items.isEmpty || activeCommittingItemID != nil || isAcceptingAll)
+            .disabled(
+              items.isEmpty
+                || activeCommittingItemID != nil
+                || isAcceptingAll
+            )
           }
 
           ForEach(items) { item in
@@ -75,7 +79,12 @@ struct RecipeCollectionReviewSheet: View {
               await acceptAll()
             }
           }
-          .disabled(items.isEmpty || activeCommittingItemID != nil || isAcceptingAll)
+          .disabled(
+            items.isEmpty
+              || items.contains(where: { $0.prepareCommit != nil })
+              || activeCommittingItemID != nil
+              || isAcceptingAll
+          )
         }
       }
     }
@@ -168,6 +177,7 @@ struct RecipeCollectionReviewSheet: View {
   }
 
   private func acceptAll() async {
+    guard !items.contains(where: { $0.prepareCommit != nil }) else { return }
     isAcceptingAll = true
     defer { isAcceptingAll = false }
 

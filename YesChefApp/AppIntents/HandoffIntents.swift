@@ -720,7 +720,7 @@ enum HandoffAppOperations {
       switch task {
       case .compare:
         context = workbenchContext.compareHandoffPrompt()
-        deliverableFormat = .menuPrepPlan
+        deliverableFormat = .workbenchCompare
       case .experiments:
         context = workbenchContext.experimentsHandoffPrompt()
         deliverableFormat = .workbenchExperiments

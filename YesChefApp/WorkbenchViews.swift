@@ -449,12 +449,9 @@ private struct WorkbenchReader: View {
       } header: {
         Text("Working Recipe")
       } footer: {
-        // Only offer the outboard draft door when the onboard draft verb is also eligible: no
-        // working recipe yet (createDraftRecipe throws draftRecipeAlreadyExists otherwise) and at
-        // least one candidate to synthesize from (an empty context is not worth outboarding).
-        if detail.workbench.draftRecipeID == nil, !detail.candidateRows.isEmpty {
+        if !detail.candidateRows.isEmpty {
           VStack(alignment: .leading, spacing: 8) {
-            Text("Draft the working recipe in a flat-rate ChatGPT or Claude thread, then paste the returned recipe back to review and create it.")
+            Text("Draft or revise the working recipe in a flat-rate ChatGPT or Claude thread, then paste the returned recipe back to review. It replaces the current working recipe only after you confirm.")
             HandoffCopyPasteControls(
               source: .workbench(detail.workbench.id, task: .draft),
               transport: handoffTransport,

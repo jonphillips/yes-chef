@@ -417,6 +417,117 @@ struct HandoffSectionRoutingTests {
   }
 
   @Test
+  @MainActor
+  func workbenchDraftCommitConfirmsAndAtomicallyReplacesTheCurrentWorkingRecipe() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 900_123_456)
+    let workbenchID = UUID(uuidString: "00000000-0000-0000-0000-000000003950")!
+    let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003951")!
+    let review = AIHandoffWorkbenchDraftReview(
+      handoffID: handoffID,
+      workbenchID: workbenchID,
+      draftRecipe: WorkbenchDraftRecipe(
+        title: "New Recipe",
+        ingredientLines: ["2 eggs"],
+        instructionLines: ["Cook gently."],
+        rationale: "A better version."
+      ),
+      learnings: []
+    )
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        _ = try WorkbenchRepository.addWorkbench(title: "Study", in: db, now: now, uuid: { workbenchID })
+      }
+      let coordinator = HandoffReviewCoordinator()
+      let item = try #require(coordinator.reviewItems(for: .workbenchDraft(review)).first)
+      #expect(try await item.prepareCommit?() == nil)
+      try await item.commit(item.unmodifiedApprovedText)
+      let createdID = try await database.read { db in
+        try #require(Workbench.find(workbenchID).fetchOne(db)?.draftRecipeID)
+      }
+      #expect(try await database.read { db in try Recipe.find(createdID).fetchOne(db)?.title } == "New Recipe")
+
+      // A cancel leaves the old working recipe linked and untouched.
+      let canceledReview = AIHandoffWorkbenchDraftReview(
+        handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003952")!,
+        workbenchID: workbenchID,
+        draftRecipe: review.draftRecipe,
+        learnings: []
+      )
+      let canceledItem = try #require(coordinator.reviewItems(for: .workbenchDraft(canceledReview)).first)
+      let canceledConfirmation = try #require(try await canceledItem.prepareCommit?())
+      #expect(canceledConfirmation.confirmTitle == "Replace Working Recipe")
+      #expect(canceledConfirmation.message.contains("including any edits"))
+      #expect(try await database.read { db in
+        try Workbench.find(workbenchID).fetchOne(db)?.draftRecipeID
+      } == createdID)
+
+      // Confirmation is prepared at commit time, so a working recipe added after review still asks.
+      try await database.write { db in
+        try WorkbenchRepository.removeDraftRecipe(workbenchID: workbenchID, in: db, now: now)
+      }
+      let appearedReview = AIHandoffWorkbenchDraftReview(
+        handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003953")!,
+        workbenchID: workbenchID,
+        draftRecipe: review.draftRecipe,
+        learnings: []
+      )
+      let appearedItem = try #require(coordinator.reviewItems(for: .workbenchDraft(appearedReview)).first)
+      let appearedID = try await database.write { db in
+        try WorkbenchRepository.createDraftRecipe(
+          WorkbenchDraftRecipe(
+            title: "Appeared",
+            ingredientLines: ["1 apple"],
+            instructionLines: ["Slice it."],
+            rationale: ""
+          ),
+          for: workbenchID,
+          in: db,
+          now: now,
+          uuid: { UUID() }
+        )
+      }
+      let appearedConfirmation = try #require(try await appearedItem.prepareCommit?())
+      #expect(appearedConfirmation.message.contains("including any edits"))
+      try await appearedItem.commit(appearedItem.unmodifiedApprovedText)
+      let replacementID = try await database.read { db in
+        try #require(Workbench.find(workbenchID).fetchOne(db)?.draftRecipeID)
+      }
+      let replacedOldRecipe = try await database.read { db in try Recipe.find(appearedID).fetchOne(db) }
+      #expect(replacedOldRecipe == nil)
+      #expect(replacementID != appearedID)
+      #expect(try await database.read { db in try Recipe.find(replacementID).fetchOne(db)?.title } == "New Recipe")
+
+      try await database.write { db in
+        _ = try WorkbenchRepository.promoteDraftRecipe(workbenchID: workbenchID, in: db, now: now)
+      }
+      let promotedReview = AIHandoffWorkbenchDraftReview(
+        handoffID: UUID(uuidString: "00000000-0000-0000-0000-000000003955")!,
+        workbenchID: workbenchID,
+        draftRecipe: review.draftRecipe,
+        learnings: []
+      )
+      let promotedItem = try #require(coordinator.reviewItems(for: .workbenchDraft(promotedReview)).first)
+      let promotedConfirmation = try #require(try await promotedItem.prepareCommit?())
+      #expect(promotedConfirmation.message == "Detaches it from this workbench and stays in your library.")
+      try await promotedItem.commit(promotedItem.unmodifiedApprovedText)
+      let state = try await database.read { db in
+        (
+          try Workbench.find(workbenchID).fetchOne(db)?.draftRecipeID,
+          try Recipe.find(replacementID).fetchOne(db)?.libraryPlacement
+        )
+      }
+      #expect(state.0 != replacementID)
+      #expect(state.1 == .main)
+    }
+  }
+
+  @Test
   func recipeAdjustmentRoundTripKeepsTheTokenContractMarkerProseAndLearnings() throws {
     let handoffID = UUID(uuidString: "00000000-0000-0000-0000-000000003903")!
     let result = """
