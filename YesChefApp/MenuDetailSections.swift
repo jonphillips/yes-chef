@@ -503,12 +503,22 @@ struct MenuPlacementList: View {
   let menu: CoreMenu
   let minimumDayCount: Int
   let placements: [MenuPlacement]
+  let bringInOffer: MenuBringInOffer?
 
   var body: some View {
     if !placements.isEmpty {
       VStack(alignment: .leading, spacing: 12) {
         Text("Calendar")
           .font(.title2.weight(.semibold))
+
+        if let bringInOffer {
+          Button {
+            model.bringInButtonTapped(menu: menu, offer: bringInOffer)
+          } label: {
+            Label("Bring In Calendar Items…", systemImage: "calendar.badge.plus")
+          }
+          .buttonStyle(.bordered)
+        }
 
         VStack(spacing: 0) {
           ForEach(placements) { placement in

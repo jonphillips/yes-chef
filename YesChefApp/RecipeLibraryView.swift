@@ -259,6 +259,18 @@ struct AppContainer: View {
     } message: { context in
       Text("Remove \(context.menuTitle) from \(context.startDate.formatted(.dateTime.month(.wide).day().year()))?")
     }
+    .confirmationDialog(
+      "Bring Calendar Items into \(menuModel.bringInPresentation?.menuTitle ?? "Menu")?",
+      item: $menuModel.destination.bringIn,
+      titleVisibility: .visible
+    ) { presentation in
+      Button("Bring In") {
+        menuModel.confirmBringIn(presentation)
+      }
+      Button("Not Now", role: .cancel) {}
+    } message: { presentation in
+      Text(presentation.message)
+    }
     .alert("Import Complete", item: $recipeModel.destination.importSummary) { summary in
       if summary.canUndo {
         Button("Undo Import", role: .destructive) {

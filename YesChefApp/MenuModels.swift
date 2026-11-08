@@ -19,6 +19,7 @@ final class MenuLibraryModel {
     case deleteMenu(MenuDeletionContext)
     case deleteItem(MenuItemDeletionContext)
     case deletePlacement(MenuPlacementDeletionContext)
+    case bringIn(MenuBringInPresentation)
   }
 
   @ObservationIgnored
@@ -33,6 +34,10 @@ final class MenuLibraryModel {
   @Fetch(RecipeListRequest(), animation: .default) var recipeRows: [RecipeListRowData] = []
 
   var destination: Destination?
+  var bringInPresentation: MenuBringInPresentation? {
+    guard case let .bringIn(presentation) = destination else { return nil }
+    return presentation
+  }
   var selectedMenuID: CoreMenu.ID?
   var errorMessage: String?
   var isShowingError = false
@@ -132,6 +137,22 @@ final class MenuLibraryModel {
       errorMessage = String(describing: error)
       isShowingError = true
       return false
+    }
+  }
+
+  func bringInButtonTapped(menu: CoreMenu, offer: MenuBringInOffer) {
+    destination = .bringIn(MenuBringInPresentation(menuID: menu.id, menuTitle: menu.title, offer: offer))
+  }
+
+  func confirmBringIn(_ presentation: MenuBringInPresentation) {
+    do {
+      _ = try database.write { db in
+        try MenuRepository.bringIn(menuID: presentation.menuID, in: db, now: now, uuid: { uuid() })
+      }
+      destination = nil
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
     }
   }
 
@@ -431,7 +452,12 @@ final class MenuLibraryModel {
           )
         }
       }
-      destination = nil
+      let offer = try database.read { db in
+        try MenuRepository.bringInOffer(menuID: context.menuID, in: db)
+      }
+      destination = offer.map {
+        .bringIn(MenuBringInPresentation(menuID: context.menuID, menuTitle: context.menuTitle, offer: $0))
+      }
       return true
     } catch {
       errorMessage = String(describing: error)
@@ -1045,4 +1071,29 @@ struct MenuPlacementDeletionContext: Identifiable, Hashable, Sendable {
   var startDate: Date
 
   var id: MenuPlacement.ID { placementID }
+}
+
+struct MenuBringInPresentation: Hashable, Identifiable {
+  var menuID: CoreMenu.ID
+  var menuTitle: String
+  var offer: MenuBringInOffer
+
+  var id: CoreMenu.ID { menuID }
+
+  var message: String {
+    var lines: [String] = []
+    if offer.looseCalendarItemCount > 0 {
+      let count = offer.looseCalendarItemCount
+      lines.append("\(count) calendar item\(count == 1 ? "" : "s")")
+    }
+    lines += offer.containedPlacements.map { placement in
+      let dishes = "\(placement.dishCount) dish\(placement.dishCount == 1 ? "" : "es")"
+      let steps = "\(placement.prepStepCount) prep step\(placement.prepStepCount == 1 ? "" : "s")"
+      return "\(placement.title) — \(dishes), \(steps)"
+    }
+    lines += offer.partiallyOverlappingMenuTitles.map {
+      "\($0) overlaps these days but runs past them, so it stays as is."
+    }
+    return lines.joined(separator: "\n")
+  }
 }

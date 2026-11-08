@@ -233,17 +233,11 @@ extension GroceryRepository {
     let items = menuItems
       .filter { $0.kind == .recipe && $0.recipeID != nil }
       .sorted(by: areMenuItemsInIncreasingOrder)
-    let calendar = Calendar(identifier: .gregorian)
-
     var itemIDs: [GroceryItem.ID] = []
     for menuItem in items {
       guard let recipeID = menuItem.recipeID else { continue }
       let recipe = try requireRecipe(recipeID, in: db)
-      let scheduledDate = calendar.date(
-        byAdding: .day,
-        value: menuItem.dayOffset,
-        to: placement.startDate
-      )
+      let scheduledDate = MenuPlacementDay.date(for: menuItem.dayOffset, from: placement)
       do {
         itemIDs += try addRecipeIngredients(
           recipe: recipe,

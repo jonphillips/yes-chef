@@ -192,6 +192,6 @@ shifted. Session labels are unchanged.
 
 ## Dispatch ledger
 
-- [ ] Dispatch 1 — S1 + S2 (history counts placed menus; bring-in), one PR. No schema.
+- [x] Dispatch 1 — S1 + S2 (history counts placed menus; bring-in), one PR. No schema.
 - [ ] Dispatch 2 — S3 + S4 + S5 (work-day column, weave and text, day bands and picker, copied-step dating), one PR.
   Schema: escalate to Jon at review.
