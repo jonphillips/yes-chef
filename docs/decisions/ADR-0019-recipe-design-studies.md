@@ -132,6 +132,10 @@ manually ordered, each carrying an optional cook's annotation ("this one nails t
 meat"). Suggest a soft cap (~5) for the grounding reason in D2; not a hard schema constraint. No smart
 seed in v1 (unlike Collection's optional rule — a study is a deliberate hand-pick).
 
+> **Amended by [ADR-0042 Amd 6](ADR-0042-workbench-handoff-and-the-return-block.md#amendment-6--every-workbench-hand-off-can-finalize-as-a-recipe-and-the-cook-picks-what-it-carries-2026-11-08)
+> (2026-11-08):** the soft cap now applies at the on-device tier only. Workbench hand-offs carry the candidates the
+> cook selects at export, bounded by the frontier character budget, and the export picker shows anything left out.
+
 ### D4 — Living workspace, passive artifacts (**recommended**)
 
 Like the menu prep plan (ADR-0012 A3) and reference/original provenance (ADR-0010), the draft and the

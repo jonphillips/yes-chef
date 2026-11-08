@@ -26,3 +26,4 @@ discoverable"):
 ## Live
 
 
+- [Workbench hand-offs: recipe returns and candidate choice](workbench-handoff-recipe-returns-and-candidate-choice.md) — **Ready**. A recipe returned on any workbench hand-off stages as the working recipe (replace on confirm); the cook picks the hand-off's candidates instead of a hidden five-candidate cap.
