@@ -490,9 +490,9 @@ public enum AIHandoffToken {
       case .readerFeedbackCuration:
         "the paste-ready reader-feedback points"
       case .workbenchCompare:
-        "the named candidate differences with concrete claims"
+        "the named candidate differences with concrete claims — or, if the cook has settled on a recipe, that recipe as the schema.org Recipe JSON-LD block described above, then its rationale as a separate block"
       case .workbenchExperiments:
-        "the proposed experiments"
+        "the proposed experiments — or, if the cook has settled on a recipe, that recipe as the schema.org Recipe JSON-LD block described above, then its rationale as a separate block"
       case .workbenchDraft:
         "the drafted recipe as the schema.org Recipe JSON-LD block described above, then its rationale as a separate block"
       }

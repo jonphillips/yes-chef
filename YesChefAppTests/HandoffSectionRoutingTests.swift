@@ -461,7 +461,7 @@ struct HandoffSectionRoutingTests {
       )
       let canceledItem = try #require(coordinator.reviewItems(for: .workbenchDraft(canceledReview)).first)
       let canceledConfirmation = try #require(try await canceledItem.prepareCommit?())
-      #expect(canceledConfirmation.confirmTitle == "Replace Working Recipe…")
+      #expect(canceledConfirmation.confirmTitle == "Replace Working Recipe")
       #expect(canceledConfirmation.message.contains("including any edits"))
       #expect(try await database.read { db in
         try Workbench.find(workbenchID).fetchOne(db)?.draftRecipeID
@@ -478,8 +478,8 @@ struct HandoffSectionRoutingTests {
         learnings: []
       )
       let appearedItem = try #require(coordinator.reviewItems(for: .workbenchDraft(appearedReview)).first)
-      try await database.write { db in
-        _ = try WorkbenchRepository.createDraftRecipe(
+      let appearedID = try await database.write { db in
+        try WorkbenchRepository.createDraftRecipe(
           WorkbenchDraftRecipe(
             title: "Appeared",
             ingredientLines: ["1 apple"],
@@ -498,7 +498,9 @@ struct HandoffSectionRoutingTests {
       let replacementID = try await database.read { db in
         try #require(Workbench.find(workbenchID).fetchOne(db)?.draftRecipeID)
       }
-      #expect(replacementID != UUID(uuidString: "00000000-0000-0000-0000-000000003954")!)
+      let replacedOldRecipe = try await database.read { db in try Recipe.find(appearedID).fetchOne(db) }
+      #expect(replacedOldRecipe == nil)
+      #expect(replacementID != appearedID)
       #expect(try await database.read { db in try Recipe.find(replacementID).fetchOne(db)?.title } == "New Recipe")
 
       try await database.write { db in

@@ -143,5 +143,5 @@ No schema, migration, sync, contract-version or new-parser change is authorized:
 
 ## Dispatch ledger
 
-- [ ] Dispatch 1 — S1 + S2 (return routing, Compare ask fix, replace-on-confirm, Draft door), one PR.
+- [x] Dispatch 1 — S1 + S2 (return routing, Compare ask fix, replace-on-confirm, Draft door), one PR.
 - [ ] Dispatch 2 — S3 (candidate picker, tier-scoped cap, honest header), one PR.

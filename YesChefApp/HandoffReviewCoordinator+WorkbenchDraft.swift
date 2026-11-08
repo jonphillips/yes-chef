@@ -41,9 +41,10 @@ extension HandoffReviewCoordinator {
               return ChatApplyReviewConfirmation(
                 title: "Replace Working Recipe?",
                 message: message,
-                confirmTitle: "Replace Working Recipe…"
+                confirmTitle: "Replace Working Recipe"
               )
             } catch {
+              self.confirmedWorkbenchRecipeIDs.removeValue(forKey: review.workbenchID)
               return nil
             }
           },

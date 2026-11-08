@@ -37,7 +37,6 @@ struct RecipeCollectionReviewSheet: View {
             .font(.subheadline)
             .disabled(
               items.isEmpty
-                || items.contains(where: { $0.prepareCommit != nil })
                 || activeCommittingItemID != nil
                 || isAcceptingAll
             )
@@ -80,7 +79,12 @@ struct RecipeCollectionReviewSheet: View {
               await acceptAll()
             }
           }
-          .disabled(items.isEmpty || activeCommittingItemID != nil || isAcceptingAll)
+          .disabled(
+            items.isEmpty
+              || items.contains(where: { $0.prepareCommit != nil })
+              || activeCommittingItemID != nil
+              || isAcceptingAll
+          )
         }
       }
     }

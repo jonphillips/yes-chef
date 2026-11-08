@@ -835,6 +835,7 @@ struct ChatApplyReviewSheet: View {
   @State private var isShowingDiscardConfirmation = false
   @State private var pendingCommitConfirmation: ChatApplyReviewConfirmation?
   @State private var pendingCommit: PendingReviewCommit?
+  @State private var preparationErrorMessage: String?
 
   init(
     item: ChatApplyReviewItem,
@@ -958,6 +959,17 @@ struct ChatApplyReviewSheet: View {
     } message: {
       Text(pendingCommitConfirmation?.message ?? "")
     }
+    .alert(
+      "Could Not Prepare Commit",
+      isPresented: Binding(
+        get: { preparationErrorMessage != nil },
+        set: { if !$0 { preparationErrorMessage = nil } }
+      )
+    ) {
+      Button("OK") { preparationErrorMessage = nil }
+    } message: {
+      Text(preparationErrorMessage ?? "")
+    }
     .presentationDetents([.medium, .large])
   }
 
@@ -990,13 +1002,17 @@ struct ChatApplyReviewSheet: View {
   ) -> some View {
     Button(role: role) {
       Task {
-        if let prepareCommit = item.prepareCommit,
-           let confirmation = try? await prepareCommit()
-        {
-          pendingCommit = PendingReviewCommit(text: draftText, usingSecondaryCommit: usingSecondaryCommit)
-          pendingCommitConfirmation = confirmation
-        } else {
-          await commit(draftText, usingSecondaryCommit)
+        do {
+          if let prepareCommit = item.prepareCommit,
+             let confirmation = try await prepareCommit()
+          {
+            pendingCommit = PendingReviewCommit(text: draftText, usingSecondaryCommit: usingSecondaryCommit)
+            pendingCommitConfirmation = confirmation
+          } else {
+            await commit(draftText, usingSecondaryCommit)
+          }
+        } catch {
+          preparationErrorMessage = error.localizedDescription
         }
       }
     } label: {

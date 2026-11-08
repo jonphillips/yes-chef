@@ -339,17 +339,10 @@ private enum AIHandoffReviewStager {
     guard try Workbench.find(handoff.sourceID).fetchOne(db) != nil else {
       throw AIHandoffIntentImportError.wrongTask
     }
+    let recipeReview = workbenchRecipeReview(handoff: handoff, payload: payload)
     switch handoff.taskType {
     case .workbenchCompare:
-      let recipeReturn = AIHandoffReturn.workbenchDraft(from: payload, capturedAt: handoff.createdAt)
-      if let draftRecipe = recipeReturn.draftRecipe {
-        return .workbenchDraft(AIHandoffWorkbenchDraftReview(
-          handoffID: handoff.id,
-          workbenchID: handoff.sourceID,
-          draftRecipe: draftRecipe,
-          learnings: recipeReturn.learnings
-        ))
-      }
+      if let recipeReview { return recipeReview }
       let returned = AIHandoffReturn.plainText(from: payload)
       guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
         throw AIHandoffIntentImportError.emptyPlan
@@ -359,15 +352,7 @@ private enum AIHandoffReviewStager {
         comparison: returned.deliverable, learnings: returned.learnings
       ))
     case .workbenchExperiments:
-      let recipeReturn = AIHandoffReturn.workbenchDraft(from: payload, capturedAt: handoff.createdAt)
-      if let draftRecipe = recipeReturn.draftRecipe {
-        return .workbenchDraft(AIHandoffWorkbenchDraftReview(
-          handoffID: handoff.id,
-          workbenchID: handoff.sourceID,
-          draftRecipe: draftRecipe,
-          learnings: recipeReturn.learnings
-        ))
-      }
+      if let recipeReview { return recipeReview }
       let returned = AIHandoffReturn.workbenchExperiments(from: payload)
       guard returned.unparsedBlocks.isEmpty else {
         throw AIHandoffIntentImportError.unparsedExperimentBlocks(returned.unparsedBlocks)
@@ -395,5 +380,16 @@ private enum AIHandoffReviewStager {
       .mealPlanMakeAheadStrategy, .mealPlanComplement, .menuComplement, .readerFeedbackCuration:
       throw AIHandoffIntentImportError.wrongTask
     }
+  }
+
+  private static func workbenchRecipeReview(handoff: AIHandoff, payload: String) -> AIHandoffReview? {
+    let returned = AIHandoffReturn.workbenchDraft(from: payload, capturedAt: handoff.createdAt)
+    guard let draftRecipe = returned.draftRecipe else { return nil }
+    return .workbenchDraft(AIHandoffWorkbenchDraftReview(
+      handoffID: handoff.id,
+      workbenchID: handoff.sourceID,
+      draftRecipe: draftRecipe,
+      learnings: returned.learnings
+    ))
   }
 }
