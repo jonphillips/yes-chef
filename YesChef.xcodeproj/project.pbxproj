@@ -148,6 +148,7 @@
 		B272D3EEC8E70834165F4E67 /* WorkbenchCandidatePickerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F811B4BCF619BB9EFC3CFFA /* WorkbenchCandidatePickerViews.swift */; };
 		B46A558486B6A2B676650ABF /* AttentionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58B2B2BF5D8C5766C1902 /* AttentionCard.swift */; };
 		B7E58D7FBEB23C7DDDBA0DD1 /* AppNavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */; };
+		B98C4D558951FC9E775F3263 /* HandoffReviewCoordinator+WorkbenchDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887DE401196A15977469F2B9 /* HandoffReviewCoordinator+WorkbenchDraft.swift */; };
 		BA592CBECD6F92A9AC4C390C /* AppIcon-Dev.icon in Resources */ = {isa = PBXBuildFile; fileRef = C04525676D7E3DBE58E299E4 /* AppIcon-Dev.icon */; };
 		BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */; };
 		BEB3FF474359BA28DEBBE14E /* RecipeVariationInstructionDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 987510FE835260D17DC91CBB /* RecipeVariationInstructionDisplayTests.swift */; };
@@ -316,6 +317,7 @@
 		851ED481B27014D93BC3E92F /* AppToastCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppToastCenter.swift; sourceTree = "<group>"; };
 		85D49CBB7931A65D53EC1654 /* AppNavigationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationModels.swift; sourceTree = "<group>"; };
 		870CDB16B3140953C11EFDDC /* PantryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryViews.swift; sourceTree = "<group>"; };
+		887DE401196A15977469F2B9 /* HandoffReviewCoordinator+WorkbenchDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+WorkbenchDraft.swift"; sourceTree = "<group>"; };
 		8A4FCB37DBBA09D6123D7989 /* SettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViews.swift; sourceTree = "<group>"; };
 		8A9BFE509F2353C5A21A5819 /* PowerBrowserModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerBrowserModel.swift; sourceTree = "<group>"; };
 		8C507E80F42B4348BC5E3472 /* ModelCallInventoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCallInventoryView.swift; sourceTree = "<group>"; };
@@ -588,6 +590,7 @@
 				7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */,
 				524747E80606624B20663AC9 /* HandoffReviewCoordinator+RecipeReturn.swift */,
 				ABD955FEF5EBA92A06FCE62C /* HandoffReviewCoordinator+Variation.swift */,
+				887DE401196A15977469F2B9 /* HandoffReviewCoordinator+WorkbenchDraft.swift */,
 				18FECD94C6F2E120A02EE0A6 /* IdleTimerDisabledModifier.swift */,
 				7ED8C4BF9300184ABE4E59A5 /* Info.plist */,
 				A5B6A9C5B5B1B8A7AA3C2136 /* IngredientFractionPillRow.swift */,
@@ -934,6 +937,7 @@
 				6B55B2CE20BB6B0E56896F50 /* HandoffReviewCoordinator+PrepPlanEvidence.swift in Sources */,
 				773976FDA66CBC537EEEE55F /* HandoffReviewCoordinator+RecipeReturn.swift in Sources */,
 				DDDFAA0F691253337D66DE0B /* HandoffReviewCoordinator+Variation.swift in Sources */,
+				B98C4D558951FC9E775F3263 /* HandoffReviewCoordinator+WorkbenchDraft.swift in Sources */,
 				2F07342A5ED8AB64EFA742F1 /* HandoffReviewCoordinator.swift in Sources */,
 				26A54D34845DADD8C9E1493D /* IdleTimerDisabledModifier.swift in Sources */,
 				195F4BE15DAFE5DF10414E83 /* IngredientFractionPillRow.swift in Sources */,

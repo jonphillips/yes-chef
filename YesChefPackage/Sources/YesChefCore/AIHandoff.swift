@@ -467,6 +467,7 @@ public enum AIHandoffToken {
     case mealPlanMakeAheadStrategy
     case mealPlanComplement
     case readerFeedbackCuration
+    case workbenchCompare
     case workbenchExperiments
     case workbenchDraft
 
@@ -488,6 +489,8 @@ public enum AIHandoffToken {
         "the paste-ready meal-plan complements"
       case .readerFeedbackCuration:
         "the paste-ready reader-feedback points"
+      case .workbenchCompare:
+        "the named candidate differences with concrete claims"
       case .workbenchExperiments:
         "the proposed experiments"
       case .workbenchDraft:
@@ -513,6 +516,8 @@ public enum AIHandoffToken {
         "Return the completed meal-plan complements in your first response when the day needs them."
       case .readerFeedbackCuration:
         "Return the completed reader-feedback curation in your first response when useful tips exist."
+      case .workbenchCompare:
+        "Return named candidate differences with concrete claims in your first response."
       case .workbenchExperiments:
         "Return the proposed experiments in your first response when the workbench needs them."
       case .workbenchDraft:

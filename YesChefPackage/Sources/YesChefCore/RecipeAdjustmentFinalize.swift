@@ -22,9 +22,7 @@ public enum RecipeAdjustmentFinalize: Equatable, Sendable {
   /// provenance-only and irrelevant to classification.
   public static func classify(payload: String) throws -> RecipeAdjustmentFinalize {
     let unmarked = try AIHandoffReturnContract.strippingMarker(from: payload).text
-    let deliverable = AIHandoffReturn.plainText(from: unmarked).deliverable
-    let jsonLD = AIHandoffReturn.splittingJSONLDAndRationale(deliverable).jsonLD
-    let draft = WorkbenchDraftRecipe.fromJSONLD(jsonLD, rationale: "", capturedAt: .distantPast)
+    let draft = AIHandoffReturn.workbenchDraft(from: unmarked, capturedAt: .distantPast).draftRecipe
     return draft == nil ? .revisionBrief : .newRecipe
   }
 }

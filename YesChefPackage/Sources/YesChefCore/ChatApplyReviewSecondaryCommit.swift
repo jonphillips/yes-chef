@@ -15,6 +15,7 @@ public struct ChatApplyReviewItem: Identifiable {
   public var validateText: (@MainActor (_ approvedText: String) -> String?)?
   public var commit: @MainActor (_ approvedText: String) async throws -> Void
   public var secondaryCommit: ChatApplyReviewSecondaryCommit?
+  public var prepareCommit: (@MainActor () async throws -> ChatApplyReviewConfirmation?)?
 
   public init(
     id: UUID = UUID(),
@@ -29,6 +30,7 @@ public struct ChatApplyReviewItem: Identifiable {
     committingTitle: String,
     committedTitle: String,
     secondaryCommit: ChatApplyReviewSecondaryCommit? = nil,
+    prepareCommit: (@MainActor () async throws -> ChatApplyReviewConfirmation?)? = nil,
     validateText: (@MainActor (_ approvedText: String) -> String?)? = nil,
     commit: @escaping @MainActor () async throws -> Void
   ) {
@@ -44,6 +46,7 @@ public struct ChatApplyReviewItem: Identifiable {
     self.committingTitle = committingTitle
     self.committedTitle = committedTitle
     self.secondaryCommit = secondaryCommit
+    self.prepareCommit = prepareCommit
     self.validateText = validateText
     self.commit = { _ in try await commit() }
   }
@@ -61,6 +64,7 @@ public struct ChatApplyReviewItem: Identifiable {
     committingTitle: String,
     committedTitle: String,
     secondaryCommit: ChatApplyReviewSecondaryCommit? = nil,
+    prepareCommit: (@MainActor () async throws -> ChatApplyReviewConfirmation?)? = nil,
     validateText: (@MainActor (_ approvedText: String) -> String?)? = nil,
     commit: @escaping @MainActor (_ approvedText: String) async throws -> Void
   ) {
@@ -76,6 +80,7 @@ public struct ChatApplyReviewItem: Identifiable {
     self.committingTitle = committingTitle
     self.committedTitle = committedTitle
     self.secondaryCommit = secondaryCommit
+    self.prepareCommit = prepareCommit
     self.validateText = validateText
     self.commit = commit
   }
@@ -105,6 +110,18 @@ public struct ChatApplyReviewItem: Identifiable {
   @MainActor
   public func validationMessage(for approvedText: String) -> String? {
     validateText?(approvedText)
+  }
+}
+
+public struct ChatApplyReviewConfirmation: Sendable, Equatable {
+  public var title: String
+  public var message: String
+  public var confirmTitle: String
+
+  public init(title: String, message: String, confirmTitle: String) {
+    self.title = title
+    self.message = message
+    self.confirmTitle = confirmTitle
   }
 }
 

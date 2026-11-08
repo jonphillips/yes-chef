@@ -341,6 +341,15 @@ private enum AIHandoffReviewStager {
     }
     switch handoff.taskType {
     case .workbenchCompare:
+      let recipeReturn = AIHandoffReturn.workbenchDraft(from: payload, capturedAt: handoff.createdAt)
+      if let draftRecipe = recipeReturn.draftRecipe {
+        return .workbenchDraft(AIHandoffWorkbenchDraftReview(
+          handoffID: handoff.id,
+          workbenchID: handoff.sourceID,
+          draftRecipe: draftRecipe,
+          learnings: recipeReturn.learnings
+        ))
+      }
       let returned = AIHandoffReturn.plainText(from: payload)
       guard !returned.deliverable.isEmpty || !returned.learnings.isEmpty else {
         throw AIHandoffIntentImportError.emptyPlan
@@ -350,6 +359,15 @@ private enum AIHandoffReviewStager {
         comparison: returned.deliverable, learnings: returned.learnings
       ))
     case .workbenchExperiments:
+      let recipeReturn = AIHandoffReturn.workbenchDraft(from: payload, capturedAt: handoff.createdAt)
+      if let draftRecipe = recipeReturn.draftRecipe {
+        return .workbenchDraft(AIHandoffWorkbenchDraftReview(
+          handoffID: handoff.id,
+          workbenchID: handoff.sourceID,
+          draftRecipe: draftRecipe,
+          learnings: recipeReturn.learnings
+        ))
+      }
       let returned = AIHandoffReturn.workbenchExperiments(from: payload)
       guard returned.unparsedBlocks.isEmpty else {
         throw AIHandoffIntentImportError.unparsedExperimentBlocks(returned.unparsedBlocks)
