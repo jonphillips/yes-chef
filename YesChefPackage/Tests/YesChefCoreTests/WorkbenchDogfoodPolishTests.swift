@@ -113,6 +113,7 @@ extension RecipeCoreTests {
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
+            id: SampleUUIDSequence.uuid(22_915),
             sourceURL: "https://example.com/birria-technique",
             label: "Chile technique",
             captureKind: .browserCapture,
@@ -154,6 +155,7 @@ extension RecipeCoreTests {
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
+            id: SampleUUIDSequence.uuid(22_916),
             sourceURL: "https://example.com/chiles",
             label: "Chile technique",
             captureKind: .browserCapture,
@@ -189,6 +191,7 @@ extension RecipeCoreTests {
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
+            id: SampleUUIDSequence.uuid(22_917),
             sourceURL: "https://example.com/birria",
             label: "Duplicate source",
             captureKind: .urlFetch,
@@ -218,18 +221,28 @@ extension RecipeCoreTests {
       let referenceText = "This extract belongs to a candidate beyond the soft cap."
       let candidateCount = WorkbenchChatContext.softCandidateCap + 2
       let candidateIDs = (0..<candidateCount).map { SampleUUIDSequence.uuid(22_920 + $0) }
-      let referenceID = SampleUUIDSequence.uuid(22_940)
+      let deduplicatedReferenceID = SampleUUIDSequence.uuid(22_940)
+      let oversizedReferenceID = SampleUUIDSequence.uuid(22_941)
       let context = WorkbenchChatContext(
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
-            id: referenceID,
+            id: deduplicatedReferenceID,
             sourceURL: "https://example.com/late-candidate",
             label: "Late candidate source",
             captureKind: .urlFetch,
             reducedText: referenceText,
             reductionStatus: .complete,
             dateCreated: Date(timeIntervalSinceReferenceDate: 808_020_000)
+          ),
+          WorkbenchReferenceChatContext(
+            id: oversizedReferenceID,
+            sourceURL: "https://example.com/oversized",
+            label: "Oversized source",
+            captureKind: .pastedText,
+            reducedText: String(repeating: "too large ", count: WorkbenchChatContext.frontierSerializedCharacterBudget / 10 + 1),
+            reductionStatus: .complete,
+            dateCreated: Date(timeIntervalSinceReferenceDate: 808_020_001)
           )
         ],
         candidates: (0..<candidateCount).map { index in
@@ -247,13 +260,16 @@ extension RecipeCoreTests {
       let frontier = context.serializationResult(for: .frontierPreferred)
       #expect(frontier.includedCandidateIDs == candidateIDs)
       #expect(frontier.omittedCandidateIDs.isEmpty)
-      #expect(frontier.omittedReferenceIDs == [referenceID])
+      #expect(frontier.omittedReferenceIDs == [oversizedReferenceID])
+      #expect(frontier.deduplicatedReferenceIDs == [deduplicatedReferenceID])
       #expect(!frontier.text.contains(referenceText))
+      #expect(!frontier.text.contains("Oversized source"))
 
       let onDevice = context.serializationResult(for: .onDevice)
       #expect(onDevice.includedCandidateIDs == Array(candidateIDs.prefix(WorkbenchChatContext.softCandidateCap)))
       #expect(onDevice.omittedCandidateIDs == Array(candidateIDs.dropFirst(WorkbenchChatContext.softCandidateCap)))
-      #expect(onDevice.includedReferenceIDs == [referenceID])
+      #expect(onDevice.includedReferenceIDs == [deduplicatedReferenceID])
+      #expect(onDevice.omittedReferenceIDs == [oversizedReferenceID])
     }
 
     @Test

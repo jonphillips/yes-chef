@@ -20,6 +20,10 @@ public struct WorkbenchChatContext: Equatable, Sendable {
   public var references: [WorkbenchReferenceChatContext]
   public var candidates: [WorkbenchCandidateChatContext]
 
+  public static func candidatesInWorkbenchOrder(_ candidates: [WorkbenchCandidateChatContext]) -> [WorkbenchCandidateChatContext] {
+    candidates.sorted(by: areWorkbenchChatCandidatesInIncreasingOrder)
+  }
+
   public init(
     workbenchID: Workbench.ID? = nil,
     title: String,
@@ -78,10 +82,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
   }
 
   public func serialized(characterBudget: Int = Self.serializedCharacterBudget) -> String {
-    budgetedSerialization(
-      characterBudget: characterBudget,
-      applySoftCandidateCap: characterBudget <= Self.onDeviceSerializedCharacterBudget
-    ).text
+    budgetedSerialization(characterBudget: characterBudget).text
   }
 
   /// External compare is deliberately prose-only: the deterministic matrix remains in-app, while the
@@ -152,7 +153,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     candidateIDs: [WorkbenchCandidate.ID]? = nil,
     applySoftCandidateCap: Bool = true
   ) -> WorkbenchChatSerializedContext {
-    let sortedCandidates = candidates.sorted(by: areWorkbenchChatCandidatesInIncreasingOrder)
+    let sortedCandidates = Self.candidatesInWorkbenchOrder(candidates)
     let selectedCandidates = candidateIDs.map { ids in
       let selected = Set(ids)
       return sortedCandidates.filter { selected.contains($0.id) }
@@ -284,14 +285,25 @@ public struct WorkbenchChatContext: Equatable, Sendable {
     candidates: [WorkbenchCandidateChatContext],
     references: [WorkbenchReferenceChatContext]
   ) -> WorkbenchChatSerializedContext {
-    let includedReferenceIDs = references.compactMap(\.id)
+    let includedReferenceIDs = references.map(\.id)
+    let includedCandidateSources = Set(candidates.compactMap { normalizedSourceURL($0.sourceURL) })
+    let deduplicatedReferenceIDs = self.references.compactMap { reference -> WorkbenchReference.ID? in
+      guard let sourceURL = normalizedSourceURL(reference.sourceURL),
+            includedCandidateSources.contains(sourceURL)
+      else { return nil }
+      return reference.id
+    }
     return WorkbenchChatSerializedContext(
       text: text,
       notes: notes,
       includedCandidateIDs: candidates.map(\.id),
+      // Includes rows the cook deselected as well as candidates omitted by the character budget.
       omittedCandidateIDs: self.candidates.map(\.id).filter { id in !candidates.contains { $0.id == id } },
       includedReferenceIDs: includedReferenceIDs,
-      omittedReferenceIDs: self.references.compactMap(\.id).filter { !includedReferenceIDs.contains($0) }
+      omittedReferenceIDs: self.references.map(\.id).filter { id in
+        !includedReferenceIDs.contains(id) && !deduplicatedReferenceIDs.contains(id)
+      },
+      deduplicatedReferenceIDs: deduplicatedReferenceIDs
     )
   }
 
@@ -388,7 +400,7 @@ public struct WorkbenchChatContext: Equatable, Sendable {
 }
 
 public struct WorkbenchReferenceChatContext: Equatable, Sendable {
-  public var id: WorkbenchReference.ID?
+  public var id: WorkbenchReference.ID
   public var sourceURL: String?
   public var label: String
   public var captureKind: WorkbenchReferenceCaptureKind
@@ -397,7 +409,7 @@ public struct WorkbenchReferenceChatContext: Equatable, Sendable {
   public var dateCreated: Date
 
   public init(
-    id: WorkbenchReference.ID? = nil,
+    id: WorkbenchReference.ID,
     sourceURL: String? = nil,
     label: String,
     captureKind: WorkbenchReferenceCaptureKind,
@@ -574,9 +586,11 @@ public struct WorkbenchChatSerializedContext: Equatable, Sendable {
   public var text: String
   public var notes: [String]
   public var includedCandidateIDs: [WorkbenchCandidate.ID]
+  /// Candidates omitted by the user's selection or the character budget.
   public var omittedCandidateIDs: [WorkbenchCandidate.ID]
   public var includedReferenceIDs: [WorkbenchReference.ID]
   public var omittedReferenceIDs: [WorkbenchReference.ID]
+  public var deduplicatedReferenceIDs: [WorkbenchReference.ID]
 }
 
 private func areWorkbenchLogEntriesInIncreasingOrder(

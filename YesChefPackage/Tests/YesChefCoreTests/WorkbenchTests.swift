@@ -243,7 +243,7 @@ extension RecipeCoreTests {
         candidates: candidates
       )
 
-      let serialized = context.serialized(characterBudget: 100_000)
+      let serialized = context.serialized(for: .frontierPreferred)
 
       #expect(serialized.contains("- Title: Birria"))
       #expect(serialized.contains("- Workbench notes: Find the best consommé."))

@@ -1,6 +1,6 @@
 # Effort — Workbench hand-offs: recipe returns become the working recipe, and the cook picks the candidates
 
-Status: Ready
+Status: Done — 2026-11-08 (PRs #462, #463); device pass owed
 Summary: A recipe that comes back on any workbench hand-off stages as the working recipe (replacing an existing one only on confirm), Compare stops asking for a "prep plan", and the cook chooses which candidates a hand-off carries instead of a hidden five-candidate cap.
 
 Jon reported on 2026-11-08 that a recipe staged from a workbench discussion landed in the workbench log as a JSON
@@ -144,4 +144,4 @@ No schema, migration, sync, contract-version or new-parser change is authorized:
 ## Dispatch ledger
 
 - [x] Dispatch 1 — S1 + S2 (return routing, Compare ask fix, replace-on-confirm, Draft door), one PR.
-- [ ] Dispatch 2 — S3 (candidate picker, tier-scoped cap, honest header), one PR.
+- [x] Dispatch 2 — S3 (candidate picker, tier-scoped cap, honest header), one PR.

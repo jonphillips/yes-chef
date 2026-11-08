@@ -501,8 +501,7 @@ final class WorkbenchHandoffCandidatePickerModel {
   }
 
   var orderedSelection: [WorkbenchCandidate.ID] {
-    state.context.candidates
-      .sorted { $0.sortOrder < $1.sortOrder }
+    WorkbenchChatContext.candidatesInWorkbenchOrder(state.context.candidates)
       .filter { selectedCandidateIDs.contains($0.id) }
       .map(\.id)
   }
@@ -513,10 +512,10 @@ final class WorkbenchHandoffCandidatePickerModel {
     state.context.serializationResult(for: .frontierPreferred, candidateIDs: orderedSelection)
   }
 
-  var fitDescription: String {
+  func fitDescription(using serialization: WorkbenchChatSerializedContext) -> String {
     let budgetOmissions = serialization.omittedCandidateIDs.filter { selectedCandidateIDs.contains($0) }
     guard !budgetOmissions.isEmpty else { return "All \(selectedCandidateIDs.count) fit" }
-    let names = state.context.candidates
+    let names = WorkbenchChatContext.candidatesInWorkbenchOrder(state.context.candidates)
       .filter { budgetOmissions.contains($0.id) }
       .map { $0.title.isEmpty ? "(untitled)" : $0.title }
     return "Too much to send: \(names.joined(separator: ", ")) would be left out"
@@ -534,9 +533,10 @@ private struct WorkbenchHandoffCandidatePicker: View {
 
   var body: some View {
     @Bindable var model = model
+    let serialization = model.serialization
     List {
       Section {
-        ForEach(model.state.context.candidates.sorted { $0.sortOrder < $1.sortOrder }, id: \.id) { candidate in
+        ForEach(WorkbenchChatContext.candidatesInWorkbenchOrder(model.state.context.candidates), id: \.id) { candidate in
           Toggle(candidate.title.isEmpty ? "(untitled)" : candidate.title, isOn: Binding(
             get: { model.selectedCandidateIDs.contains(candidate.id) },
             set: { isSelected in
@@ -547,8 +547,8 @@ private struct WorkbenchHandoffCandidatePicker: View {
         }
       } footer: {
         VStack(alignment: .leading, spacing: 6) {
-          Text(model.fitDescription)
-          Text("\(model.serialization.includedReferenceIDs.count) references included · \(model.serialization.omittedReferenceIDs.count) left out")
+          Text(model.fitDescription(using: serialization))
+          Text("\(serialization.includedReferenceIDs.count) references included · \(serialization.omittedReferenceIDs.count) left out · \(serialization.deduplicatedReferenceIDs.count) matched candidates")
         }
       }
     }

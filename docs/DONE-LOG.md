@@ -9,11 +9,11 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
-## 2026-11-08 — Workbench hand-off candidate choice (`effort/workbench-handoff-recipe-returns-and-candidate-choice`)
+## 2026-11-08 — Workbench hand-offs: recipe returns and candidate choice (`effort/workbench-handoff-recipe-returns-and-candidate-choice`)
 
-- **Result:** Compare, Experiments, and Draft hand-offs now let cooks select candidates. Frontier prompts and chat use the character budget without the on-device candidate cap, and serialization reports included and omitted candidates and references.
+- **Result:** S1 + S2 (PR #462) route recipe returns to recipe review, fix Compare's finalize ask, add replace confirmation, and keep Draft available with a working recipe. S3 (PR #463) lets cooks select candidates for Compare, Experiments, and Draft; frontier serialization follows the character budget, reports candidate and reference omissions, and the chat header follows the active tier.
 - **Verification:** scripts/check-drift.sh, focused Core tests, the generic iOS build, and the YesChefTests simulator target passed.
-- **Owed:** workbench-handoff-recipe-returns-and-candidate-choice S3 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+- **Owed:** [Workbench hand-off recipe returns (S1 + S2)](device-passes.md#L20) and [Workbench hand-off candidate choice (S3)](device-passes.md#L21) device gates.
 
 ---
 ## 2026-11-06 — Adopt ChatAccessKit export in Yes Chef (`effort/chat-access-export-adoption`)
