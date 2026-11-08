@@ -215,6 +215,12 @@ public struct MenuChatContext: Equatable, Sendable {
     case .onboard:
       ""
     }
+    let workDayInstruction = dayCount > 1
+      ? "For this multi-day menu, use `Day N · <session>:` for dated work (Day 0 or below means days before Day 1), and plain `<session>:` for undated work."
+      : "Keep using the existing session headers; this one-day menu has no work-day headers."
+    let formatExample = dayCount > 1
+      ? "Day 2 · Wednesday evening:\n- Salt the chicken → Thursday dinner\nFlexible:\n- Set out serving platters"
+      : "The day before:\n- Salt the chicken → Thursday dinner"
     let subjectContext = switch destination {
     case .outboard: "\n\n\(context)"
     case .onboard: ""
@@ -230,9 +236,9 @@ public struct MenuChatContext: Equatable, Sendable {
     Make-ahead & prep-plan preferences:
     \(makeAheadPreference)
 
-    Return only paste-ready review text, not JSON. Use free-form session headers ending with a colon, followed by one or more bullets, exactly like this:
-    Wednesday evening:
-    - Salt the chicken → Thursday dinner
+    Return only paste-ready review text, not JSON. Use free-form session headers ending with a colon, followed by one or more bullets.
+    \(workDayInstruction) Example:
+    \(formatExample)
 
     Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix.\(transportInstruction)\(subjectContext)
     """
@@ -288,7 +294,8 @@ public struct MenuChatContext: Equatable, Sendable {
     if !prepPlan.isEmpty {
       lines.append("Current prep plan:")
       for step in prepPlan {
-        lines.append("- \(step.session): \(step.task)")
+        let dayBand = dayCount > 1 ? step.workDayOffset.map { "Day \($0 + 1) · " } ?? "Flexible · " : ""
+        lines.append("- \(dayBand)\(step.session): \(step.task)")
         if let serves = step.serves {
           lines.append("  - Serves: \(serves)")
         }
@@ -375,7 +382,7 @@ public enum MenuDayHandoffScope {
       "Day \(dayOffset + 1)"
     }
     return """
-    This request focuses on \(dayTitle) dishes. The context includes only that day's dishes, but it also includes the full current prep plan for the menu. Return the whole menu prep plan: preserve every existing step for other days verbatim and in place, and weave \(dayTitle) changes into the existing horizon bands rather than adding a new appended section. Anything omitted from the reply will be deleted.
+    This request focuses on \(dayTitle) dishes. The context includes only that day's dishes, but it also includes the full current prep plan for the menu. Return the whole menu prep plan: preserve every existing step for other days verbatim and in place, and weave \(dayTitle) changes into the existing work days rather than adding a new appended section. For dated work, use `Day N · <session>:` headers; keep undated work under Flexible. Anything omitted from the reply will be deleted.
     """
   }
 

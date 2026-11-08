@@ -181,11 +181,24 @@ extension MenuRepository {
       }
       let nextStepOrder = (try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
       for (stepIndex, source) in candidate.prepSteps.enumerated() {
+        let workDayOffset: Int?
+        if let sourceOffset = source.workDayOffset {
+          workDayOffset = sourceOffset + shift
+        } else if candidate.menu.dayCount == 1 {
+          switch PrepPlanSessionBand(matching: source.session) {
+          case .dayOf, .atService: workDayOffset = shift
+          case .dayBefore: workDayOffset = shift - 1
+          default: workDayOffset = nil
+          }
+        } else {
+          workDayOffset = nil
+        }
         try PrepPlanStepRecord.insert {
           PrepPlanStepRecord(
             id: uuid(), menuID: menuID, sortOrder: nextStepOrder + stepIndex, session: source.session,
             task: source.task, serves: source.serves,
-            sourceDish: source.sourceDish.flatMap { copiedItemIDs[$0] }
+            sourceDish: source.sourceDish.flatMap { copiedItemIDs[$0] },
+            workDayOffset: workDayOffset
           )
         }.execute(db)
       }

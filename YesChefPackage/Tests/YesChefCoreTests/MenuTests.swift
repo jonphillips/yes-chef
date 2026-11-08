@@ -300,7 +300,7 @@ extension RecipeCoreTests {
 
       #expect(serialized.contains("- Title: Birthday Menu"))
       #expect(serialized.contains("Current prep plan:"))
-      #expect(serialized.contains("- Day before: Marinate the chicken."))
+      #expect(serialized.contains("- Flexible · Day before: Marinate the chicken."))
       #expect(serialized.contains("  - Source menu item ID: \(prepSourceID.uuidString)"))
       #expect(serialized.contains("- Menu item ID: \(itemID.uuidString)"))
       #expect(serialized.contains("- Day: 2 (dayOffset 1)"))

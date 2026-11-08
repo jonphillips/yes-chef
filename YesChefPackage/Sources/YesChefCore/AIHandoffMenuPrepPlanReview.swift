@@ -9,6 +9,7 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
   public let advisoryNotes: [String]
   public let prepPlanIntent: AIHandoffPrepPlanIntent
   public let replacementStepCount: Int
+  public let dayCount: Int
 
   public init(
     handoffID: AIHandoff.ID,
@@ -18,7 +19,8 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
     unparsedPlanLines: [String] = [],
     advisoryNotes: [String] = [],
     prepPlanIntent: AIHandoffPrepPlanIntent = .refine,
-    replacementStepCount: Int = 0
+    replacementStepCount: Int = 0,
+    dayCount: Int = 1
   ) {
     self.handoffID = handoffID
     self.menuID = menuID
@@ -28,5 +30,6 @@ public struct AIHandoffMenuPrepPlanReview: Equatable, Sendable {
     self.advisoryNotes = advisoryNotes
     self.prepPlanIntent = prepPlanIntent
     self.replacementStepCount = replacementStepCount
+    self.dayCount = dayCount
   }
 }

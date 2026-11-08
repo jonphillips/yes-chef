@@ -504,6 +504,7 @@ extension RecipeCoreTests {
           task: "Salt the chicken overnight",
           serves: "Saturday dinner",
           sourceDish: sourceDishID,
+          workDayOffset: nil,
           in: db,
           now: now
         )

@@ -37,6 +37,37 @@ struct SchemaColumnTests {
   }
 
   @Test
+  func addingPrepPlanWorkDayPreservesExistingRowsAsFlexible() async throws {
+    let databaseURL = try temporaryDirectory().appendingPathComponent("prep-work-day.sqlite")
+    let menuID = UUID()
+    let stepID = UUID()
+    let now = Date(timeIntervalSinceReferenceDate: 812_000_000)
+    let database = try pathBackedDatabase(at: databaseURL)
+    try await database.write { db in
+      try Menu.insert { Menu(id: menuID, title: "Week", dayCount: 3, dateCreated: now, dateModified: now) }
+        .execute(db)
+      try PrepPlanStepRecord.insert {
+        PrepPlanStepRecord(
+          id: stepID, menuID: menuID, sortOrder: 0, session: "Morning", task: "Make dough"
+        )
+      }.execute(db)
+      try db.execute(sql: #"ALTER TABLE "prepPlanSteps" DROP COLUMN "workDayOffset""#)
+      try db.execute(
+        sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Add prep plan work day offset'"#
+      )
+    }
+    try database.close()
+
+    let migratedDatabase = try pathBackedDatabase(at: databaseURL)
+    try await migratedDatabase.read { db in
+      let step = try #require(try PrepPlanStepRecord.find(stepID).fetchOne(db))
+      #expect(step.task == "Make dough")
+      #expect(step.workDayOffset == nil)
+    }
+    try migratedDatabase.close()
+  }
+
+  @Test
   func droppingLegacyRecipeCookingColumnsPreservesExistingRecipeValues() async throws {
     let databaseURL = try temporaryDirectory().appendingPathComponent("legacy-library.sqlite")
     let recipeID = UUID()

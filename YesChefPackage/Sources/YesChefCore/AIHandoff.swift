@@ -818,12 +818,6 @@ public indirect enum AIHandoffReview: Equatable, Sendable {
 }
 
 public enum AIHandoffReturn {
-  public struct MenuPrepPlanReturn: Equatable, Sendable {
-    public var plan: MenuPrepPlan
-    public var learnings: [String]
-    public var unparsedLines: [String]
-  }
-
   public struct ReaderFeedbackReturn: Equatable, Sendable {
     public var tips: [ReaderFeedbackTip]
     public var unparsedLines: [String]
@@ -839,20 +833,6 @@ public enum AIHandoffReturn {
   }
 
   public static let learningsMarker = "YC-LEARNINGS:"
-
-  public static func menuPrepPlan(
-    from text: String,
-    currentPlan: MenuPrepPlan
-  ) -> MenuPrepPlanReturn {
-    let split = splitting(text)
-    let parsed = currentPlan.parsingEditableReviewText(split.deliverable)
-    let parsedLearnings = learnings(from: split.learnings)
-    return MenuPrepPlanReturn(
-      plan: parsed.plan,
-      learnings: parsedLearnings.learnings,
-      unparsedLines: parsed.unparsedLines
-    )
-  }
 
   public static func omittedCurrentPrepStepEvidence(
     proposedPlan: MenuPrepPlan,
@@ -1089,6 +1069,7 @@ public enum AIHandoffMenuPrepPlanImport {
     text: String,
     to menuID: Menu.ID,
     currentPlan: MenuPrepPlan,
+    dayCount: Int = 1,
     in db: Database,
     now: Date,
     uuid: () -> UUID
@@ -1108,7 +1089,8 @@ public enum AIHandoffMenuPrepPlanImport {
 
       let returned = AIHandoffReturn.menuPrepPlan(
         from: routedText.payload,
-        currentPlan: currentPlan
+        currentPlan: currentPlan,
+        dayCount: dayCount
       )
       try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
       try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
@@ -1117,14 +1099,15 @@ public enum AIHandoffMenuPrepPlanImport {
 
     let returned = AIHandoffReturn.menuPrepPlan(
       from: routedText?.payload ?? text,
-      currentPlan: currentPlan
+      currentPlan: currentPlan,
+      dayCount: dayCount
     )
     try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
     return .applied
   }
 
   private static func apply(
-    _ returned: AIHandoffReturn.MenuPrepPlanReturn,
+    _ returned: AIHandoffMenuPrepPlanReturn,
     to menuID: Menu.ID,
     in db: Database,
     now: Date,

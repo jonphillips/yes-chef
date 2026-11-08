@@ -625,6 +625,7 @@ final class MenuDetailModel {
           text: text,
           to: menuID,
           currentPlan: currentPlan,
+          dayCount: detail?.menu.dayCount ?? 1,
           in: db,
           now: now,
           uuid: { uuid() }
@@ -697,6 +698,7 @@ final class MenuDetailModel {
       commit: { _ in
       }
     )
+    let menuDayCount = detail?.menu.dayCount ?? 1
     let prepPlanAction = ChatApplyAction<MenuPrepPlan>(
       title: "Build prep plan -> Prep Plan section",
       extractingTitle: "Building prep plan...",
@@ -764,14 +766,17 @@ final class MenuDetailModel {
           No prep steps to save yet. Try asking for a work-session timeline for the menu's dishes.
           """,
         editableSummary: { plan in
-          plan.editableReviewText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          plan.editableReviewText(dayCount: menuDayCount).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? nil
-            : plan.editableReviewText()
+            : plan.editableReviewText(dayCount: menuDayCount)
         },
         commitEditedSummary: { [weak self] plan, editedText in
-          let parsed = plan.parsingEditableReviewText(editedText)
+          let parsed = plan.parsingEditableReviewText(editedText, dayCount: menuDayCount)
           guard parsed.unparsedLines.isEmpty else {
             throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(parsed.unparsedLines)
+          }
+          guard parsed.outOfRangeDayCount == 0 else {
+            throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(["\(parsed.outOfRangeDayCount) prep plan day header(s) fell outside this menu and were left Flexible."])
           }
           try self?.commitPrepPlan(parsed.plan)
         }

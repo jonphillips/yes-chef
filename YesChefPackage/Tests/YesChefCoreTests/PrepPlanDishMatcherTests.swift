@@ -91,6 +91,7 @@ extension RecipeCoreTests {
           task: "Salt the chicken",
           serves: "Friday's chicken",
           sourceDish: nil,
+          workDayOffset: nil,
           in: db,
           now: now
         )

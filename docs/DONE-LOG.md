@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-08 — Menu prep plans run by work day (`effort/menu-absorbs-calendar-days-dispatch-2`)
+
+- **Result:** Added the nullable synced work-day offset, multi-day prep-plan prompting and review, day-based bands and editing, and work-day shifts when a menu is brought in.
+- **Verification:** SwiftLint passed; check-drift passed with 782 package tests and the app test target build; the generic iOS build passed; YesChefTests passed 128 tests on the simulator.
+- **Owed:** menu-absorbs-calendar-days S3 + S4 + S5 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-08 — Menu brings in calendar days (`effort/menu-absorbs-calendar-days`)
 
 - **Result:** Cooking history now counts recipes served on past placed menus, and bring-in moves loose calendar items while copying contained placed menus, prep steps, and grocery provenance in one write transaction. Placement saves and Menu detail present the same offer and confirmation.

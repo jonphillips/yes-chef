@@ -55,6 +55,7 @@ extension MenuDetailModel {
           task: draft.task,
           serves: draft.serves,
           sourceDish: draft.sourceDish,
+          workDayOffset: draft.workDayOffset,
           in: db,
           now: now
         )

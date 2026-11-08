@@ -147,7 +147,7 @@ private enum AIHandoffReviewStager {
     case .prepPlan, .learning:
       let steps = try PrepPlanStepRepository.steps(for: menu.id, in: db)
       let currentPlan = MenuPrepPlan(steps: steps.map(PrepPlanStep.init))
-      let returned = AIHandoffReturn.menuPrepPlan(from: payload, currentPlan: currentPlan)
+      let returned = AIHandoffReturn.menuPrepPlan(from: payload, currentPlan: currentPlan, dayCount: menu.dayCount)
       let baseline: MenuPrepPlan
       switch handoff.prepPlanIntent {
       case .refine:
@@ -162,6 +162,9 @@ private enum AIHandoffReviewStager {
         proposedPlan: returned.plan,
         currentPlan: baseline
       )
+      + (returned.outOfRangeDayCount > 0
+        ? ["\(returned.outOfRangeDayCount) prep plan day header(s) fell outside this menu and were left Flexible."]
+        : [])
       guard !returned.plan.steps.isEmpty || !returned.learnings.isEmpty else {
         throw AIHandoffIntentImportError.emptyPlan
       }
@@ -170,7 +173,8 @@ private enum AIHandoffReviewStager {
         learnings: returned.learnings, unparsedPlanLines: returned.unparsedLines,
         advisoryNotes: advisoryNotes,
         prepPlanIntent: handoff.prepPlanIntent,
-        replacementStepCount: currentPlan.steps.count
+        replacementStepCount: currentPlan.steps.count,
+        dayCount: menu.dayCount
       ))
     case .menuComplement:
       let returned = AIHandoffReturn.menuComplement(from: payload, dayCount: menu.dayCount)

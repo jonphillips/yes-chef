@@ -52,13 +52,21 @@ extension RecipeCoreTests {
           dateCreated: now, dateModified: now, scale: 1.5
         )
         try MenuItem.insert { containedItem }.execute(db)
-        try PrepPlanStepRecord.insert {
-          PrepPlanStepRecord(
-            id: containedStepID, menuID: containedID, sortOrder: 0,
-            session: "The day before", task: "Make gravy base", serves: "Gravy",
-            sourceDish: containedItemID
-          )
-        }.execute(db)
+        for (index, session, task) in [
+          (0, "The day before", "Make gravy base"),
+          (1, "The day of", "Roast turkey"),
+          (2, "At service", "Carve turkey"),
+          (3, "Flexible", "Set out platters"),
+        ] {
+          try PrepPlanStepRecord.insert {
+            PrepPlanStepRecord(
+              id: index == 0 ? containedStepID : SampleUUIDSequence.uuid(61_020 + index),
+              menuID: containedID, sortOrder: index, session: session, task: task,
+              serves: index == 0 ? "Gravy" : nil,
+              sourceDish: index == 0 ? containedItemID : nil
+            )
+          }.execute(db)
+        }
         let looseItem = MealPlanItem(
           id: looseItemID, kind: .reservation, title: "Farmers market",
           scheduledDate: nextDay, mealSlot: .breakfast, notes: "Bring bags", sortOrder: 0,
@@ -100,7 +108,7 @@ extension RecipeCoreTests {
         #expect(offer.looseCalendarItemCount == 2)
         #expect(offer.containedPlacements.map(\.title) == ["Thanksgiving"])
         #expect(offer.containedPlacements.first?.dishCount == 1)
-        #expect(offer.containedPlacements.first?.prepStepCount == 1)
+        #expect(offer.containedPlacements.first?.prepStepCount == 4)
         #expect(offer.partiallyOverlappingMenuTitles == ["Beach Brunch"])
 
         // The write deliberately sees a row added after the offer was computed.
@@ -145,6 +153,11 @@ extension RecipeCoreTests {
         #expect(copiedStep.sourceDish == copied.id)
         #expect(copiedStep.session == "The day before")
         #expect(copiedStep.serves == "Gravy")
+        #expect(copiedStep.workDayOffset == 0)
+        let copiedSteps = try PrepPlanStepRepository.steps(for: targetID, in: db)
+        #expect(copiedSteps.first { $0.task == "Roast turkey" }?.workDayOffset == 1)
+        #expect(copiedSteps.first { $0.task == "Carve turkey" }?.workDayOffset == 1)
+        #expect(copiedSteps.first { $0.task == "Set out platters" }?.workDayOffset == nil)
 
         let sources = try GroceryItemSource.fetchAll(db)
         let looseSource = try #require(sources.first { $0.groceryItemID == looseGroceryID })

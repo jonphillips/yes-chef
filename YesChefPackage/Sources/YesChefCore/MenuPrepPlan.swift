@@ -15,6 +15,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
   public var task: String
   public var serves: String?
   public var sourceDish: MenuItem.ID?
+  public var workDayOffset: Int?
 
   public init(
     id: UUID,
@@ -23,7 +24,8 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     session: String,
     task: String,
     serves: String? = nil,
-    sourceDish: MenuItem.ID? = nil
+    sourceDish: MenuItem.ID? = nil,
+    workDayOffset: Int? = nil
   ) {
     self.id = id
     self.menuID = menuID
@@ -32,6 +34,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     self.task = task
     self.serves = serves
     self.sourceDish = sourceDish
+    self.workDayOffset = workDayOffset
   }
 
 }
@@ -81,17 +84,20 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
   public var task: String
   public var serves: String?
   public var sourceDish: MenuItem.ID?
+  public var workDayOffset: Int?
 
   public init(
     session: String,
     task: String,
     serves: String? = nil,
-    sourceDish: MenuItem.ID? = nil
+    sourceDish: MenuItem.ID? = nil,
+    workDayOffset: Int? = nil
   ) {
     self.session = session
     self.task = task
     self.serves = serves
     self.sourceDish = sourceDish
+    self.workDayOffset = workDayOffset
   }
 
   public init(_ record: PrepPlanStepRecord) {
@@ -99,7 +105,8 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
       session: record.session,
       task: record.task,
       serves: record.serves,
-      sourceDish: record.sourceDish
+      sourceDish: record.sourceDish,
+      workDayOffset: record.workDayOffset
     )
   }
 
@@ -109,6 +116,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     case task
     case serves
     case sourceDish
+    case workDay
   }
 
   public init(from decoder: any Decoder) throws {
@@ -118,6 +126,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     task = try container.decode(String.self, forKey: .task)
     serves = try container.decodeIfPresent(String.self, forKey: .serves)
     sourceDish = try container.decodeIfPresent(MenuItem.ID.self, forKey: .sourceDish)
+    workDayOffset = try container.decodeIfPresent(Int.self, forKey: .workDay).map { $0 - 1 }
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -126,6 +135,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     try container.encode(task, forKey: .task)
     try container.encodeIfPresent(serves, forKey: .serves)
     try container.encodeIfPresent(sourceDish, forKey: .sourceDish)
+    try container.encodeIfPresent(workDayOffset.map { $0 + 1 }, forKey: .workDay)
   }
 }
 
@@ -133,51 +143,64 @@ public struct MenuPrepPlan: Equatable, Sendable {
   public struct EditableReviewParseResult: Equatable, Sendable {
     public var plan: MenuPrepPlan
     public var unparsedLines: [String]
+    public var outOfRangeDayCount: Int
 
-    public init(plan: MenuPrepPlan, unparsedLines: [String]) {
+    public init(plan: MenuPrepPlan, unparsedLines: [String], outOfRangeDayCount: Int = 0) {
       self.plan = plan
       self.unparsedLines = unparsedLines
+      self.outOfRangeDayCount = outOfRangeDayCount
     }
   }
 
   public var steps: [PrepPlanStep]
+  public var outOfRangeDayCount: Int
 
-  public init(steps: [PrepPlanStep] = []) {
+  public init(steps: [PrepPlanStep] = [], outOfRangeDayCount: Int = 0) {
     self.steps = steps
+    self.outOfRangeDayCount = outOfRangeDayCount
   }
 
   public func rendered() -> String {
     editableReviewText()
   }
 
-  public func editableReviewText() -> String {
+  public func editableReviewText(dayCount: Int = 1) -> String {
     var lines: [String] = []
-    var previousSession: String?
+    var previousGroup: (day: Int?, session: String)?
     for step in steps {
-      if step.session != previousSession {
-        lines.append("\(step.session):")
-        previousSession = step.session
+      let day = dayCount > 1 ? step.workDayOffset.map { $0 + 1 } : nil
+      let group = (day: day, session: step.session)
+      if previousGroup?.day != group.day || previousGroup?.session != group.session {
+        let header = day.map { "Day \($0) · \(step.session)" } ?? step.session
+        lines.append("\(header):")
+        previousGroup = group
       }
       lines.append("- \(step.renderedEditableReviewLine)")
     }
     return lines.joined(separator: "\n")
   }
 
-  public func applyingEditableReviewText(_ text: String) -> MenuPrepPlan {
-    parsingEditableReviewText(text).plan
+  public func applyingEditableReviewText(_ text: String, dayCount: Int = 1) -> MenuPrepPlan {
+    parsingEditableReviewText(text, dayCount: dayCount).plan
   }
 
-  public func parsingEditableReviewText(_ text: String) -> EditableReviewParseResult {
+  public func parsingEditableReviewText(_ text: String, dayCount: Int = 1) -> EditableReviewParseResult {
     var session: String?
+    var workDayOffset: Int?
     var revisedSteps: [PrepPlanStep] = []
     var unparsedLines: [String] = []
+    var outOfRangeDayCount = 0
 
     for rawLine in text.components(separatedBy: .newlines) {
       let line = rawLine.cleanedEditablePrepPlanLine
       guard !line.isEmpty else { continue }
 
-      if rawLine.isEditablePrepPlanSessionHeader, let parsedSession = line.editablePrepPlanSession {
-        session = parsedSession
+      if rawLine.isEditablePrepPlanSessionHeader, let parsedHeader = line.editablePrepPlanHeader(dayCount: dayCount) {
+        session = parsedHeader.session
+        workDayOffset = parsedHeader.workDayOffset
+        if dayCount > 1, workDayOffset == nil, line.hasOutOfRangeWorkDayHeader(dayCount: dayCount) {
+          outOfRangeDayCount += 1
+        }
         continue
       }
 
@@ -197,17 +220,48 @@ public struct MenuPrepPlan: Equatable, Sendable {
         PrepPlanStep(
           session: session,
           task: parsedLine.task,
-          serves: parsedLine.serves
+          serves: parsedLine.serves,
+          workDayOffset: workDayOffset
         )
       )
     }
 
     return EditableReviewParseResult(
       plan: MenuPrepPlan(steps: revisedSteps),
-      unparsedLines: unparsedLines
+      unparsedLines: unparsedLines,
+      outOfRangeDayCount: outOfRangeDayCount
     )
   }
 
+}
+
+private extension String {
+  func editablePrepPlanHeader(dayCount: Int) -> (session: String, workDayOffset: Int?)? {
+    guard dayCount > 1 else {
+      guard let session = editablePrepPlanSession else { return nil }
+      return (session, nil)
+    }
+    let header = trimmingCharacters(in: CharacterSet(charactersIn: ":"))
+    guard let range = header.range(of: #"^Day\s+(-?\d+)(?:\s*(?:·|—|–|-|:)\s*(.*))?$"#, options: [.regularExpression, .caseInsensitive]) else {
+      guard let session = editablePrepPlanSession else { return nil }
+      return (session, nil)
+    }
+    let match = String(header[range])
+    guard let dayRange = match.range(of: #"-?\d+"#, options: .regularExpression),
+      let day = Int(match[dayRange]) else { return nil }
+    let suffix = String(match[dayRange.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " ·—–-:"))
+    let session = suffix.isEmpty ? "Any time" : suffix
+    guard day >= -6, day <= dayCount else { return (session, nil) }
+    return (session, day - 1)
+  }
+
+  func hasOutOfRangeWorkDayHeader(dayCount: Int) -> Bool {
+    let header = trimmingCharacters(in: CharacterSet(charactersIn: ":"))
+    guard let range = header.range(of: #"^Day\s+(-?\d+)(?:\s*(?:·|—|–|-|:)\s*.*)?$"#, options: [.regularExpression, .caseInsensitive]),
+      let dayRange = header[range].range(of: #"-?\d+"#, options: .regularExpression),
+      let day = Int(header[range][dayRange]) else { return false }
+    return day < -6 || day > dayCount
+  }
 }
 
 private extension PrepPlanStep {
@@ -284,7 +338,7 @@ extension MenuPrepPlanClient: DependencyKey {
     let response = try await call.complete(using: modelClient)
     guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
     guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
-    return parse(response.text)
+    return parse(response.text, dayCount: context.menuDayCount ?? 1)
   }
 
   public static let testValue = MenuPrepPlanClient { _, _, _, _ in
@@ -294,7 +348,10 @@ extension MenuPrepPlanClient: DependencyKey {
   static let instructions = """
     You weave a staged prep plan for one multi-day menu from the current menu context and conversation.
     Return ONLY strict JSON:
-    {"steps":[{"session":"work-session label","task":"concrete kitchen task","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
+    {"steps":[{"workDay":1,"session":"time within that day","task":"concrete kitchen task","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
+    Include workDay as a 1-based day number for scheduled work, or null for Flexible work. Day 0 and negative numbers mean
+    days before Day 1; no more than 7 days before Day 1. Keep session as the time within that day. For one-day menus,
+    omit workDay and keep using session bands.
     Emit separable, atomic, context-free tasks that stand on their own, such as "Salt the chicken Wednesday" or
     "Pull the beef to temp at 4." Do not generate choreography: never interleave recipe instructions, coordinate
     concurrent cooking, or turn the prep plan into a merged mega-recipe. The recipes hold the cooking.
@@ -327,7 +384,7 @@ extension MenuPrepPlanClient: DependencyKey {
       """
   }
 
-  public static func parse(_ text: String) -> MenuPrepPlan {
+  public static func parse(_ text: String, dayCount: Int = 1) -> MenuPrepPlan {
     guard
       let json = jsonObjectSlice(text) ?? jsonArraySlice(text),
       let data = json.data(using: .utf8),
@@ -341,22 +398,26 @@ extension MenuPrepPlanClient: DependencyKey {
       elements = raw as? [[String: Any]] ?? []
     }
 
-    return MenuPrepPlan(
-      steps: elements.compactMap { element in
+    var outOfRangeDayCount = 0
+    let steps = elements.compactMap { element -> PrepPlanStep? in
         guard
           let session = (element["session"] as? String)?.cleanedPrepPlanText
             ?? (element["when"] as? String)?.cleanedPrepPlanText,
           let task = (element["task"] as? String)?.cleanedPrepPlanText
         else { return nil }
+        let workDay = element["workDay"] as? Int
+        let isOutOfRange = dayCount > 1 && workDay.map { $0 < -6 || $0 > dayCount } == true
+        if isOutOfRange { outOfRangeDayCount += 1 }
         return PrepPlanStep(
           session: session,
           task: task,
           serves: (element["serves"] as? String)?.cleanedPrepPlanText,
           sourceDish: (element["sourceDish"] as? String)
-            .flatMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .flatMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespacesAndNewlines)) },
+          workDayOffset: dayCount > 1 && !isOutOfRange ? workDay.map { $0 - 1 } : nil
         )
       }
-    )
+    return MenuPrepPlan(steps: steps, outOfRangeDayCount: outOfRangeDayCount)
   }
 
   private static func jsonObjectSlice(_ text: String) -> String? {
@@ -369,6 +430,15 @@ extension MenuPrepPlanClient: DependencyKey {
     guard let open = text.firstIndex(of: "["), let close = text.lastIndex(of: "]"), open < close
     else { return nil }
     return String(text[open...close])
+  }
+}
+
+private extension String {
+  var menuDayCount: Int? {
+    guard let range = range(of: #"(?m)^- Duration: (\d+) days?$"#, options: .regularExpression) else { return nil }
+    let line = self[range]
+    guard let numberRange = line.range(of: #"\d+"#, options: .regularExpression) else { return nil }
+    return Int(line[numberRange])
   }
 }
 
@@ -419,7 +489,8 @@ public enum PrepPlanStepRepository {
         session: draft.session,
         task: draft.task,
         serves: draft.serves,
-        sourceDish: draft.sourceDish
+        sourceDish: draft.sourceDish,
+        workDayOffset: draft.workDayOffset
       )
     }
     .execute(db)
@@ -432,6 +503,7 @@ public enum PrepPlanStepRepository {
     task: String,
     serves: String?,
     sourceDish: MenuItem.ID?,
+    workDayOffset: Int?,
     in db: Database,
     now: Date
   ) throws {
@@ -441,6 +513,7 @@ public enum PrepPlanStepRepository {
       $0.task = #bind(task)
       $0.serves = #bind(serves?.cleanedPrepPlanText)
       $0.sourceDish = #bind(sourceDish)
+      $0.workDayOffset = #bind(workDayOffset)
     }
     .execute(db)
     try Menu.find(existing.menuID).update { $0.dateModified = #bind(now) }.execute(db)
@@ -462,10 +535,17 @@ public enum PrepPlanStepRepository {
   ) throws -> Bool {
     guard let step = try PrepPlanStepRecord.find(id).fetchOne(db) else { return false }
     var steps = try steps(for: step.menuID, in: db)
-    guard let index = steps.firstIndex(where: { $0.id == id }) else { return false }
-    let neighborIndex = direction == .earlier ? index - 1 : index + 1
-    guard steps.indices.contains(neighborIndex) else { return false }
-    steps.swapAt(index, neighborIndex)
+    let bandSteps = steps.filter { $0.workDayOffset == step.workDayOffset }
+    guard let band = bandSteps.firstIndex(where: { $0.id == id }) else { return false }
+    let neighbor = direction == .earlier ? band - 1 : band + 1
+    guard bandSteps.indices.contains(neighbor) else { return false }
+    var reorderedBand = bandSteps
+    reorderedBand.swapAt(band, neighbor)
+    var bandIndex = 0
+    for index in steps.indices where steps[index].workDayOffset == step.workDayOffset {
+      steps[index] = reorderedBand[bandIndex]
+      bandIndex += 1
+    }
     try writeSortOrder(steps, in: db)
     try Menu.find(step.menuID).update { $0.dateModified = #bind(now) }.execute(db)
     return true
@@ -495,7 +575,8 @@ public enum PrepPlanStepRepository {
           session: draft.session,
           task: draft.task,
           serves: draft.serves,
-          sourceDish: draft.sourceDish
+          sourceDish: draft.sourceDish,
+          workDayOffset: draft.workDayOffset
         )
       )
     }
@@ -538,13 +619,15 @@ public enum PrepPlanStepRepository {
     let task: String
     let serves: String?
     let sourceDish: MenuItem.ID?
+    let workDayOffset: Int?
 
     init(_ step: PrepPlanStep) {
       self.init(
         session: step.session,
         task: step.task,
         serves: step.serves,
-        sourceDish: step.sourceDish
+        sourceDish: step.sourceDish,
+        workDayOffset: step.workDayOffset
       )
     }
 
@@ -553,15 +636,17 @@ public enum PrepPlanStepRepository {
         session: step.session,
         task: step.task,
         serves: step.serves,
-        sourceDish: step.sourceDish
+        sourceDish: step.sourceDish,
+        workDayOffset: step.workDayOffset
       )
     }
 
-    private init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?) {
+    private init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?, workDayOffset: Int?) {
       self.session = session
       self.task = task
       self.serves = serves
       self.sourceDish = sourceDish
+      self.workDayOffset = workDayOffset
     }
   }
 }
@@ -651,19 +736,21 @@ struct PrepPlanStepVisibleContent: Hashable {
   let session: String
   let task: String
   let serves: String?
+  let workDayOffset: Int?
 
   init(_ step: PrepPlanStep) {
-    self.init(session: step.session, task: step.task, serves: step.serves)
+    self.init(session: step.session, task: step.task, serves: step.serves, workDayOffset: step.workDayOffset)
   }
 
   init(_ step: PrepPlanStepRecord) {
-    self.init(session: step.session, task: step.task, serves: step.serves)
+    self.init(session: step.session, task: step.task, serves: step.serves, workDayOffset: step.workDayOffset)
   }
 
-  private init(session: String, task: String, serves: String?) {
+  private init(session: String, task: String, serves: String?, workDayOffset: Int?) {
     self.session = session
     self.task = task
     self.serves = serves
+    self.workDayOffset = workDayOffset
   }
 }
 

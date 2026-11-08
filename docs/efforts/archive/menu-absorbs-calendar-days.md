@@ -6,10 +6,10 @@ Summary: Placing a menu offers to bring in the calendar items and wholly-contain
 Jon asked on 2026-11-08 to plan days on the calendar, then define a menu over them and get one prep plan for the
 result, and to pull Thanksgiving 2026 into Thanksgiving Week 2026. He accepted the design the same day.
 
-Decisions: [ADR-0063](../decisions/ADR-0063-menus-absorb-calendar-days.md).
-Related: [ADR-0034](../decisions/ADR-0034-prep-plan-work-session-timeline.md) (prep plan, bands, the anchoring this
-builds) · [ADR-0062 D8](../decisions/ADR-0062-serve-with-recipe-links.md) (the Production field gate copied in S3) ·
-[standing guards](../standing-guards.md).
+Decisions: [ADR-0063](../../decisions/ADR-0063-menus-absorb-calendar-days.md).
+Related: [ADR-0034](../../decisions/ADR-0034-prep-plan-work-session-timeline.md) (prep plan, bands, the anchoring this
+builds) · [ADR-0062 D8](../../decisions/ADR-0062-serve-with-recipe-links.md) (the Production field gate copied in S3) ·
+[standing guards](../../standing-guards.md).
 
 ## Where things are (architect, 2026-11-08)
 
@@ -176,7 +176,7 @@ shifted. Session labels are unchanged.
 
 - S1 and S2 change no schema. S3 adds one nullable column to a synced table, authorized by ADR-0063 D5/D8.
 - Run focused tests, then `scripts/check-drift.sh`, the generic device build, and the `YesChefTests` app target per
-  [verification.md](../verification.md). Every dispatch touches `YesChefApp/` model code.
+  [verification.md](../../verification.md). Every dispatch touches `YesChefApp/` model code.
 - Closeout per ADR-0005 D16. Dispatch 2 archives this brief.
 - Gate lines (Jon, iPad + iPhone):
   - **Dispatch 1:** Put two dishes and a note on the calendar across three days, and place Thanksgiving 2026 on one of
@@ -193,5 +193,5 @@ shifted. Session labels are unchanged.
 ## Dispatch ledger
 
 - [x] Dispatch 1 — S1 + S2 (history counts placed menus; bring-in), one PR. No schema.
-- [ ] Dispatch 2 — S3 + S4 + S5 (work-day column, weave and text, day bands and picker, copied-step dating), one PR.
+- [x] Dispatch 2 — S3 + S4 + S5 (work-day column, weave and text, day bands and picker, copied-step dating), one PR.
   Schema: escalate to Jon at review.

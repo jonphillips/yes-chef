@@ -184,7 +184,7 @@ extension RecipeCoreTests {
       #expect(prompt.contains("1. Salt the chicken overnight."))
       #expect(prompt.contains("Favor bright, spicy flavors."))
       #expect(prompt.contains("Protect the resting time."))
-      #expect(prompt.contains("Wednesday evening:"))
+      #expect(prompt.contains("The day before:"))
       #expect(prompt.contains("`- task → serves` bullet"))
       #expect(!prompt.contains("strict JSON"))
       #expect(!prompt.contains("menu item UUID"))
@@ -250,6 +250,17 @@ extension RecipeCoreTests {
           now: createdAt,
           uuid: { uuids.next() }
         )
+        let prepStepID = uuids.next()
+        try PrepPlanStepRecord.insert {
+          PrepPlanStepRecord(
+            id: prepStepID,
+            menuID: menuID,
+            sortOrder: 0,
+            session: "Morning",
+            task: "Make stock",
+            workDayOffset: 2
+          )
+        }.execute(db)
 
         try MenuRepository.updateNoteItem(
           itemID: noteItemID,
@@ -285,6 +296,9 @@ extension RecipeCoreTests {
         expectNoDifference(detail.itemRows.map(\.item.dayOffset), [1, 1])
         expectNoDifference(detail.itemRows.map(\.item.mealSlot), [.lunch, .dinner])
         expectNoDifference(detail.itemRows.map(\.item.notes), ["Serve warm.", "Pack leftovers."])
+        let clearedPrepStep = try #require(try PrepPlanStepRecord.find(prepStepID).fetchOne(db))
+        expectNoDifference(clearedPrepStep.workDayOffset, nil)
+        expectNoDifference(clearedPrepStep.task, "Make stock")
       }
     }
 
