@@ -8,6 +8,22 @@ extension RecipeCoreTests {
   @Suite
   struct MealCalendarTests {
     @Test
+    func placementDayArithmeticMatchesGregorianProjectionAcrossDST() throws {
+      let calendar = Calendar(identifier: .gregorian)
+      let startDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 3, day: 7, hour: 12)))
+      let placement = MenuPlacement(
+        id: SampleUUIDSequence.uuid(5_990),
+        menuID: SampleUUIDSequence.uuid(5_991),
+        startDate: startDate,
+        dateCreated: startDate,
+        dateModified: startDate
+      )
+      let expected = try #require(calendar.date(byAdding: .day, value: 2, to: startDate))
+      expectNoDifference(MenuPlacementDay.date(for: 2, from: placement), expected)
+      expectNoDifference(MenuPlacementDay.offset(of: expected, from: placement), 2)
+    }
+
+    @Test
     func derivesLastCookedFromPastRecipeCalendarItems() throws {
       @Dependency(\.defaultDatabase) var database
       let today = Date(timeIntervalSinceReferenceDate: 803_400_000)
@@ -83,10 +99,44 @@ extension RecipeCoreTests {
           try MealPlanItem.insert { item }.execute(db)
         }
 
+        let historyMenuID = SampleUUIDSequence.uuid(5_930)
+        let historyMenu = Menu(
+          id: historyMenuID,
+          title: "History Menu",
+          dayCount: 1,
+          dateCreated: today,
+          dateModified: today
+        )
+        try Menu.insert { historyMenu }.execute(db)
+        let historyMenuItem = MenuItem(
+          id: SampleUUIDSequence.uuid(5_940),
+          menuID: historyMenuID,
+          kind: .recipe,
+          recipeID: cookedRecipeID,
+          title: "Cooked Recipe",
+          dayOffset: 0,
+          mealSlot: .dinner,
+          sortOrder: 0,
+          dateCreated: today,
+          dateModified: today
+        )
+        try MenuItem.insert { historyMenuItem }.execute(db)
+        let pastPlacementDates = [olderDate, newestDate, futureDate]
+        for (index, date) in pastPlacementDates.enumerated() {
+          let placement = MenuPlacement(
+            id: SampleUUIDSequence.uuid(5_931 + index),
+            menuID: historyMenuID,
+            startDate: date,
+            dateCreated: today,
+            dateModified: today
+          )
+          try MenuPlacement.insert { placement }.execute(db)
+        }
+
         let batch = try RecipeCookingHistory.lastCookedValues(onOrBefore: today, in: db)
         let batchCooked = try #require(batch[cookedRecipeID])
         expectNoDifference(batchCooked.lastCookedAt, today)
-        expectNoDifference(batchCooked.timesCooked, 3)
+        expectNoDifference(batchCooked.timesCooked, 5)
         #expect(!batch.keys.contains(futureOnlyRecipeID))
         let singleCookedValue = try RecipeCookingHistory.lastCookedValue(
           for: cookedRecipeID,
@@ -95,7 +145,7 @@ extension RecipeCoreTests {
         )
         let singleCooked = try #require(singleCookedValue)
         expectNoDifference(singleCooked.lastCookedAt, today)
-        expectNoDifference(singleCooked.timesCooked, 3)
+        expectNoDifference(singleCooked.timesCooked, 5)
         let singleFuture = try RecipeCookingHistory.lastCookedValue(
           for: futureOnlyRecipeID,
           onOrBefore: today,
@@ -106,7 +156,7 @@ extension RecipeCoreTests {
         let browserRecipes = try RecipeBrowserDataRequest(today: today).fetch(db).recipes
         let browserCookedRecipe = try #require(browserRecipes.first { $0.id == cookedRecipeID })
         expectNoDifference(browserCookedRecipe.lastCookedAt, today)
-        expectNoDifference(browserCookedRecipe.timesCooked, 3)
+        expectNoDifference(browserCookedRecipe.timesCooked, 5)
         let browserFutureRecipe = try #require(browserRecipes.first { $0.id == futureOnlyRecipeID })
         expectNoDifference(browserFutureRecipe.lastCookedAt, nil)
         expectNoDifference(browserFutureRecipe.timesCooked, 0)

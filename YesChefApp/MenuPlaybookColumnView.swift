@@ -178,7 +178,8 @@ struct MenuDetailReader: View {
         model: model,
         menu: detail.menu,
         minimumDayCount: max((detail.itemRows.map(\.item.dayOffset).max() ?? 0) + 1, 1),
-        placements: detail.placements
+        placements: detail.placements,
+        bringInOffer: detail.bringInOffer
       )
     }
   }

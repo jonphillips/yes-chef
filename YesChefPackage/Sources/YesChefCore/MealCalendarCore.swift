@@ -69,6 +69,24 @@ public struct MealPlanItemRowData: Identifiable, Equatable, Sendable {
   }
 }
 
+/// Gregorian day arithmetic shared by calendar projection, menu groceries, history and bring-in.
+public enum MenuPlacementDay {
+  public static func date(for dayOffset: Int, from placement: MenuPlacement) -> Date? {
+    Calendar(identifier: .gregorian).date(
+      byAdding: .day,
+      value: dayOffset,
+      to: placement.startDate
+    )
+  }
+
+  public static func offset(of date: Date, from placement: MenuPlacement) -> Int? {
+    let calendar = Calendar(identifier: .gregorian)
+    let scheduledDay = calendar.startOfDay(for: date)
+    let placementDay = calendar.startOfDay(for: placement.startDate)
+    return calendar.dateComponents([.day], from: placementDay, to: scheduledDay).day
+  }
+}
+
 public struct MealCalendarRequest: FetchKeyRequest {
   public init() {}
 
@@ -148,7 +166,6 @@ public struct MealCalendarRequest: FetchKeyRequest {
     sourcesByRecipeID: [Recipe.ID: [RecipeSource]],
     thumbnailsByRecipeID: [Recipe.ID: MealCalendarPhotoRow]
   ) throws -> [MealPlanItemRowData] {
-    let calendar = Calendar(identifier: .gregorian)
     let menusByID = Dictionary(uniqueKeysWithValues: try Menu.fetchAll(db).map { ($0.id, $0) })
     let itemsByMenuID = Dictionary(grouping: try MenuItem.fetchAll(db), by: \.menuID)
 
@@ -156,11 +173,7 @@ public struct MealCalendarRequest: FetchKeyRequest {
       guard let menu = menusByID[placement.menuID] else { return [] }
       return (itemsByMenuID[placement.menuID] ?? []).compactMap { menuItem in
         guard
-          let scheduledDate = calendar.date(
-            byAdding: .day,
-            value: menuItem.dayOffset,
-            to: placement.startDate
-          )
+          let scheduledDate = MenuPlacementDay.date(for: menuItem.dayOffset, from: placement)
         else { return nil }
 
         let item = MealPlanItem(
@@ -208,7 +221,7 @@ public enum RecipeCookingHistory {
     onOrBefore today: Date,
     in db: Database
   ) throws -> [Recipe.ID: LastCookedValue] {
-    try MealPlanItem
+    var values: [Recipe.ID: LastCookedValue] = try MealPlanItem
       .where {
         $0.kind.eq(MealPlanItemKind.recipe)
           && $0.recipeID.isNot(nil)
@@ -227,6 +240,22 @@ public enum RecipeCookingHistory {
         guard let recipeID = row.recipeID, let lastCookedAt = row.lastCookedAt else { return }
         result[recipeID] = (lastCookedAt: lastCookedAt, timesCooked: row.timesCooked)
       }
+
+    let placements = try MenuPlacement.fetchAll(db)
+    let placementsByMenuID = Dictionary(grouping: placements, by: \.menuID)
+    let recipeMenuItems = try MenuItem.fetchAll(db).filter { $0.kind == .recipe && $0.recipeID != nil }
+    for menu in try Menu.fetchAll(db) {
+      guard let menuPlacements = placementsByMenuID[menu.id] else { continue }
+      for item in recipeMenuItems where item.menuID == menu.id {
+        for placement in menuPlacements {
+          guard let recipeID = item.recipeID,
+            let date = MenuPlacementDay.date(for: item.dayOffset, from: placement), date <= today
+          else { continue }
+          addCookingHistory(date, for: recipeID, to: &values)
+        }
+      }
+    }
+    return values
   }
 
   public static func lastCookedValue(
@@ -234,7 +263,8 @@ public enum RecipeCookingHistory {
     onOrBefore today: Date,
     in db: Database
   ) throws -> LastCookedValue? {
-    try MealPlanItem
+    var values: [Recipe.ID: LastCookedValue] = [:]
+    if let value = try (MealPlanItem
       .where {
         $0.kind.eq(MealPlanItemKind.recipe)
           && $0.recipeID.eq(recipeID)
@@ -248,11 +278,37 @@ public enum RecipeCookingHistory {
           timesCooked: $0.id.count()
         )
       }
-      .fetchOne(db)
-      .flatMap { row in
-        guard let lastCookedAt = row.lastCookedAt else { return nil }
-        return (lastCookedAt: lastCookedAt, timesCooked: row.timesCooked)
+      .fetchOne(db)), let lastCookedAt = value.lastCookedAt {
+      values[recipeID] = (lastCookedAt: lastCookedAt, timesCooked: value.timesCooked)
+    }
+
+    let matchingItems = try MenuItem
+      .where { $0.kind.eq(MealPlanItemKind.recipe) && $0.recipeID.eq(recipeID) }
+      .fetchAll(db)
+    let itemsByMenuID = Dictionary(grouping: matchingItems, by: \.menuID)
+    let menuIDs = Set(itemsByMenuID.keys)
+    for placement in try MenuPlacement.fetchAll(db) where menuIDs.contains(placement.menuID) {
+      for item in itemsByMenuID[placement.menuID] ?? [] {
+        guard let date = MenuPlacementDay.date(for: item.dayOffset, from: placement), date <= today else { continue }
+        addCookingHistory(date, for: recipeID, to: &values)
       }
+    }
+    return values[recipeID]
+  }
+}
+
+private func addCookingHistory(
+  _ date: Date,
+  for recipeID: Recipe.ID,
+  to values: inout [Recipe.ID: RecipeCookingHistory.LastCookedValue]
+) {
+  if let existing = values[recipeID] {
+    values[recipeID] = (
+      lastCookedAt: max(existing.lastCookedAt, date),
+      timesCooked: existing.timesCooked + 1
+    )
+  } else {
+    values[recipeID] = (lastCookedAt: date, timesCooked: 1)
   }
 }
 

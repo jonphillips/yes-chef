@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-08 — Menu brings in calendar days (`effort/menu-absorbs-calendar-days`)
+
+- **Result:** Cooking history now counts recipes served on past placed menus, and bring-in moves loose calendar items while copying contained placed menus, prep steps, and grocery provenance in one write transaction. Placement saves and Menu detail present the same offer and confirmation.
+- **Verification:** scripts/check-drift.sh passed: SwiftLint clean, 776 package tests passed, and YesChefTests built. Generic iOS build passed. YesChefTests simulator run passed: 128 tests in 28 suites.
+- **Owed:** menu-absorbs-calendar-days S1 + S2 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-08 — Workbench hand-offs: recipe returns and candidate choice (`effort/workbench-handoff-recipe-returns-and-candidate-choice`)
 
 - **Result:** S1 + S2 (PR #462) route recipe returns to recipe review, fix Compare's finalize ask, add replace confirmation, and keep Draft available with a working recipe. S3 (PR #463) lets cooks select candidates for Compare, Experiments, and Draft; frontier serialization follows the character budget, reports candidate and reference omissions, and the chat header follows the active tier.

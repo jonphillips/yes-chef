@@ -21,20 +21,41 @@ public struct MenuDetailData: Equatable, Sendable {
   public var placements: [MenuPlacement]
   public var prepPlanSteps: [PrepPlanStepRecord]
   public var learnings: [Learning]
+  public var bringInOffer: MenuBringInOffer?
 
   public init(
     menu: Menu,
     itemRows: [MenuItemRowData] = [],
     placements: [MenuPlacement] = [],
     prepPlanSteps: [PrepPlanStepRecord] = [],
-    learnings: [Learning] = []
+    learnings: [Learning] = [],
+    bringInOffer: MenuBringInOffer? = nil
   ) {
     self.menu = menu
     self.itemRows = itemRows
     self.placements = placements
     self.prepPlanSteps = prepPlanSteps
     self.learnings = learnings
+    self.bringInOffer = bringInOffer
   }
+}
+
+public struct MenuBringInContainedPlacement: Hashable, Sendable {
+  public var menuID: Menu.ID
+  public var title: String
+  public var dishCount: Int
+  public var prepStepCount: Int
+}
+
+public struct MenuBringInOffer: Hashable, Sendable {
+  public var looseCalendarItemCount: Int
+  public var containedPlacements: [MenuBringInContainedPlacement]
+  public var partiallyOverlappingMenuTitles: [String]
+}
+
+public struct MenuBringInResult: Equatable, Sendable {
+  public var movedCalendarItemCount: Int
+  public var copiedPlacementCount: Int
 }
 
 public enum MenuServiceDate {
@@ -189,7 +210,8 @@ public struct MenuDetailRequest: FetchKeyRequest {
       itemRows: itemRows,
       placements: placements,
       prepPlanSteps: try PrepPlanStepRepository.steps(for: menuID, in: db),
-      learnings: try LearningRepository.learnings(sourceType: .menu, sourceID: menuID, in: db)
+      learnings: try LearningRepository.learnings(sourceType: .menu, sourceID: menuID, in: db),
+      bringInOffer: try MenuRepository.bringInOffer(menuID: menuID, in: db)
     )
   }
 }
@@ -746,7 +768,7 @@ public enum MenuRepository {
     }
   }
 
-  private static func nextSortOrder(
+  static func nextSortOrder(
     menuID: Menu.ID,
     dayOffset: Int,
     mealSlot: MealPlanItemSlot,
@@ -802,7 +824,9 @@ public enum MenuRepositoryError: Error, Equatable, Sendable {
   case invalidReorderDestination
   case placementNotFound(MenuPlacement.ID)
   case recipeNotFound(Recipe.ID)
+  case menuMustHaveOnePlacement
 }
+
 
 private func areMenuItemRowsInIncreasingOrder(
   _ lhs: MenuItemRowData,
