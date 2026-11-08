@@ -242,7 +242,7 @@ private extension String {
       return (session, nil)
     }
     let header = trimmingCharacters(in: CharacterSet(charactersIn: ":"))
-    guard let range = header.range(of: #"^Day\s+(-?\d+)(?:\s*(?:·|—|–|-|:)\s*(.*))?$"#, options: [.regularExpression, .caseInsensitive]) else {
+    guard let range = header.range(of: #"^Day\s+(-?\d+)(?:(?:\s*[·—–\-:]\s*|\s+)(.*))?$"#, options: [.regularExpression, .caseInsensitive]) else {
       guard let session = editablePrepPlanSession else { return nil }
       return (session, nil)
     }
@@ -257,7 +257,7 @@ private extension String {
 
   func hasOutOfRangeWorkDayHeader(dayCount: Int) -> Bool {
     let header = trimmingCharacters(in: CharacterSet(charactersIn: ":"))
-    guard let range = header.range(of: #"^Day\s+(-?\d+)(?:\s*(?:·|—|–|-|:)\s*.*)?$"#, options: [.regularExpression, .caseInsensitive]),
+    guard let range = header.range(of: #"^Day\s+(-?\d+)(?:(?:\s*[·—–\-:]\s*|\s+).*)?$"#, options: [.regularExpression, .caseInsensitive]),
       let dayRange = header[range].range(of: #"-?\d+"#, options: .regularExpression),
       let day = Int(header[range][dayRange]) else { return false }
     return day < -6 || day > dayCount
@@ -296,6 +296,7 @@ public struct MenuPrepPlanClient: Sendable {
     _ selection: String,
     _ messages: [RecipeChatMessage],
     _ context: String,
+    _ dayCount: Int,
     _ tier: ModelTier
   ) async throws -> MenuPrepPlan
 
@@ -304,6 +305,7 @@ public struct MenuPrepPlanClient: Sendable {
       _ selection: String,
       _ messages: [RecipeChatMessage],
       _ context: String,
+      _ dayCount: Int,
       _ tier: ModelTier
     ) async throws -> MenuPrepPlan
   ) {
@@ -314,14 +316,15 @@ public struct MenuPrepPlanClient: Sendable {
     selection: String,
     messages: [RecipeChatMessage],
     context: String,
+    dayCount: Int,
     tier: ModelTier
   ) async throws -> MenuPrepPlan {
-    try await extract(selection, messages, context, tier)
+    try await extract(selection, messages, context, dayCount, tier)
   }
 }
 
 extension MenuPrepPlanClient: DependencyKey {
-  public static let liveValue = MenuPrepPlanClient { selection, messages, context, tier in
+  public static let liveValue = MenuPrepPlanClient { selection, messages, context, dayCount, tier in
     @Dependency(\.modelClient) var modelClient
     let call = ModelCall(
       surface: .menu,
@@ -338,10 +341,10 @@ extension MenuPrepPlanClient: DependencyKey {
     let response = try await call.complete(using: modelClient)
     guard !response.wasBlockedByProvider else { throw StructuredModelResponseError.responseBlocked }
     guard !response.wasTruncated else { throw StructuredModelResponseError.responseTruncated }
-    return parse(response.text, dayCount: context.menuDayCount ?? 1)
+    return parse(response.text, dayCount: dayCount)
   }
 
-  public static let testValue = MenuPrepPlanClient { _, _, _, _ in
+  public static let testValue = MenuPrepPlanClient { _, _, _, _, _ in
     MenuPrepPlan()
   }
 
@@ -430,15 +433,6 @@ extension MenuPrepPlanClient: DependencyKey {
     guard let open = text.firstIndex(of: "["), let close = text.lastIndex(of: "]"), open < close
     else { return nil }
     return String(text[open...close])
-  }
-}
-
-private extension String {
-  var menuDayCount: Int? {
-    guard let range = range(of: #"(?m)^- Duration: (\d+) days?$"#, options: .regularExpression) else { return nil }
-    let line = self[range]
-    guard let numberRange = line.range(of: #"\d+"#, options: .regularExpression) else { return nil }
-    return Int(line[numberRange])
   }
 }
 
@@ -535,16 +529,21 @@ public enum PrepPlanStepRepository {
   ) throws -> Bool {
     guard let step = try PrepPlanStepRecord.find(id).fetchOne(db) else { return false }
     var steps = try steps(for: step.menuID, in: db)
-    let bandSteps = steps.filter { $0.workDayOffset == step.workDayOffset }
+    guard let menu = try Menu.find(step.menuID).fetchOne(db) else { return false }
+    let bandSteps = menu.dayCount > 1 ? steps.filter { $0.workDayOffset == step.workDayOffset } : steps
     guard let band = bandSteps.firstIndex(where: { $0.id == id }) else { return false }
     let neighbor = direction == .earlier ? band - 1 : band + 1
     guard bandSteps.indices.contains(neighbor) else { return false }
-    var reorderedBand = bandSteps
-    reorderedBand.swapAt(band, neighbor)
-    var bandIndex = 0
-    for index in steps.indices where steps[index].workDayOffset == step.workDayOffset {
-      steps[index] = reorderedBand[bandIndex]
-      bandIndex += 1
+    if menu.dayCount > 1 {
+      var reorderedBand = bandSteps
+      reorderedBand.swapAt(band, neighbor)
+      var bandIndex = 0
+      for index in steps.indices where steps[index].workDayOffset == step.workDayOffset {
+        steps[index] = reorderedBand[bandIndex]
+        bandIndex += 1
+      }
+    } else {
+      steps.swapAt(band, neighbor)
     }
     try writeSortOrder(steps, in: db)
     try Menu.find(step.menuID).update { $0.dateModified = #bind(now) }.execute(db)

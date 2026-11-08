@@ -200,5 +200,53 @@ extension RecipeCoreTests {
         #expect(try MenuRepository.bringInOffer(menuID: twoPlacementsID, in: db) == nil)
       }
     }
+
+    @Test
+    func bringingInDatedStepFromMultiDayMenuShiftsItsWorkDay() throws {
+      @Dependency(\.defaultDatabase) var database
+      var calendar = Calendar(identifier: .gregorian)
+      calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+      let start = calendar.startOfDay(for: Date(timeIntervalSinceReferenceDate: 805_800_000))
+      let sourceStart = try #require(calendar.date(byAdding: .day, value: 3, to: start))
+      let targetID = SampleUUIDSequence.uuid(63_000)
+      let sourceID = SampleUUIDSequence.uuid(63_001)
+      let targetPlacementID = SampleUUIDSequence.uuid(63_002)
+      let sourcePlacementID = SampleUUIDSequence.uuid(63_003)
+      let sourceStepID = SampleUUIDSequence.uuid(63_004)
+      var ids = SampleUUIDSequence(start: 63_100)
+
+      try database.write { db in
+        for menu in [
+          Menu(id: targetID, title: "Week", dayCount: 7, dateCreated: start, dateModified: start),
+          Menu(id: sourceID, title: "Prep weekend", dayCount: 2, dateCreated: start, dateModified: start),
+        ] {
+          try Menu.insert { menu }.execute(db)
+        }
+        for placement in [
+          MenuPlacement(id: targetPlacementID, menuID: targetID, startDate: start, dateCreated: start, dateModified: start),
+          MenuPlacement(id: sourcePlacementID, menuID: sourceID, startDate: sourceStart, dateCreated: start, dateModified: start),
+        ] {
+          try MenuPlacement.insert { placement }.execute(db)
+        }
+        try PrepPlanStepRecord.insert {
+          PrepPlanStepRecord(
+            id: sourceStepID,
+            menuID: sourceID,
+            sortOrder: 0,
+            session: "Morning",
+            task: "Make the dough",
+            workDayOffset: 1
+          )
+        }.execute(db)
+
+        let result = try MenuRepository.bringIn(menuID: targetID, in: db, now: start, uuid: { ids.next() })
+        #expect(result.copiedPlacementCount == 1)
+
+        let copiedStep = try #require(try PrepPlanStepRepository.steps(for: targetID, in: db).first)
+        #expect(copiedStep.task == "Make the dough")
+        #expect(copiedStep.session == "Morning")
+        #expect(copiedStep.workDayOffset == 4)
+      }
+    }
   }
 }

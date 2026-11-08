@@ -274,6 +274,7 @@ extension RecipeCoreTests {
           selection: "Sequence the prep.",
           messages: [RecipeChatMessage(role: .user, text: "Build a prep plan.")],
           context: "Menu context",
+          dayCount: 1,
           tier: .frontier(.anthropic)
         )
       }
@@ -304,6 +305,7 @@ extension RecipeCoreTests {
             selection: "Build the prep plan.",
             messages: [],
             context: "Menu context",
+            dayCount: 1,
             tier: .frontier(.anthropic)
           )
         }
@@ -488,8 +490,8 @@ extension RecipeCoreTests {
         try MenuRepository.applyPrepPlan(
           MenuPrepPlan(
             steps: [
-              PrepPlanStep(session: "The day before", task: "Salt the chicken", sourceDish: sourceDishID),
-              PrepPlanStep(session: "At service", task: "Warm the tortillas"),
+              PrepPlanStep(session: "The day before", task: "Salt the chicken", sourceDish: sourceDishID, workDayOffset: 0),
+              PrepPlanStep(session: "At service", task: "Warm the tortillas", workDayOffset: -1),
             ]
           ),
           to: menuID,
@@ -504,7 +506,7 @@ extension RecipeCoreTests {
           task: "Salt the chicken overnight",
           serves: "Saturday dinner",
           sourceDish: sourceDishID,
-          workDayOffset: nil,
+          workDayOffset: 0,
           in: db,
           now: now
         )
@@ -519,7 +521,8 @@ extension RecipeCoreTests {
               menuID: menuID,
               sortOrder: 0,
               session: "At service",
-              task: "Warm the tortillas"
+              task: "Warm the tortillas",
+              workDayOffset: -1
             ),
             PrepPlanStepRecord(
               id: firstID,
@@ -528,7 +531,8 @@ extension RecipeCoreTests {
               session: "The day before",
               task: "Salt the chicken overnight",
               serves: "Saturday dinner",
-              sourceDish: sourceDishID
+              sourceDish: sourceDishID,
+              workDayOffset: 0
             ),
           ]
         )

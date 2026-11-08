@@ -625,7 +625,6 @@ final class MenuDetailModel {
           text: text,
           to: menuID,
           currentPlan: currentPlan,
-          dayCount: detail?.menu.dayCount ?? 1,
           in: db,
           now: now,
           uuid: { uuid() }
@@ -711,6 +710,7 @@ final class MenuDetailModel {
           selection: selection,
           messages: messages,
           context: context,
+          dayCount: menuDayCount,
           tier: chatModel.activeTier
         )
       },

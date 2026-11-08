@@ -64,21 +64,23 @@ public enum MenuPrepPlanBanding {
       }
       let workDate = placementStartDate.flatMap { calendar.date(byAdding: .day, value: offset, to: $0) }
       let dayNumber = offset + 1
+      let undatedTitle = dayNumber <= 0
+        ? "\(-offset) \(-offset == 1 ? "day" : "days") before Day 1"
+        : "Day \(dayNumber)"
+      let isToday = placementStartDate != nil && workDate.map { calendar.isDate($0, inSameDayAs: today) } == true
       let title: String
-      if dayNumber <= 0 {
-        title = "\(-offset) \(-offset == 1 ? "day" : "days") before Day 1"
-      } else if placementStartDate != nil, let workDate {
-        title = calendar.isDate(workDate, inSameDayAs: today)
-          ? "Today"
-          : "\(workDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · Day \(dayNumber)"
+      if isToday {
+        title = "Today"
+      } else if let workDate {
+        title = "\(workDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · \(undatedTitle)"
       } else {
-        title = "Day \(dayNumber)"
+        title = undatedTitle
       }
       result.append(MenuPrepPlanBand(
         id: "day:\(offset)",
         title: title,
         steps: bandSteps,
-        isToday: placementStartDate != nil && workDate.map { calendar.isDate($0, inSameDayAs: today) } == true
+        isToday: isToday
       ))
     }
     return result

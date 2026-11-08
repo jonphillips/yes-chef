@@ -66,5 +66,24 @@ extension RecipeCoreTests {
       #expect(plan.editableReviewText(dayCount: 1) == "The day before:\n- Make stock")
       #expect(plan.applyingEditableReviewText(plan.editableReviewText(dayCount: 1), dayCount: 1) == plan)
     }
+
+    @Test
+    func dayHeaderAllowsWhitespaceSeparatorBeforeSession() {
+      let parsed = MenuPrepPlan().parsingEditableReviewText(
+        "Day 2 Morning:\n- Prepare the bread",
+        dayCount: 3
+      )
+      #expect(parsed.plan.steps == [PrepPlanStep(session: "Morning", task: "Prepare the bread", workDayOffset: 1)])
+      #expect(parsed.unparsedLines.isEmpty)
+    }
+
+    @Test
+    func oneDayMenuKeepsDayNumberHeaderAsSessionText() {
+      let parsed = MenuPrepPlan().parsingEditableReviewText(
+        "Day 2 prep:\n- Set the oven",
+        dayCount: 1
+      )
+      #expect(parsed.plan.steps == [PrepPlanStep(session: "Day 2 prep", task: "Set the oven")])
+    }
   }
 }

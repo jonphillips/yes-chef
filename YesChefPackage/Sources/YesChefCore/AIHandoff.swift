@@ -1069,11 +1069,13 @@ public enum AIHandoffMenuPrepPlanImport {
     text: String,
     to menuID: Menu.ID,
     currentPlan: MenuPrepPlan,
-    dayCount: Int = 1,
     in db: Database,
     now: Date,
     uuid: () -> UUID
   ) throws -> AIHandoffMenuPrepPlanImportResult {
+    guard let menu = try Menu.find(menuID).fetchOne(db) else {
+      throw AIHandoffMenuPrepPlanImportError.wrongMenu
+    }
     let routedText = AIHandoffToken.stripping(from: text)
 
     if let routedText, let handoff = try AIHandoffRepository.handoff(id: routedText.handoffID, in: db) {
@@ -1090,7 +1092,7 @@ public enum AIHandoffMenuPrepPlanImport {
       let returned = AIHandoffReturn.menuPrepPlan(
         from: routedText.payload,
         currentPlan: currentPlan,
-        dayCount: dayCount
+        dayCount: menu.dayCount
       )
       try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
       try AIHandoffRepository.markImported(id: handoff.id, at: now, in: db)
@@ -1100,7 +1102,7 @@ public enum AIHandoffMenuPrepPlanImport {
     let returned = AIHandoffReturn.menuPrepPlan(
       from: routedText?.payload ?? text,
       currentPlan: currentPlan,
-      dayCount: dayCount
+      dayCount: menu.dayCount
     )
     try apply(returned, to: menuID, in: db, now: now, uuid: uuid)
     return .applied
@@ -1113,6 +1115,11 @@ public enum AIHandoffMenuPrepPlanImport {
     now: Date,
     uuid: () -> UUID
   ) throws {
+    guard returned.outOfRangeDayCount == 0 else {
+      throw AIHandoffMenuPrepPlanImportError.unparsedPlanText([
+        "\(returned.outOfRangeDayCount) prep plan day header(s) fell outside this menu and were left Flexible."
+      ])
+    }
     guard returned.unparsedLines.isEmpty else {
       throw AIHandoffMenuPrepPlanImportError.unparsedPlanText(returned.unparsedLines)
     }
