@@ -13,7 +13,7 @@ Newest first.
 
 - **Result:** S1 + S2 (PR #462) route recipe returns to recipe review, fix Compare's finalize ask, add replace confirmation, and keep Draft available with a working recipe. S3 (PR #463) lets cooks select candidates for Compare, Experiments, and Draft; frontier serialization follows the character budget, reports candidate and reference omissions, and the chat header follows the active tier.
 - **Verification:** scripts/check-drift.sh, focused Core tests, the generic iOS build, and the YesChefTests simulator target passed.
-- **Owed:** [Workbench hand-off recipe returns (S1 + S2)](device-passes.md#L20) and [Workbench hand-off candidate choice (S3)](device-passes.md#L21) device gates.
+- **Owed:** The S1 + S2 and S3 device gates, in [device-passes.md](device-passes.md).
 
 ---
 ## 2026-11-06 — Adopt ChatAccessKit export in Yes Chef (`effort/chat-access-export-adoption`)
