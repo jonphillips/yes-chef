@@ -71,16 +71,23 @@ public struct MealPlanItemRowData: Identifiable, Equatable, Sendable {
 
 /// Gregorian day arithmetic shared by calendar projection, menu groceries, history and bring-in.
 public enum MenuPlacementDay {
-  public static func date(for dayOffset: Int, from placement: MenuPlacement) -> Date? {
-    Calendar(identifier: .gregorian).date(
+  public static func date(
+    for dayOffset: Int,
+    from placement: MenuPlacement,
+    calendar: Calendar = Calendar(identifier: .gregorian)
+  ) -> Date? {
+    calendar.date(
       byAdding: .day,
       value: dayOffset,
       to: placement.startDate
     )
   }
 
-  public static func offset(of date: Date, from placement: MenuPlacement) -> Int? {
-    let calendar = Calendar(identifier: .gregorian)
+  public static func offset(
+    of date: Date,
+    from placement: MenuPlacement,
+    calendar: Calendar = Calendar(identifier: .gregorian)
+  ) -> Int? {
     let scheduledDay = calendar.startOfDay(for: date)
     let placementDay = calendar.startOfDay(for: placement.startDate)
     return calendar.dateComponents([.day], from: placementDay, to: scheduledDay).day

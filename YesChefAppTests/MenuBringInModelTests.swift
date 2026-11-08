@@ -36,18 +36,37 @@ struct MenuBringInModelTests {
         startDate: now, dayCount: 2, minimumDayCount: 1
       )
       #expect(model.savePlacementButtonTapped(context: context, startDate: now))
-      guard case let .bringIn(presentation) = model.destination else {
+      guard case .bringIn = model.destination else {
         Issue.record("Expected the placement save to present the bring-in offer")
         return
       }
 
-      model.confirmBringIn(presentation)
+      // Dismissing with Not Now clears the destination without applying the write.
+      model.destination = nil
+      let remainsOnCalendar = try database.read { db in try MealPlanItem.find(itemID).fetchOne(db) != nil }
+      #expect(remainsOnCalendar)
+      let unchangedMenuItems = try database.read { db in try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db) }
+      #expect(unchangedMenuItems.isEmpty)
+
+      let maybePlacement = try database.read { db in
+        try MenuPlacement.where { $0.menuID.eq(menuID) }.fetchOne(db)
+      }
+      let placement = try #require(maybePlacement)
+      var secondContext = context
+      secondContext.placementID = placement.id
+      #expect(model.savePlacementButtonTapped(context: secondContext, startDate: now))
+      guard case let .bringIn(confirmedPresentation) = model.destination else {
+        Issue.record("Expected editing the placement to present the bring-in offer again")
+        return
+      }
+
+      model.confirmBringIn(confirmedPresentation)
       #expect(model.destination == nil)
       let savedItems = try database.read { db in try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db) }
       #expect(savedItems.count == 1)
       #expect(savedItems.first?.title == "Calendar note")
-      let remainsOnCalendar = try database.read { db in try MealPlanItem.find(itemID).fetchOne(db) == nil }
-      #expect(remainsOnCalendar)
+      let wasRemovedFromCalendar = try database.read { db in try MealPlanItem.find(itemID).fetchOne(db) == nil }
+      #expect(wasRemovedFromCalendar)
     }
   }
 

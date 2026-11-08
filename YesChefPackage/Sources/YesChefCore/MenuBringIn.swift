@@ -1,60 +1,138 @@
 import Foundation
 import SQLiteData
 
+struct MenuBringInContainedCandidate {
+  var placement: MenuPlacement
+  var menu: Menu
+  var items: [MenuItem]
+  var prepSteps: [PrepPlanStepRecord]
+}
+
+struct MenuBringInCandidates {
+  var targetMenu: Menu
+  var targetPlacement: MenuPlacement
+  var rangeStartDay: Date
+  var rangeEndExclusive: Date
+  var looseItems: [MealPlanItem]
+  var containedPlacements: [MenuBringInContainedCandidate]
+  var partiallyOverlappingMenuTitles: [String]
+}
+
 private struct MenuPlacementItemKey: Hashable {
   var placementID: MenuPlacement.ID
   var itemID: MenuItem.ID
 }
 
 extension MenuRepository {
-  public static func bringInOffer(menuID: Menu.ID, in db: Database) throws -> MenuBringInOffer? {
+  static func bringInCandidates(menuID: Menu.ID, in db: Database) throws -> MenuBringInCandidates? {
     guard let targetMenu = try Menu.find(menuID).fetchOne(db) else {
       throw MenuRepositoryError.menuNotFound(menuID)
     }
-    let placements = try MenuPlacement.where { $0.menuID.eq(menuID) }.fetchAll(db)
-    guard placements.count == 1, let targetPlacement = placements.first else { return nil }
-    guard let rangeEnd = MenuPlacementDay.date(for: targetMenu.dayCount - 1, from: targetPlacement) else {
-      return nil
-    }
+    let targetPlacements = try MenuPlacement.where { $0.menuID.eq(menuID) }.fetchAll(db)
+    guard targetPlacements.count == 1, let targetPlacement = targetPlacements.first else { return nil }
+    guard
+      let rangeEndExclusive = MenuPlacementDay.date(for: targetMenu.dayCount, from: targetPlacement)
+    else { return nil }
+
     let calendar = Calendar(identifier: .gregorian)
     let rangeStartDay = calendar.startOfDay(for: targetPlacement.startDate)
-    let rangeEndDay = calendar.startOfDay(for: rangeEnd)
-    let looseItems = try MealPlanItem.fetchAll(db).filter { item in
-      let day = calendar.startOfDay(for: item.scheduledDate)
-      return day >= rangeStartDay && day <= rangeEndDay
+    let looseItems = try MealPlanItem
+      .where { $0.scheduledDate.gte(rangeStartDay) && $0.scheduledDate.lt(rangeEndExclusive) }
+      .fetchAll(db)
+      .sorted(by: areMealPlanItemsInBringInOrder)
+
+    let otherPlacements = try MenuPlacement
+      .where { $0.menuID.neq(menuID) }
+      .fetchAll(db)
+    let otherMenuIDs = Set(otherPlacements.map(\.menuID))
+    let menusByID: [Menu.ID: Menu]
+    if otherMenuIDs.isEmpty {
+      menusByID = [:]
+    } else {
+      menusByID = Dictionary(
+        uniqueKeysWithValues: try Menu.where { $0.id.in(otherMenuIDs) }.fetchAll(db).map { ($0.id, $0) }
+      )
     }
-    let menusByID = Dictionary(uniqueKeysWithValues: try Menu.fetchAll(db).map { ($0.id, $0) })
-    let itemsByMenuID = Dictionary(grouping: try MenuItem.fetchAll(db), by: \.menuID)
-    let stepsByMenuID = Dictionary(grouping: try PrepPlanStepRecord.fetchAll(db), by: \.menuID)
-    var contained: [MenuBringInContainedPlacement] = []
-    var partial: [String] = []
-    for placement in try MenuPlacement.fetchAll(db) where placement.menuID != menuID {
+
+    var containedPlacements: [(MenuPlacement, Menu)] = []
+    var partialTitles: [String] = []
+    for placement in otherPlacements {
       guard let menu = menusByID[placement.menuID],
-        let otherEnd = MenuPlacementDay.date(for: menu.dayCount - 1, from: placement)
+        let menuEndExclusive = MenuPlacementDay.date(for: menu.dayCount, from: placement)
       else { continue }
-      let otherStartDay = calendar.startOfDay(for: placement.startDate)
-      let otherEndDay = calendar.startOfDay(for: otherEnd)
-      guard otherStartDay <= rangeEndDay && otherEndDay >= rangeStartDay else { continue }
-      if otherStartDay >= rangeStartDay && otherEndDay <= rangeEndDay {
-        let dishes = itemsByMenuID[menu.id] ?? []
-        let steps = stepsByMenuID[menu.id] ?? []
-        if !dishes.isEmpty || !steps.isEmpty {
-          contained.append(MenuBringInContainedPlacement(
-            menuID: menu.id,
-            title: menu.title,
-            dishCount: dishes.count,
-            prepStepCount: steps.count
-          ))
-        }
+      let placementStartDay = calendar.startOfDay(for: placement.startDate)
+      let placementEndExclusive = calendar.startOfDay(for: menuEndExclusive)
+      guard placementStartDay < rangeEndExclusive && placementEndExclusive > rangeStartDay else { continue }
+      if placementStartDay >= rangeStartDay && placementEndExclusive <= rangeEndExclusive {
+        containedPlacements.append((placement, menu))
       } else {
-        partial.append(menu.title)
+        partialTitles.append(menu.title)
       }
     }
-    guard !looseItems.isEmpty || !contained.isEmpty else { return nil }
+
+    let containedMenuIDs = Set(containedPlacements.map { $0.1.id })
+    let itemsByMenuID: [Menu.ID: [MenuItem]]
+    let stepsByMenuID: [Menu.ID: [PrepPlanStepRecord]]
+    if containedMenuIDs.isEmpty {
+      itemsByMenuID = [:]
+      stepsByMenuID = [:]
+    } else {
+      itemsByMenuID = Dictionary(
+        grouping: try MenuItem.where { $0.menuID.in(containedMenuIDs) }.fetchAll(db),
+        by: \.menuID
+      )
+      stepsByMenuID = Dictionary(
+        grouping: try PrepPlanStepRecord.where { $0.menuID.in(containedMenuIDs) }.fetchAll(db),
+        by: \.menuID
+      )
+    }
+    let copyablePlacements = containedPlacements.compactMap { placement, menu -> MenuBringInContainedCandidate? in
+      let items = (itemsByMenuID[menu.id] ?? []).sorted(by: areMenuItemsInBringInOrder)
+      let prepSteps = (stepsByMenuID[menu.id] ?? []).sorted(by: arePrepPlanStepsInBringInOrder)
+      guard !items.isEmpty || !prepSteps.isEmpty else { return nil }
+      return MenuBringInContainedCandidate(
+        placement: placement,
+        menu: menu,
+        items: items,
+        prepSteps: prepSteps
+      )
+    }
+
+    let orderedCopyablePlacements = copyablePlacements.sorted { lhs, rhs in
+      let titleOrder = lhs.menu.title.localizedStandardCompare(rhs.menu.title)
+      if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
+      if lhs.placement.startDate != rhs.placement.startDate {
+        return lhs.placement.startDate < rhs.placement.startDate
+      }
+      return lhs.placement.id.uuidString < rhs.placement.id.uuidString
+    }
+
+    return MenuBringInCandidates(
+      targetMenu: targetMenu,
+      targetPlacement: targetPlacement,
+      rangeStartDay: rangeStartDay,
+      rangeEndExclusive: rangeEndExclusive,
+      looseItems: looseItems,
+      containedPlacements: orderedCopyablePlacements,
+      partiallyOverlappingMenuTitles: partialTitles.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    )
+  }
+
+  public static func bringInOffer(menuID: Menu.ID, in db: Database) throws -> MenuBringInOffer? {
+    guard let candidates = try bringInCandidates(menuID: menuID, in: db),
+      !candidates.looseItems.isEmpty || !candidates.containedPlacements.isEmpty
+    else { return nil }
     return MenuBringInOffer(
-      looseCalendarItemCount: looseItems.count,
-      containedPlacements: contained.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
-      partiallyOverlappingMenuTitles: partial.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+      looseCalendarItemCount: candidates.looseItems.count,
+      containedPlacements: candidates.containedPlacements.map { candidate in
+        MenuBringInContainedPlacement(
+          menuID: candidate.menu.id,
+          title: candidate.menu.title,
+          dishCount: candidate.items.count,
+          prepStepCount: candidate.prepSteps.count
+        )
+      },
+      partiallyOverlappingMenuTitles: candidates.partiallyOverlappingMenuTitles
     )
   }
 
@@ -64,35 +142,15 @@ extension MenuRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> MenuBringInResult {
-    guard let targetMenu = try Menu.find(menuID).fetchOne(db) else {
-      throw MenuRepositoryError.menuNotFound(menuID)
-    }
-    let targetPlacements = try MenuPlacement.where { $0.menuID.eq(menuID) }.fetchAll(db)
-    guard targetPlacements.count == 1, let targetPlacement = targetPlacements.first else {
+    guard let candidates = try bringInCandidates(menuID: menuID, in: db) else {
       throw MenuRepositoryError.menuMustHaveOnePlacement
     }
-    guard let rangeEnd = MenuPlacementDay.date(for: targetMenu.dayCount - 1, from: targetPlacement) else {
-      return MenuBringInResult(movedCalendarItemCount: 0, copiedPlacementCount: 0)
-    }
-    let calendar = Calendar(identifier: .gregorian)
-    let startDay = calendar.startOfDay(for: targetPlacement.startDate)
-    let endDay = calendar.startOfDay(for: rangeEnd)
-    let sourceCalendarItems = try MealPlanItem.fetchAll(db)
-      .filter { item in
-        let day = calendar.startOfDay(for: item.scheduledDate)
-        return day >= startDay && day <= endDay
-      }
-      .sorted {
-        if $0.scheduledDate != $1.scheduledDate { return $0.scheduledDate < $1.scheduledDate }
-        if $0.mealSlot.sortOrder != $1.mealSlot.sortOrder { return $0.mealSlot.sortOrder < $1.mealSlot.sortOrder }
-        if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
-        return $0.id.uuidString < $1.id.uuidString
-      }
-
+    let targetPlacement = candidates.targetPlacement
     var newItemIDsByCalendarItemID: [MealPlanItem.ID: MenuItem.ID] = [:]
     var newItemIDsByPlacementItem: [MenuPlacementItemKey: MenuItem.ID] = [:]
     var deletedPlacementIDs: Set<MenuPlacement.ID> = []
-    for source in sourceCalendarItems {
+
+    for source in candidates.looseItems {
       guard let dayOffset = MenuPlacementDay.offset(of: source.scheduledDate, from: targetPlacement) else { continue }
       let kind: MealPlanItemKind = source.kind == .recipe && source.recipeID == nil ? .note : source.kind
       let item = MenuItem(
@@ -105,51 +163,31 @@ extension MenuRepository {
       newItemIDsByCalendarItemID[source.id] = item.id
     }
 
-    let menusByID = Dictionary(uniqueKeysWithValues: try Menu.fetchAll(db).map { ($0.id, $0) })
-    let allItems = try MenuItem.fetchAll(db)
-    let allSteps = try PrepPlanStepRecord.fetchAll(db)
-    let containedPlacements = try MenuPlacement.fetchAll(db).filter { placement in
-      guard placement.menuID != menuID, let menu = menusByID[placement.menuID],
-        let otherEnd = MenuPlacementDay.date(for: menu.dayCount - 1, from: placement)
-      else { return false }
-      let otherStartDay = calendar.startOfDay(for: placement.startDate)
-      let otherEndDay = calendar.startOfDay(for: otherEnd)
-      return otherStartDay >= startDay && otherEndDay <= endDay
-        && (allItems.contains { $0.menuID == menu.id } || allSteps.contains { $0.menuID == menu.id })
-    }
-    for sourcePlacement in containedPlacements {
-      let sourceMenuID = sourcePlacement.menuID
+    for candidate in candidates.containedPlacements {
+      let sourcePlacement = candidate.placement
       var copiedItemIDs: [MenuItem.ID: MenuItem.ID] = [:]
       let shift = MenuPlacementDay.offset(of: sourcePlacement.startDate, from: targetPlacement) ?? 0
-      let sourceItems = allItems.filter { $0.menuID == sourceMenuID }
-        .sorted { lhs, rhs in
-          if lhs.dayOffset != rhs.dayOffset { return lhs.dayOffset < rhs.dayOffset }
-          if lhs.mealSlot.sortOrder != rhs.mealSlot.sortOrder { return lhs.mealSlot.sortOrder < rhs.mealSlot.sortOrder }
-          if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
-          return lhs.id.uuidString < rhs.id.uuidString
-        }
-      for source in sourceItems {
+      for source in candidate.items {
+        let dayOffset = source.dayOffset + shift
         let item = MenuItem(
           id: uuid(), menuID: menuID, kind: source.kind, recipeID: source.recipeID, title: source.title,
-          dayOffset: source.dayOffset + shift, mealSlot: source.mealSlot, notes: source.notes,
-          sortOrder: try nextSortOrder(menuID: menuID, dayOffset: source.dayOffset + shift, mealSlot: source.mealSlot, in: db),
+          dayOffset: dayOffset, mealSlot: source.mealSlot, notes: source.notes,
+          sortOrder: try nextSortOrder(menuID: menuID, dayOffset: dayOffset, mealSlot: source.mealSlot, in: db),
           dateCreated: source.dateCreated, dateModified: now, scale: source.scale
         )
         try MenuItem.insert { item }.execute(db)
         copiedItemIDs[source.id] = item.id
         newItemIDsByPlacementItem[MenuPlacementItemKey(placementID: sourcePlacement.id, itemID: source.id)] = item.id
       }
-      let sourceSteps = allSteps.filter { $0.menuID == sourceMenuID }.sorted { $0.sortOrder < $1.sortOrder }
-      var nextStepOrder = (try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
-      for source in sourceSteps {
+      let nextStepOrder = (try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
+      for (stepIndex, source) in candidate.prepSteps.enumerated() {
         try PrepPlanStepRecord.insert {
           PrepPlanStepRecord(
-            id: uuid(), menuID: menuID, sortOrder: nextStepOrder, session: source.session,
+            id: uuid(), menuID: menuID, sortOrder: nextStepOrder + stepIndex, session: source.session,
             task: source.task, serves: source.serves,
             sourceDish: source.sourceDish.flatMap { copiedItemIDs[$0] }
           )
         }.execute(db)
-        nextStepOrder += 1
       }
       deletedPlacementIDs.insert(sourcePlacement.id)
     }
@@ -172,16 +210,34 @@ extension MenuRepository {
       updated.mealPlanItemID = nil
       try GroceryItemSource.upsert { updated }.execute(db)
     }
-    for item in sourceCalendarItems {
+    for item in candidates.looseItems {
       try MealPlanItem.find(item.id).delete().execute(db)
     }
     for placementID in deletedPlacementIDs {
       try MenuPlacement.find(placementID).delete().execute(db)
     }
     return MenuBringInResult(
-      movedCalendarItemCount: sourceCalendarItems.count,
+      movedCalendarItemCount: candidates.looseItems.count,
       copiedPlacementCount: deletedPlacementIDs.count
     )
   }
+}
 
+private func areMealPlanItemsInBringInOrder(_ lhs: MealPlanItem, _ rhs: MealPlanItem) -> Bool {
+  if lhs.scheduledDate != rhs.scheduledDate { return lhs.scheduledDate < rhs.scheduledDate }
+  if lhs.mealSlot.sortOrder != rhs.mealSlot.sortOrder { return lhs.mealSlot.sortOrder < rhs.mealSlot.sortOrder }
+  if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+  return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func areMenuItemsInBringInOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
+  if lhs.dayOffset != rhs.dayOffset { return lhs.dayOffset < rhs.dayOffset }
+  if lhs.mealSlot.sortOrder != rhs.mealSlot.sortOrder { return lhs.mealSlot.sortOrder < rhs.mealSlot.sortOrder }
+  if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+  return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private func arePrepPlanStepsInBringInOrder(_ lhs: PrepPlanStepRecord, _ rhs: PrepPlanStepRecord) -> Bool {
+  if lhs.sortOrder != rhs.sortOrder { return lhs.sortOrder < rhs.sortOrder }
+  return lhs.id.uuidString < rhs.id.uuidString
 }

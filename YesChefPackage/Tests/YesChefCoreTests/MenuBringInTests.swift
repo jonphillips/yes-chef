@@ -165,10 +165,12 @@ extension RecipeCoreTests {
     func offerRequiresExactlyOnePlacementAndSomethingInRange() throws {
       @Dependency(\.defaultDatabase) var database
       let date = Date(timeIntervalSinceReferenceDate: 803_400_000)
+      let zeroPlacementsID = SampleUUIDSequence.uuid(62_000)
       let onePlacementID = SampleUUIDSequence.uuid(62_001)
       let twoPlacementsID = SampleUUIDSequence.uuid(62_002)
       try database.write { db in
         for menu in [
+          Menu(id: zeroPlacementsID, title: "Unplaced", dayCount: 1, dateCreated: date, dateModified: date),
           Menu(id: onePlacementID, title: "Empty", dayCount: 1, dateCreated: date, dateModified: date),
           Menu(id: twoPlacementsID, title: "Twice", dayCount: 1, dateCreated: date, dateModified: date),
         ] { try Menu.insert { menu }.execute(db) }
@@ -180,6 +182,7 @@ extension RecipeCoreTests {
             )
           }.execute(db)
         }
+        #expect(try MenuRepository.bringInOffer(menuID: zeroPlacementsID, in: db) == nil)
         #expect(try MenuRepository.bringInOffer(menuID: onePlacementID, in: db) == nil)
         #expect(try MenuRepository.bringInOffer(menuID: twoPlacementsID, in: db) == nil)
       }

@@ -9,8 +9,10 @@ extension RecipeCoreTests {
   struct MealCalendarTests {
     @Test
     func placementDayArithmeticMatchesGregorianProjectionAcrossDST() throws {
-      let calendar = Calendar(identifier: .gregorian)
-      let startDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 3, day: 7, hour: 12)))
+      var calendar = Calendar(identifier: .gregorian)
+      calendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
+      let unnormalizedStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 3, day: 7)))
+      let startDate = calendar.startOfDay(for: unnormalizedStart)
       let placement = MenuPlacement(
         id: SampleUUIDSequence.uuid(5_990),
         menuID: SampleUUIDSequence.uuid(5_991),
@@ -18,9 +20,14 @@ extension RecipeCoreTests {
         dateCreated: startDate,
         dateModified: startDate
       )
-      let expected = try #require(calendar.date(byAdding: .day, value: 2, to: startDate))
-      expectNoDifference(MenuPlacementDay.date(for: 2, from: placement), expected)
-      expectNoDifference(MenuPlacementDay.offset(of: expected, from: placement), 2)
+      let projectedDays = try (0...3).map { dayOffset in
+        try #require(MenuPlacementDay.date(for: dayOffset, from: placement, calendar: calendar))
+      }
+      for (dayOffset, projectedDate) in projectedDays.enumerated() {
+        #expect(calendar.startOfDay(for: projectedDate) == projectedDate)
+        #expect(MenuPlacementDay.offset(of: projectedDate, from: placement, calendar: calendar) == dayOffset)
+      }
+      #expect(projectedDays[2].timeIntervalSince(projectedDays[1]) == 23 * 60 * 60)
     }
 
     @Test
