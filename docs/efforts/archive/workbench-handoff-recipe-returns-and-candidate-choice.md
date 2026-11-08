@@ -1,17 +1,17 @@
 # Effort — Workbench hand-offs: recipe returns become the working recipe, and the cook picks the candidates
 
-Status: Ready
+Status: Done — 2026-11-08 (PRs #462, #463); device pass owed
 Summary: A recipe that comes back on any workbench hand-off stages as the working recipe (replacing an existing one only on confirm), Compare stops asking for a "prep plan", and the cook chooses which candidates a hand-off carries instead of a hidden five-candidate cap.
 
 Jon reported on 2026-11-08 that a recipe staged from a workbench discussion landed in the workbench log as a JSON
 Observation, and questioned the hand-off candidate cap. He decided: a returned recipe **replaces** an existing working
 recipe **behind a confirm**, and **he chooses** which candidates go on a workbench hand-off.
 
-Decisions: [ADR-0042 Amendment 6](../decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-6--every-workbench-hand-off-can-finalize-as-a-recipe-and-the-cook-picks-what-it-carries-2026-11-08).
-Related: [ADR-0042 Amd 4](../decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-4--the-recipe-body-hand-off-finalizes-two-ways-revise-or-riff-into-a-new-recipe-2026-08-15)
-(the same route-by-shape on the recipe body), [ADR-0019 D2/D3](../decisions/ADR-0019-recipe-design-studies.md)
-(the original soft cap), [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) (`stage_handoff_return`),
-[standing guards](../standing-guards.md) (no new recipe-text parser; Amd2-D2/D5).
+Decisions: [ADR-0042 Amendment 6](../../decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-6--every-workbench-hand-off-can-finalize-as-a-recipe-and-the-cook-picks-what-it-carries-2026-11-08).
+Related: [ADR-0042 Amd 4](../../decisions/ADR-0042-workbench-handoff-and-the-return-block.md#amendment-4--the-recipe-body-hand-off-finalizes-two-ways-revise-or-riff-into-a-new-recipe-2026-08-15)
+(the same route-by-shape on the recipe body), [ADR-0019 D2/D3](../../decisions/ADR-0019-recipe-design-studies.md)
+(the original soft cap), [ADR-0060](../../decisions/ADR-0060-chat-access-over-mcp.md) (`stage_handoff_return`),
+[standing guards](../../standing-guards.md) (no new recipe-text parser; Amd2-D2/D5).
 
 ## Diagnosis (architect, 2026-11-08)
 
@@ -131,7 +131,7 @@ No schema, migration, sync, contract-version or new-parser change is authorized:
 `HandoffExportSource` isn't persisted, and the selection is ephemeral.
 
 - Run focused tests, then `scripts/check-drift.sh`, the generic device build, and the `YesChefTests` app target per
-  [verification.md](../verification.md). All slices touch `YesChefApp/` model code.
+  [verification.md](../../verification.md). All slices touch `YesChefApp/` model code.
 - Closeout: DONE-LOG entry and archive this brief with the final dispatch.
 - Owed device gate (Jon, iPad + iPhone):
   - Run a Compare hand-off through chat access that ends in a recipe. It stages "Review working recipe" and creates
@@ -144,4 +144,4 @@ No schema, migration, sync, contract-version or new-parser change is authorized:
 ## Dispatch ledger
 
 - [x] Dispatch 1 — S1 + S2 (return routing, Compare ask fix, replace-on-confirm, Draft door), one PR.
-- [ ] Dispatch 2 — S3 (candidate picker, tier-scoped cap, honest header), one PR.
+- [x] Dispatch 2 — S3 (candidate picker, tier-scoped cap, honest header), one PR.

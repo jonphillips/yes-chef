@@ -113,6 +113,7 @@ extension RecipeCoreTests {
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
+            id: SampleUUIDSequence.uuid(22_915),
             sourceURL: "https://example.com/birria-technique",
             label: "Chile technique",
             captureKind: .browserCapture,
@@ -154,6 +155,7 @@ extension RecipeCoreTests {
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
+            id: SampleUUIDSequence.uuid(22_916),
             sourceURL: "https://example.com/chiles",
             label: "Chile technique",
             captureKind: .browserCapture,
@@ -189,6 +191,7 @@ extension RecipeCoreTests {
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
+            id: SampleUUIDSequence.uuid(22_917),
             sourceURL: "https://example.com/birria",
             label: "Duplicate source",
             captureKind: .urlFetch,
@@ -214,23 +217,37 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func workbenchChatRetainsReferenceWhenMatchingCandidateIsOutsideSoftCap() {
+    func frontierWorkbenchChatIncludesCandidatesBeyondOnDeviceCap() {
       let referenceText = "This extract belongs to a candidate beyond the soft cap."
-      let serialized = WorkbenchChatContext(
+      let candidateCount = WorkbenchChatContext.softCandidateCap + 2
+      let candidateIDs = (0..<candidateCount).map { SampleUUIDSequence.uuid(22_920 + $0) }
+      let deduplicatedReferenceID = SampleUUIDSequence.uuid(22_940)
+      let oversizedReferenceID = SampleUUIDSequence.uuid(22_941)
+      let context = WorkbenchChatContext(
         title: "Birria",
         references: [
           WorkbenchReferenceChatContext(
+            id: deduplicatedReferenceID,
             sourceURL: "https://example.com/late-candidate",
             label: "Late candidate source",
             captureKind: .urlFetch,
             reducedText: referenceText,
             reductionStatus: .complete,
             dateCreated: Date(timeIntervalSinceReferenceDate: 808_020_000)
+          ),
+          WorkbenchReferenceChatContext(
+            id: oversizedReferenceID,
+            sourceURL: "https://example.com/oversized",
+            label: "Oversized source",
+            captureKind: .pastedText,
+            reducedText: String(repeating: "too large ", count: WorkbenchChatContext.frontierSerializedCharacterBudget / 10 + 1),
+            reductionStatus: .complete,
+            dateCreated: Date(timeIntervalSinceReferenceDate: 808_020_001)
           )
         ],
-        candidates: (0...WorkbenchChatContext.softCandidateCap).map { index in
+        candidates: (0..<candidateCount).map { index in
           WorkbenchCandidateChatContext(
-            id: SampleUUIDSequence.uuid(22_920 + index),
+            id: candidateIDs[index],
             title: "Candidate \(index)",
             sourceURL: index == WorkbenchChatContext.softCandidateCap
               ? "https://example.com/late-candidate"
@@ -239,11 +256,60 @@ extension RecipeCoreTests {
           )
         }
       )
-      .serialized(for: .frontierPreferred)
 
-      #expect(serialized.contains("Late candidate source"))
-      #expect(serialized.contains(referenceText))
-      #expect(!serialized.contains("matched a candidate source and were omitted"))
+      let frontier = context.serializationResult(for: .frontierPreferred)
+      #expect(frontier.includedCandidateIDs == candidateIDs)
+      #expect(frontier.omittedCandidateIDs.isEmpty)
+      #expect(frontier.omittedReferenceIDs == [oversizedReferenceID])
+      #expect(frontier.deduplicatedReferenceIDs == [deduplicatedReferenceID])
+      #expect(!frontier.text.contains(referenceText))
+      #expect(!frontier.text.contains("Oversized source"))
+
+      let onDevice = context.serializationResult(for: .onDevice)
+      #expect(onDevice.includedCandidateIDs == Array(candidateIDs.prefix(WorkbenchChatContext.softCandidateCap)))
+      #expect(onDevice.omittedCandidateIDs == Array(candidateIDs.dropFirst(WorkbenchChatContext.softCandidateCap)))
+      #expect(onDevice.includedReferenceIDs == [deduplicatedReferenceID])
+      #expect(onDevice.omittedReferenceIDs == [oversizedReferenceID])
+    }
+
+    @Test
+    func workbenchCandidateSelectionKeepsWorkbenchOrderAndReportsBudgetOmissions() {
+      let ids = (0..<3).map { SampleUUIDSequence.uuid(22_950 + $0) }
+      let context = WorkbenchChatContext(
+        title: "Soup",
+        candidates: ids.enumerated().map { index, id in
+          WorkbenchCandidateChatContext(
+            id: id,
+            title: "Candidate \(index)",
+            sortOrder: index,
+            summary: index == 2 ? String(repeating: "long", count: 45_000) : nil
+          )
+        }
+      )
+
+      let result = context.serializationResult(for: .frontierPreferred, candidateIDs: [ids[2], ids[0], ids[1]])
+      #expect(result.includedCandidateIDs == [ids[0], ids[1]])
+      #expect(result.omittedCandidateIDs == [ids[2]])
+      #expect(result.text.contains("Candidate 0"))
+      #expect(result.text.contains("Candidate 1"))
+      #expect(!result.text.contains("Candidate 2"))
+    }
+
+    @Test
+    func workbenchHeaderReportsOmissionsForActiveTier() {
+      let context = WorkbenchChatContext(
+        title: "Soup",
+        candidates: (0...WorkbenchChatContext.softCandidateCap).map { index in
+          WorkbenchCandidateChatContext(
+            id: SampleUUIDSequence.uuid(22_970 + index),
+            title: "Candidate \(index)",
+            sortOrder: index
+          )
+        }
+      )
+
+      #expect(context.seededContextDescription(for: .onDevice).contains("omitted"))
+      #expect(!context.seededContextDescription(for: .frontierPreferred).contains("omitted"))
     }
 
     @Test

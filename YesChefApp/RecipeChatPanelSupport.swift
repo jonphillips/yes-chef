@@ -74,7 +74,7 @@ struct ChatContextHeader: View {
   var body: some View {
     if !chatModel.messages.isEmpty {
       VStack(alignment: .leading, spacing: 6) {
-        Text(chatModel.context.seededContextDescription)
+        Text(chatModel.context.seededContextDescription(for: chatModel.activeTier))
           .font(.footnote)
           .foregroundStyle(.secondary)
       }

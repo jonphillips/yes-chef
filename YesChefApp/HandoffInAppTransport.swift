@@ -18,6 +18,7 @@ final class HandoffInAppTransport {
   var isShowingError = false
   var unmatchedResult: String?
   var unmatchedSource: HandoffExportSource?
+  var workbenchPicker: WorkbenchHandoffPickerState?
   private var unmatchedHandoff: AIHandoff?
   private var unmatchedMessageText: String?
   var isShowingUnmatchedConfirmation = false
@@ -43,6 +44,37 @@ final class HandoffInAppTransport {
   }
 
   func copyPrompt(for source: HandoffExportSource) async {
+    if case let .workbench(workbenchID, task, candidateIDs) = source, candidateIDs == nil {
+      do {
+        guard let context = try await database.read({ db in
+          try WorkbenchChatContextRequest(workbenchID: workbenchID).fetch(db)
+        }) else { throw WorkbenchHandoffPickerError.sourceNotFound }
+        if context.candidates.count > 1 {
+          workbenchPicker = WorkbenchHandoffPickerState(
+            source: .workbench(workbenchID, task: task),
+            context: context,
+            selectedCandidateIDs: Set(context.candidates.map(\.id))
+          )
+          return
+        }
+      } catch {
+        present(error)
+        return
+      }
+    }
+    await exportPrompt(for: source)
+  }
+
+  func copySelectedWorkbenchPrompt(_ source: HandoffExportSource, candidateIDs: [WorkbenchCandidate.ID]) async {
+    workbenchPicker = nil
+    await exportPrompt(for: source.withCandidateIDs(candidateIDs))
+  }
+
+  func dismissWorkbenchPicker() {
+    workbenchPicker = nil
+  }
+
+  private func exportPrompt(for source: HandoffExportSource) async {
     do {
       let handoff = try await HandoffAppOperations.export(
         source: source,
@@ -293,6 +325,12 @@ final class HandoffInAppTransport {
   }
 }
 
+private enum WorkbenchHandoffPickerError: LocalizedError {
+  case sourceNotFound
+
+  var errorDescription: String? { "Yes Chef could not find that workbench." }
+}
+
 private extension AIHandoffSourceType {
   var handoffSubject: String {
     switch self {
@@ -419,7 +457,12 @@ private struct HandoffTransportAlert: ViewModifier {
   func body(content: Content) -> some View {
     @Bindable var transport = transport
 
-    content.alert(transport.errorTitle, isPresented: $transport.isShowingError) {
+    content.sheet(item: $transport.workbenchPicker) { picker in
+      NavigationStack {
+        WorkbenchHandoffCandidatePicker(picker: picker, transport: transport)
+      }
+    }
+    .alert(transport.errorTitle, isPresented: $transport.isShowingError) {
       Button("OK") {}
     } message: {
       Text(transport.errorMessage ?? "Something went wrong.")
@@ -435,6 +478,94 @@ private struct HandoffTransportAlert: ViewModifier {
       }
     } message: {
       Text(transport.unmatchedMessage)
+    }
+  }
+}
+
+struct WorkbenchHandoffPickerState: Identifiable {
+  let id = UUID()
+  let source: HandoffExportSource
+  let context: WorkbenchChatContext
+  let selectedCandidateIDs: Set<WorkbenchCandidate.ID>
+}
+
+@Observable
+@MainActor
+final class WorkbenchHandoffCandidatePickerModel {
+  let state: WorkbenchHandoffPickerState
+  var selectedCandidateIDs: Set<WorkbenchCandidate.ID>
+
+  init(state: WorkbenchHandoffPickerState) {
+    self.state = state
+    selectedCandidateIDs = state.selectedCandidateIDs
+  }
+
+  var orderedSelection: [WorkbenchCandidate.ID] {
+    WorkbenchChatContext.candidatesInWorkbenchOrder(state.context.candidates)
+      .filter { selectedCandidateIDs.contains($0.id) }
+      .map(\.id)
+  }
+
+  var isCopyDisabled: Bool { selectedCandidateIDs.isEmpty }
+
+  var serialization: WorkbenchChatSerializedContext {
+    state.context.serializationResult(for: .frontierPreferred, candidateIDs: orderedSelection)
+  }
+
+  func fitDescription(using serialization: WorkbenchChatSerializedContext) -> String {
+    let budgetOmissions = serialization.omittedCandidateIDs.filter { selectedCandidateIDs.contains($0) }
+    guard !budgetOmissions.isEmpty else { return "All \(selectedCandidateIDs.count) fit" }
+    let names = WorkbenchChatContext.candidatesInWorkbenchOrder(state.context.candidates)
+      .filter { budgetOmissions.contains($0.id) }
+      .map { $0.title.isEmpty ? "(untitled)" : $0.title }
+    return "Too much to send: \(names.joined(separator: ", ")) would be left out"
+  }
+}
+
+private struct WorkbenchHandoffCandidatePicker: View {
+  @State private var model: WorkbenchHandoffCandidatePickerModel
+  let transport: HandoffInAppTransport
+
+  init(picker: WorkbenchHandoffPickerState, transport: HandoffInAppTransport) {
+    _model = State(wrappedValue: WorkbenchHandoffCandidatePickerModel(state: picker))
+    self.transport = transport
+  }
+
+  var body: some View {
+    @Bindable var model = model
+    let serialization = model.serialization
+    List {
+      Section {
+        ForEach(WorkbenchChatContext.candidatesInWorkbenchOrder(model.state.context.candidates), id: \.id) { candidate in
+          Toggle(candidate.title.isEmpty ? "(untitled)" : candidate.title, isOn: Binding(
+            get: { model.selectedCandidateIDs.contains(candidate.id) },
+            set: { isSelected in
+              if isSelected { model.selectedCandidateIDs.insert(candidate.id) }
+              else { model.selectedCandidateIDs.remove(candidate.id) }
+            }
+          ))
+        }
+      } footer: {
+        VStack(alignment: .leading, spacing: 6) {
+          Text(model.fitDescription(using: serialization))
+          Text("\(serialization.includedReferenceIDs.count) references included · \(serialization.omittedReferenceIDs.count) left out · \(serialization.deduplicatedReferenceIDs.count) matched candidates")
+        }
+      }
+    }
+    .navigationTitle("Choose Candidates")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") { transport.dismissWorkbenchPicker() }
+      }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Copy Prompt") {
+          Task {
+            await transport.copySelectedWorkbenchPrompt(model.state.source, candidateIDs: model.orderedSelection)
+          }
+        }
+        .disabled(model.isCopyDisabled)
+      }
     }
   }
 }

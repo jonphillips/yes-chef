@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-08 — Workbench hand-offs: recipe returns and candidate choice (`effort/workbench-handoff-recipe-returns-and-candidate-choice`)
+
+- **Result:** S1 + S2 (PR #462) route recipe returns to recipe review, fix Compare's finalize ask, add replace confirmation, and keep Draft available with a working recipe. S3 (PR #463) lets cooks select candidates for Compare, Experiments, and Draft; frontier serialization follows the character budget, reports candidate and reference omissions, and the chat header follows the active tier.
+- **Verification:** scripts/check-drift.sh, focused Core tests, the generic iOS build, and the YesChefTests simulator target passed.
+- **Owed:** The S1 + S2 and S3 device gates, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-06 — Adopt ChatAccessKit export in Yes Chef (`effort/chat-access-export-adoption`)
 
 - **Result:** Yes Chef's export reader, writer, and helper setup now use jon-platform [#128](https://github.com/jonphillips/jon-platform/pull/128), preserving the decoded cache, tool messages, 15-minute background throttle, and export references.
