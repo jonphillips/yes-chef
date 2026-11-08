@@ -37,6 +37,9 @@ be prose and which must be pinned). **Amends the slice plan of [ADR-0023](ADR-00
 [[llm-curation-not-synthesis]] to every return shape here.
 **[Amendment 3](#amendment-3--late-bound-recipe-capture-ends-a-product-turn-not-the-conversation-2026-08-09)
 — Proposed 2026-08-09 (first post-dogfood run; deliberately scoped to Recipe capture).**
+**[Amendment 6](#amendment-6--every-workbench-hand-off-can-finalize-as-a-recipe-and-the-cook-picks-what-it-carries-2026-11-08)
+— Accepted 2026-11-08.** Workbench returns route by shape, so a recipe becomes the working recipe, replacing an
+existing one only on confirm. The cook picks the hand-off's candidates, and the count cap is now on-device only.
 
 ## Context
 
@@ -962,6 +965,51 @@ for warnings, and **translates** the package's galavant-worded `HandoffContractE
 design, so it now always shows the "missing contract marker" footnote — a mild false positive on a
 legitimate path. Left as-is pending a dogfood read; the fix, if wanted, is to marker-exempt that one
 path rather than tighten the tolerance.
+
+## Amendment 6 — Every workbench hand-off can finalize as a recipe, and the cook picks what it carries (2026-11-08)
+
+**Status: Accepted** — Jon's calls on 2026-11-08: replace behind a confirm, and he chooses the candidates. The rest is
+the architect's design. Brief:
+[`efforts/workbench-handoff-recipe-returns-and-candidate-choice.md`](../efforts/workbench-handoff-recipe-returns-and-candidate-choice.md).
+
+**Trigger.** Dogfood: a Compare conversation, finalized through chat access, settled on a recipe and returned
+schema.org JSON-LD. The Compare return path never parses, so the JSON was saved verbatim as a workbench-log
+Observation. Separately, Compare's `.discuss` clause still asked for "the paste-ready prep plan", the
+`.menuPrepPlan` default leak that Amd4-D3 fixed only on the recipe body.
+
+### Amd6-D1 — Workbench returns route by shape, as Amd4-D1 does for the recipe body
+
+A Compare or Experiments return that holds a Recipe JSON-LD object stages the **working-recipe review** (the Amd 2
+draft path), not an Observation or an experiments parse error. The detection is the existing
+`fromJSONLD` test: a real Recipe object with ingredients or instructions is required. **No new parser.** The verb
+chosen at export sets the starting ask, not the only allowed outcome; a deliberation that converges on a recipe is a
+normal result. The Compare and Experiments asks state the second outcome explicitly, and Compare gets its own
+finalize clause.
+
+### Amd6-D2 — A returned recipe replaces the working recipe, behind a confirm
+
+When a working recipe exists, committing the draft review asks first, then detaches or deletes the old one with the
+existing `removeDraftRecipe` semantics and creates the new one in a single transaction:
+- an unpromoted `.reference` draft is deleted (the confirm says its edits go with it);
+- a promoted recipe stays in the library, unlinked.
+
+The check runs at commit time. As a result, the Draft hand-off door no longer hides when a working recipe exists: a
+Draft round from an existing recipe is a revision, and the ask already carries the current working recipe.
+
+### Amd6-D3 — The cook chooses the candidates; the count cap becomes on-device only
+
+ADR-0019 D2/D3's soft cap (~5) was a **budget** argument: full method for few recipes beats cut method for many. On
+frontier tiers the character budget already enforces that, so a fixed count only hid candidates from the cook. Now:
+- workbench hand-offs carry the candidates the cook selects at export time, all by default, ephemeral, not persisted;
+- the count cap applies at the on-device tier only;
+- the export picker shows which selected candidates would be left out by the budget before anything is copied.
+
+Shortcuts and App Intents send all candidates, bounded by the budget.
+
+### Amd6-D4 — No contract, version, or schema change
+
+Same test as Amd2-D4. `AIHandoff` stays device-local, the selection lives only on the in-memory
+`HandoffExportSource`, and the recipe shape is the verb's own ask (`RecipeJSONLDContract`). No `YC-CONTRACT` bump.
 
 ## Related
 
