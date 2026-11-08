@@ -24,3 +24,5 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
+
+- [A menu brings in its calendar days, and a multi-day prep plan runs by work day](menu-absorbs-calendar-days.md) — **Ready.** Placing a menu brings in the calendar items and placed menus on its days; history counts placed menus; a multi-day prep plan groups by work day.

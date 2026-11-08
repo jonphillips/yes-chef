@@ -157,6 +157,8 @@ Because the clipboard now carries a runnable prompt rather than raw context, the
   ("Wednesday evening") to real weekdays, and make "collapse to now" *automatic* (the app knows which
   session is current). Pre-anchoring, sessions are labels and there is no auto-"now" — all bands start
   collapsed, the human taps the one they want. This is the same deferral flagged throughout the design.
+  **Decided for multi-day menus in [ADR-0063](ADR-0063-menus-absorb-calendar-days.md) D5–D7** (2026-11-08): a
+  nullable `workDayOffset` on each step, day bands, and today opening itself. One-day menus keep session bands.
 - **Cook mode.** A dedicated single-session execution surface: one band filling the screen, giant
   checkable steps, keep-awake, a live countdown ticking against the sub-label times, "next up" peeking at
   the bottom. The banded reader + ordered timing + tappable serves (D4) delivers ~80% of that feeling with
@@ -272,7 +274,8 @@ data pass for little value. Jon can delete any he doesn't want.
 ### Questions for the brief
 
 - **Days with a placed menu.** The menu already has a plan, so the day probably links to it and doesn't offer a second
-  one. Decide what happens when the same day also has its own items.
+  one. Decide what happens when the same day also has its own items. Since [ADR-0063](ADR-0063-menus-absorb-calendar-days.md), such items can
+  be brought into the menu, and bring-in must move this table's steps for the range too.
 - **Moved or deleted dishes.** Steps stay on their date when a dish moves or is deleted, unless the brief adds handling.
   *Lean:* leave them, and keep the text readable if `sourceDish` no longer resolves. Decide what happens to a plan when
   the day's last dish goes ([[no-dead-data]]).
