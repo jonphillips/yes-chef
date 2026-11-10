@@ -17,7 +17,7 @@ sits outside `Documents/`, so it stays hidden.
 2026-11-03:** answers OQ3. A return may carry the app-minted `YC-HANDOFF` token and nothing else that names a
 row; `stage_handoff_return` stages the whole return block, and only the device that minted the token opens it.
 **[Amendment 2](#amendment-2--a-chat-that-starts-in-chatgpt-can-return-to-a-recipe-and-stage-a-menu-2026-11-10) —
-Proposed 2026-11-10:** answers OQ4. The helper resolves a read ref to its recipe when it stages, so a chat that
+Accepted 2026-11-10 (#471):** answers OQ4. The helper resolves a read ref to its recipe when it stages, so a chat that
 started in ChatGPT can return changes to a recipe (`stage_recipe_return`) and stage a new menu (`stage_menu`).
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
@@ -425,7 +425,8 @@ the `YC-HANDOFF:` line (`AIHandoffToken.finalizeInstruction`). A printed return 
 
 ## Amendment 2 — A chat that starts in ChatGPT can return to a recipe and stage a menu (2026-11-10)
 
-Status: **Proposed** — 2026-11-10. Answers Amd 1 OQ4. Schema-free. No contract bump. Adds two staging tools and
+Status: **Accepted** — 2026-11-10 (#471; proposed the same day). Built by effort
+[`chat-started-returns-and-menus`](../efforts/chat-started-returns-and-menus.md). Answers Amd 1 OQ4. Schema-free. No contract bump. Adds two staging tools and
 one inbox kind each, and adds the Playbook text that's already in the export to `get_recipe`.
 
 ### Context
