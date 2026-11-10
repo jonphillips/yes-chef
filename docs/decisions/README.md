@@ -72,3 +72,4 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0062](ADR-0062-serve-with-recipe-links.md) — A Serve With row can link to a recipe *(Accepted, 2026-11-04)*
 - [ADR-0063](ADR-0063-menus-absorb-calendar-days.md) — A menu takes in the calendar days it covers, and a multi-day prep plan runs by work day *(Accepted, 2026-11-08)*
 - [ADR-0064](ADR-0064-menu-detail-declutter.md) — Menu detail: one AI menu, an Edit sheet, and rows without buttons *(Accepted, 2026-11-10)*
+- [ADR-0065](ADR-0065-one-glyph-per-concept.md) — One glyph per concept, owned by `AppSymbol`; recipe is `richtext.page` everywhere and there is no recipe-collection glyph *(Accepted, 2026-11-10)*
