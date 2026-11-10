@@ -31,12 +31,7 @@ custom_rules:
   concept_glyph_literal:
     name: Concept glyph literal
     excluded: YesChefApp/AppSymbol.swift
-    regex: >-
-      (?:\b(?:systemImage|systemName|image):\s*"(?:custom\.[^\"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"
-      |\bImage\(\s*"(?:custom\.[^\"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"
-      |\bcase\s+[^\n:]+:\s*"(?:custom\.[^\"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"
-      |\?\s*"(?:custom\.[^\"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"
-      |\?\s*"[^"\n]*"\s*:\s*"(?:custom\.[^\"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)")
+    regex: '(?:\b(?:systemImage|systemName|image):\s*"(?:custom\.[^"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"|\bImage\(\s*"(?:custom\.[^"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"|\bcase\s+[^\n:]+:\s*"(?:custom\.[^"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"|\?\s*"(?:custom\.[^"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)"|\?\s*"[^"\n]*"\s*:\s*"(?:custom\.[^"]+|richtext\.page|menucard|book|books\.vertical|folder|folder\.badge\.plus|tag|fork\.knife|square\.and\.pencil|pencil|trash|calendar|calendar\.badge\.plus|cart|cart\.badge\.plus|hammer|target)")'
     message: Concept glyphs go through AppSymbol (ADR-0065).
     severity: error
   persistence_in_views:
