@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-10 — The menu row note shows on the recipe screen (`effort/menu-row-note-on-recipe`)
+
+- **Result:** RecipeDetailModel now observes a trimmed menu or calendar row note and the recipe screen shows it in a read-only card in compact and wide layouts. No schema or recipe writes were added.
+- **Verification:** scripts/check-drift.sh passed with SwiftLint clean, 793 Core tests and 17 helper tests; YesChefTests passed 135 tests; generic iOS build passed.
+- **Owed:** menu-row-note-on-recipe (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-10 — Chat-started recipe returns and menu staging (`effort/chat-started-returns-and-menus`)
 
 - **Result:** Added ChatGPT-started recipe return and menu staging through one helper export snapshot, versioned envelopes, local review flows, and one-transaction menu creation. Added Playbook fields to get_recipe and updated the server instructions and ChatGPT setup guide.
