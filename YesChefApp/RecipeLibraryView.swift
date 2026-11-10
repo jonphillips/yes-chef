@@ -604,7 +604,7 @@ struct RecipeListView: View {
           Button {
             model.workbenchSelectionButtonTapped()
           } label: {
-            Label("Workbench These", systemImage: "checklist")
+            Label("Workbench These", symbol: .workbench)
           }
           .disabled(model.isImporting)
         }

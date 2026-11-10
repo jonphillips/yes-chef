@@ -111,7 +111,7 @@ private struct CategoryManagementListView: View {
           Button {
             model.addLooseCategoryButtonTapped()
           } label: {
-            Label("New Category", symbol: .tag)
+            Label("New Category", symbol: .addCategory)
           }
         } label: {
           Label("Add Category", systemImage: "plus")
@@ -268,7 +268,7 @@ private struct CategoryRow: View {
 
   private var label: some View {
     HStack(spacing: 12) {
-      Image(symbol: model.childCount(for: category.id) > 0 ? AppSymbol("folder.fill") : .tag)
+      Image(symbol: model.childCount(for: category.id) > 0 ? AppSymbol("folder.fill") : .category)
         .foregroundStyle(.secondary)
         .frame(width: 22)
       Text(category.name)

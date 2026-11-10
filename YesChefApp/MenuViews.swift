@@ -138,9 +138,9 @@ struct MenuDetailView: View {
         )
         .navigationTitle(detail.menu.title)
       } else {
-      ContentUnavailableView {
-        Label("Menu Not Found", symbol: .menu)
-      }
+        ContentUnavailableView {
+          Label("Menu Not Found", symbol: .menu)
+        }
       }
     }
     .overlay(alignment: .trailing) {

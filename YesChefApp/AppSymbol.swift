@@ -29,6 +29,13 @@ struct AppSymbol: Sendable, Hashable {
     return name
   }
 
+  var systemNameForIntents: String {
+    guard let systemName else {
+      preconditionFailure("Custom AppSymbols cannot be used as App Intents system image names.")
+    }
+    return systemName
+  }
+
   static let recipe = Self("richtext.page")
   static let addRecipes = Self(.customRichtextPageBadgePlus)
   static let makeRecipe = Self(.customRichtextPageArrowIn)

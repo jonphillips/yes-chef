@@ -138,7 +138,7 @@ private struct RecipeCategoryFilterLevelView: View {
           let availability = availabilityByName[parentNode.path] ?? .empty(categoryName: parentNode.path)
           RecipeFilterSelectionRow(
             title: "All \(parentNode.title)",
-            symbol: .category,
+            symbol: AppSymbol("folder.fill"),
             detail: availability.countText,
             isSelected: availability.isSelected,
             isEnabled: availability.isEnabled
