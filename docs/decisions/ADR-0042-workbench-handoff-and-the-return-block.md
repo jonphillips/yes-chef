@@ -141,6 +141,7 @@ prompt shrinks to token + context + the verb's ask.
   list costs nothing ([[mode-trigger-date-vs-toggle]]). **If one project ever gets painful, split on the
   sources with long lives — the recipe and the workbench study — not on menus.** `Menu.externalProjectName`
   stays; it is now an override, not the default.
+  *(Superseded 2026-11-10 by [ADR-0064 D4](ADR-0064-menu-detail-declutter.md#d4--the-header-carries-the-dates-the-project-field-goes): the field and its UI are removed, and the column stays unused.)*
 - **The app generates the instruction text from one Core constant** — the same source the parser and the
   prompt serializer read — surfaced as a **copy button in Settings**. This is what keeps a hand-pasted blob
   of config that lives outside version control from silently diverging from the parser.
