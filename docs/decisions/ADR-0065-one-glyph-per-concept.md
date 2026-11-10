@@ -4,7 +4,7 @@
 > never an SF Symbol string, and a SwiftLint rule enforces it. A recipe is `richtext.page` everywhere, `book` means a
 > source, and there are two Edit glyphs. There's no separate glyph for a collection of recipes.
 
-Status: **Accepted** — 2026-11-10. Effort: [`efforts/app-symbol-vocabulary.md`](../efforts/app-symbol-vocabulary.md).
+Status: **Accepted** — 2026-11-10. Effort: [`efforts/archive/app-symbol-vocabulary.md`](../efforts/archive/app-symbol-vocabulary.md).
 Origin: Jon, 2026-11-10: *"Do we have an Icon struct nicely abstracted here so we can make sure we are properly using
 our Icons across the app?"* He chose `richtext.page` for recipes and two Edit glyphs the same day.
 Builds on: [ADR-0064 D8](ADR-0064-menu-detail-declutter.md) (the custom symbols and the overlay vocabulary) ·

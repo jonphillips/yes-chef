@@ -12,7 +12,7 @@ struct RecipeHandoffEntity: AppEntity, SyncableEntity {
   let title: String
 
   var displayRepresentation: DisplayRepresentation {
-    DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title), image: .init(systemName: "book.closed"))
+    DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title), image: .init(systemName: AppSymbol.recipe.systemNameForIntents))
   }
 }
 
@@ -57,7 +57,7 @@ struct MenuHandoffEntity: AppEntity, SyncableEntity {
   let title: String
 
   var displayRepresentation: DisplayRepresentation {
-    DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title), image: .init(systemName: "menucard"))
+    DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title), image: .init(systemName: AppSymbol.menu.systemNameForIntents))
   }
 }
 
@@ -104,7 +104,7 @@ struct MealPlanHandoffEntity: AppEntity, SyncableEntity {
     DisplayRepresentation(
       title: LocalizedStringResource(stringLiteral: title),
       subtitle: LocalizedStringResource(stringLiteral: scheduledDate.formatted(date: .abbreviated, time: .omitted)),
-      image: .init(systemName: "calendar")
+      image: .init(systemName: AppSymbol.calendar.systemNameForIntents)
     )
   }
 }
@@ -148,7 +148,7 @@ struct WorkbenchHandoffEntity: AppEntity, SyncableEntity {
   let title: String
 
   var displayRepresentation: DisplayRepresentation {
-    DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title), image: .init(systemName: "hammer"))
+    DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title), image: .init(systemName: AppSymbol.workbench.systemNameForIntents))
   }
 }
 

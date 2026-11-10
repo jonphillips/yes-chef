@@ -55,11 +55,7 @@ struct AppMainLayout: View {
   }
 
   private var recipesTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.recipes.title,
-      systemImage: AppSection.recipes.systemImage,
-      value: AppSection.recipes
-    ) {
+    Tab(value: AppSection.recipes) {
       RecipesTab(
         model: recipeModel,
         mealCalendarModel: mealCalendarModel,
@@ -69,59 +65,51 @@ struct AppMainLayout: View {
           selectedSettingsPane = .archivedRecipes
         }
       )
+    } label: {
+      Label(AppSection.recipes.title, symbol: AppSection.recipes.symbol)
     }
   }
 
   private var groceriesTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.groceries.title,
-      systemImage: AppSection.groceries.systemImage,
-      value: AppSection.groceries
-    ) {
+    Tab(value: AppSection.groceries) {
       GroceriesTab(
         model: groceryModel,
         mealCalendarModel: mealCalendarModel,
         usesCompactTabLayout: horizontalSizeClass == .compact
       )
+    } label: {
+      Label(AppSection.groceries.title, symbol: AppSection.groceries.symbol)
     }
   }
 
   private var mealCalendarTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.mealCalendar.title,
-      systemImage: AppSection.mealCalendar.systemImage,
-      value: AppSection.mealCalendar
-    ) {
+    Tab(value: AppSection.mealCalendar) {
       MealCalendarTab(
         model: mealCalendarModel,
         onMenuSelected: openMenuFromCalendar,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
       )
+    } label: {
+      Label(AppSection.mealCalendar.title, symbol: AppSection.mealCalendar.symbol)
     }
   }
 
   private var menusTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.menus.title,
-      systemImage: AppSection.menus.systemImage,
-      value: AppSection.menus
-    ) {
+    Tab(value: AppSection.menus) {
       MenusTab(
         model: menuModel,
         recipeModel: recipeModel,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested
       )
+    } label: {
+      Label(AppSection.menus.title, symbol: AppSection.menus.symbol)
     }
   }
 
   private var createRecipeTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.createRecipe.title,
-      systemImage: AppSection.createRecipe.systemImage,
-      value: AppSection.createRecipe
-    ) {
+    Tab(value: AppSection.createRecipe) {
       NavigationStack {
         CreateRecipeView(
           model: createRecipeModel,
@@ -129,58 +117,50 @@ struct AppMainLayout: View {
           onSaved: onRecipeCreated
         )
       }
+    } label: {
+      Label(AppSection.createRecipe.title, symbol: AppSection.createRecipe.symbol)
     }
     .badge(chatAccessInboxModel.inboxCount)
     .defaultVisibility(.hidden, for: .tabBar)
   }
 
   private var powerBrowserTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.powerBrowser.title,
-      systemImage: AppSection.powerBrowser.systemImage,
-      value: AppSection.powerBrowser
-    ) {
+    Tab(value: AppSection.powerBrowser) {
       if selectedSection == .powerBrowser {
         PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected)
       }
+    } label: {
+      Label(AppSection.powerBrowser.title, symbol: AppSection.powerBrowser.symbol)
     }
     .defaultVisibility(.hidden, for: .tabBar)
   }
 
   private var browserTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.browser.title,
-      systemImage: AppSection.browser.systemImage,
-      value: AppSection.browser
-    ) {
+    Tab(value: AppSection.browser) {
       NavigationStack {
         BrowserWorkspaceView(model: browserModel, onCapture: onBrowserCapture)
       }
+    } label: {
+      Label(AppSection.browser.title, symbol: AppSection.browser.symbol)
     }
     .defaultVisibility(.hidden, for: .tabBar)
   }
 
   private var workbenchesTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.workbenches.title,
-      systemImage: AppSection.workbenches.systemImage,
-      value: AppSection.workbenches
-    ) {
+    Tab(value: AppSection.workbenches) {
       WorkbenchesTab(
         model: workbenchModel,
         onRecipeSelected: onRecipeSelected,
         usesCompactTabLayout: horizontalSizeClass == .compact
       )
+    } label: {
+      Label(AppSection.workbenches.title, symbol: AppSection.workbenches.symbol)
     }
     .defaultVisibility(.hidden, for: .tabBar)
   }
 
   private var settingsTab: some TabContent<AppSection?> {
-    Tab(
-      AppSection.settings.title,
-      systemImage: AppSection.settings.systemImage,
-      value: AppSection.settings
-    ) {
+    Tab(value: AppSection.settings) {
       SettingsTab(
         recipeModel: recipeModel,
         groceryModel: groceryModel,
@@ -190,6 +170,8 @@ struct AppMainLayout: View {
         selectedPane: $selectedSettingsPane,
         usesCompactTabLayout: horizontalSizeClass == .compact
       )
+    } label: {
+      Label(AppSection.settings.title, symbol: AppSection.settings.symbol)
     }
     .defaultVisibility(.hidden, for: .tabBar)
   }
@@ -390,7 +372,9 @@ private struct RecipeDetailColumn: View {
       )
       .id(recipe.id)
     } else {
-      ContentUnavailableView("Select a Recipe", systemImage: "fork.knife")
+      ContentUnavailableView {
+        Label("Select a Recipe", symbol: .recipe)
+      }
     }
   }
 

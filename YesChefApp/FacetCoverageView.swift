@@ -14,7 +14,7 @@ struct FacetCoverageView: View {
           NavigationLink {
             FacetCoverageRecipeList(focusedFacet: summary.facet)
           } label: {
-            Label("Recipes missing a \(summary.facet.name)", systemImage: "tag")
+            Label("Recipes missing a \(summary.facet.name)", symbol: .tag)
           }
           LabeledContent("Classified", value: "\(summary.classifiedRecipeCount)")
           LabeledContent("Unclassified", value: "\(summary.unclassifiedRecipeCount)")
@@ -27,11 +27,11 @@ struct FacetCoverageView: View {
     .navigationTitle("Label Recipes")
     .overlay {
       if coverage.facetSummaries.isEmpty {
-        ContentUnavailableView(
-          "No Recipe Labels to Review",
-          systemImage: "tag",
-          description: Text("Add a facet before using this label list.")
-        )
+        ContentUnavailableView {
+          Label("No Recipe Labels to Review", symbol: .tag)
+        } description: {
+          Text("Add a facet before using this label list.")
+        }
       }
     }
   }

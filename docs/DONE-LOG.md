@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-10 — One glyph per concept: AppSymbol (`effort/app-symbol-vocabulary`)
+
+- **Result:** Added AppSymbol for the D2 vocabulary, converted concept uses and moved Core glyph mappings into the app.
+- **Verification:** scripts/check-drift.sh, simulator YesChefTests (131 tests), generic iOS build, and the SwiftLint failure probe.
+- **Owed:** app-symbol-vocabulary S1 + S2 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-10 — Menu detail declutter (`codex/menu-detail-declutter`)
 
 - **Result:** Consolidated menu AI actions in the toolbar, added Edit Menu for menu fields and placements, removed row action buttons and the Playbook toggle, and added three custom symbol sets. No schema or migration change.

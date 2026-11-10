@@ -450,7 +450,7 @@ private struct VariationIngredientSectionEditor: View {
         TextField("Ingredient", text: model.ingredientLineText(line.id))
           .swipeActions {
             Button(role: .destructive) { model.removeIngredientLine(line.id) } label: {
-              Label("Delete", systemImage: "trash")
+              Label("Delete", symbol: .delete)
             }
           }
       }
@@ -474,7 +474,7 @@ private struct VariationInstructionSectionEditor: View {
         TextField("Instruction", text: model.instructionStepText(step.id), axis: .vertical)
           .swipeActions {
             Button(role: .destructive) { model.removeInstructionStep(step.id) } label: {
-              Label("Delete", systemImage: "trash")
+              Label("Delete", symbol: .delete)
             }
           }
       }

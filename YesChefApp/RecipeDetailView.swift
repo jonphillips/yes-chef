@@ -175,12 +175,12 @@ struct RecipeDetailView: View {
           scaleContext: model.scaleContext
         )
       } label: {
-        Label("Groceries", systemImage: "cart.badge.plus")
+        Label("Groceries", symbol: .addToGroceries)
       }
       Button {
         mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
       } label: {
-        Label("Plan", systemImage: "calendar.badge.plus")
+        Label("Plan", symbol: .plan)
       }
       HandoffMenu(
         handOff: {
@@ -204,12 +204,12 @@ struct RecipeDetailView: View {
       Button {
         libraryModel.editButtonTapped(recipeID: model.recipeID)
       } label: {
-        Label("Edit", systemImage: "square.and.pencil")
+        Label("Edit", symbol: .edit)
       }
       Button {
         model.openWorkbenchButtonTapped()
       } label: {
-        Label("Workbench", systemImage: "hammer")
+        Label("Workbench", symbol: .workbench)
       }
 
       if model.recipe?.originalSnapshot != nil {
@@ -227,7 +227,7 @@ struct RecipeDetailView: View {
       Button(role: .destructive) {
         libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
       } label: {
-        Label("Delete…", systemImage: "trash")
+        Label("Delete…", symbol: .delete)
       }
     }
   }
@@ -371,7 +371,9 @@ private struct RecipeReaderView: View {
             .swipeActionsContainer()
           }
         } else {
-          ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
+          ContentUnavailableView {
+            Label("Recipe Not Found", symbol: .recipe)
+          }
             .frame(maxWidth: .infinity, minHeight: proxy.size.height)
         }
       }
@@ -515,20 +517,20 @@ private struct RecipeReaderView: View {
       }
 
       if recipe.libraryPlacement == .reference {
-        Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
+        Label(recipe.libraryPlacement.title, symbol: .libraryShelf)
           .font(.caption)
           .foregroundStyle(.secondary)
           .recipeChip()
       }
 
       if let categoryDisplayNames = model.detail?.categoryDisplayNames, !categoryDisplayNames.isEmpty {
-        WrappingLabels(labels: categoryDisplayNames, systemImage: "folder")
+        WrappingLabels(labels: categoryDisplayNames, symbol: .category)
       }
 
       Button {
         model.suggestLabelsButtonTapped()
       } label: {
-        Label("Edit Tags", systemImage: "tag")
+        Label("Edit Tags", symbol: .tag)
       }
       .buttonStyle(.bordered)
 
@@ -549,7 +551,7 @@ private struct RecipeReaderView: View {
 
       FlowLayout(spacing: 8) {
           if recipe.libraryPlacement == .reference {
-            Label(recipe.libraryPlacement.title, systemImage: "books.vertical")
+            Label(recipe.libraryPlacement.title, symbol: .libraryShelf)
               .font(.caption)
               .recipeChip()
           }
@@ -561,7 +563,7 @@ private struct RecipeReaderView: View {
           Button {
             model.suggestLabelsButtonTapped()
           } label: {
-            Label("Edit Tags", systemImage: "tag")
+            Label("Edit Tags", symbol: .tag)
               .font(.caption.weight(.medium))
               .frame(minHeight: 36)
           }

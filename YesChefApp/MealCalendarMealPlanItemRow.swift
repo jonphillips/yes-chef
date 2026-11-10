@@ -21,24 +21,24 @@ struct MealPlanItemRowView: View {
     .contextMenu {
       if let editAction {
         Button(action: editAction) {
-          Label("Edit", systemImage: "pencil")
+          Label("Edit", symbol: .editRow)
         }
       }
       if let deleteAction {
         Button(role: .destructive, action: deleteAction) {
-          Label("Remove", systemImage: "trash")
+          Label("Remove", symbol: .delete)
         }
       }
     }
     .swipeActions(edge: .trailing) {
       if let deleteAction {
         Button(role: .destructive, action: deleteAction) {
-          Label("Remove", systemImage: "trash")
+          Label("Remove", symbol: .delete)
         }
       }
       if let editAction {
         Button(action: editAction) {
-          Label("Edit", systemImage: "pencil")
+          Label("Edit", symbol: .editRow)
         }
         .tint(.blue)
       }
@@ -66,7 +66,7 @@ struct MealPlanItemRowView: View {
           .font(.headline)
           .lineLimit(3)
         if row.item.kind != .recipe {
-          Label(row.item.kind.title, systemImage: row.item.kind.systemImage)
+          Label(row.item.kind.title, symbol: row.item.kind.symbol)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -85,14 +85,14 @@ struct MealPlanItemRowView: View {
   @ViewBuilder private var menuSourceLabel: some View {
     if let sourceAction {
       Button(action: sourceAction) {
-        Label(row.menu?.title ?? "Menu", systemImage: "menucard")
+        Label(row.menu?.title ?? "Menu", symbol: .menu)
           .lineLimit(1)
       }
       .buttonStyle(.plain)
       .font(.caption)
       .foregroundStyle(.tint)
     } else {
-      Label(row.menu?.title ?? "Menu", systemImage: "menucard")
+      Label(row.menu?.title ?? "Menu", symbol: .menu)
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(1)

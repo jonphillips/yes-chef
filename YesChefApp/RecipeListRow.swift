@@ -168,18 +168,18 @@ private struct RecipeListMetadataStack: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 3) {
       if let sourceSummary {
-        RecipeListMetadataLine(systemImage: "book", text: sourceSummary)
+        RecipeListMetadataLine(symbol: .source, text: sourceSummary)
       }
 
       if let categorySummary {
-        RecipeListMetadataLine(systemImage: "folder", text: categorySummary)
+        RecipeListMetadataLine(symbol: .category, text: categorySummary)
       }
     }
   }
 }
 
 private struct RecipeListMetadataLine: View {
-  let systemImage: String
+  let symbol: AppSymbol
   let text: String
 
   var body: some View {
@@ -187,7 +187,7 @@ private struct RecipeListMetadataLine: View {
       Text(text)
         .lineLimit(1)
     } icon: {
-      Image(systemName: systemImage)
+      Image(symbol: symbol)
         .frame(width: 14)
     }
     .font(.caption2)

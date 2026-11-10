@@ -201,7 +201,7 @@ struct AISettingsView: View {
         Button(role: .destructive) {
           model.clear(provider)
         } label: {
-          Label("Clear Key", systemImage: "trash")
+          Label("Clear Key", symbol: .delete)
         }
       }
     } header: {

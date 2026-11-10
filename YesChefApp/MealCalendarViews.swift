@@ -282,12 +282,12 @@ private struct MealCalendarNavigationToolbar: ToolbarContent {
         Button {
           model.addItemButtonTapped(kind: .recipe)
         } label: {
-          Label("Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+          Label("Recipe", symbol: MealPlanItemKind.recipe.symbol)
         }
         Button {
           model.addItemButtonTapped(kind: .note)
         } label: {
-          Label("Note", systemImage: MealPlanItemKind.note.systemImage)
+          Label("Note", symbol: MealPlanItemKind.note.symbol)
         }
       } label: {
         Label("Add", systemImage: "plus")
@@ -333,7 +333,7 @@ struct MealCalendarDayAgendaView: View {
 
       if model.selectedDayRows.isEmpty {
         ContentUnavailableView {
-          Label("No Meals Scheduled", systemImage: "calendar.badge.plus")
+          Label("No Meals Scheduled", symbol: .plan)
         } description: {
           Text("Add a recipe or note to \(model.selectedDateShortTitle).")
         } actions: {
@@ -374,7 +374,7 @@ struct MealCalendarDayAgendaView: View {
     Button {
       model.addItemButtonTapped(kind: .recipe)
     } label: {
-      Label("Add Recipe", systemImage: MealPlanItemKind.recipe.systemImage)
+      Label("Add Recipe", symbol: MealPlanItemKind.recipe.symbol)
     }
     .buttonStyle(.borderedProminent)
   }
@@ -383,7 +383,7 @@ struct MealCalendarDayAgendaView: View {
     Button {
       model.addItemButtonTapped(kind: .note)
     } label: {
-      Label("Add Note", systemImage: MealPlanItemKind.note.systemImage)
+      Label("Add Note", symbol: MealPlanItemKind.note.symbol)
     }
     .buttonStyle(.bordered)
   }
@@ -488,9 +488,13 @@ struct MealPlanItemEditorView: View {
               allowsMultipleSelection: false
             )
           } else if context.locksRecipeSelection {
-            ContentUnavailableView("Recipe Not Found", systemImage: "fork.knife")
+            ContentUnavailableView {
+              Label("Recipe Not Found", symbol: .recipe)
+            }
           } else if model.availableRecipeRows.isEmpty {
-            ContentUnavailableView("No Recipes", systemImage: "book.closed")
+            ContentUnavailableView {
+              Label("No Recipes", symbol: .recipe)
+            }
           } else {
             StackedTextField(title: "Find Recipes", text: $recipeSearchText)
               .textInputAutocapitalization(.never)
@@ -911,7 +915,7 @@ private struct MealCalendarChip: View {
         .lineLimit(titleLineLimit)
         .fixedSize(horizontal: false, vertical: true)
     } icon: {
-      Image(systemName: row.isFromMenu ? "menucard" : row.item.kind.systemImage)
+      Image(symbol: row.isFromMenu ? .menu : row.item.kind.symbol)
     }
     .font(.caption2.weight(.medium))
     .labelStyle(.titleAndIcon)

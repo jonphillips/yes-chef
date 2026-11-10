@@ -23,24 +23,24 @@ struct MenuPrepPlanStepView: View {
     }
     .padding(.vertical, 12)
     .contextMenu {
-      Button("Edit", systemImage: "pencil") { editStep(step) }
+      Button { editStep(step) } label: { Label("Edit", symbol: .editRow) }
       Button("Move Earlier", systemImage: "arrow.up") { reorderStep(step.id, .earlier) }
       Button("Move Later", systemImage: "arrow.down") { reorderStep(step.id, .later) }
-      Button("Delete", systemImage: "trash", role: .destructive) { deleteStep(step.id) }
+      Button(role: .destructive) { deleteStep(step.id) } label: { Label("Delete", symbol: .delete) }
     }
   }
 
   @ViewBuilder private func servesLabel(_ serves: String) -> some View {
     if let recipePresentation {
       Button { onRecipeSelected?(recipePresentation) } label: {
-        Label(serves, systemImage: "fork.knife").recipeChip()
+        Label(serves, symbol: .dish).recipeChip()
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Open recipe for \(serves)")
     } else if step.sourceDish == nil {
       Text(serves).font(.caption).foregroundStyle(.secondary)
     } else {
-      Label(serves, systemImage: "fork.knife")
+      Label(serves, symbol: .dish)
         .font(.caption).foregroundStyle(.secondary).recipeChip()
     }
   }
@@ -253,7 +253,7 @@ struct LearningsSection: View {
       Text(learning.text)
     } badge: { learning in
       if learning.provenance == .inApp {
-        Label("Hand-authored", systemImage: "pencil")
+        Label("Hand-authored", symbol: .editRow)
           .font(.caption)
           .foregroundStyle(.secondary)
       }

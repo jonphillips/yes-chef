@@ -54,7 +54,7 @@ struct MealCalendarDayHeader: View {
         Button {
           model.addSelectedDayToGroceriesButtonTapped()
         } label: {
-          Label("Add Day to Groceries", systemImage: "cart.badge.plus")
+          Label("Add Day to Groceries", symbol: .addToGroceries)
         }
       } label: {
         Label("Day actions", systemImage: "ellipsis")

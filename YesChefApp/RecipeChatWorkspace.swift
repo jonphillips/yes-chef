@@ -536,7 +536,7 @@ struct RecipeChatPanel: View {
       Button(role: .destructive) {
         confirmingClearChat = true
       } label: {
-        Label("Clear Chat", systemImage: "trash")
+        Label("Clear Chat", symbol: .delete)
       }
       .disabled(chatModel.messages.isEmpty || chatModel.isResponding)
 
@@ -805,7 +805,7 @@ struct ChatApplyReviewRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       HStack {
         Button(role: .cancel, action: discard) {
-          Label("Discard", systemImage: "trash")
+          Label("Discard", symbol: .delete)
         }
         .buttonStyle(.bordered)
         .disabled(isCommitting || isBulkCommitting)

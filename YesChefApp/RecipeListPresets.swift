@@ -36,41 +36,41 @@ struct RecipeListPresetState: Codable, Equatable {
 
   var summaryLines: [RecipeListPresetSummaryLine] {
     var lines: [RecipeListPresetSummaryLine] = [
-      RecipeListPresetSummaryLine(title: "Sort", detail: sortOrder.title, systemImage: "arrow.up.arrow.down"),
-      RecipeListPresetSummaryLine(title: "Library", detail: libraryScope.title, systemImage: "books.vertical"),
+      RecipeListPresetSummaryLine(title: "Sort", detail: sortOrder.title, symbol: AppSymbol("arrow.up.arrow.down")),
+      RecipeListPresetSummaryLine(title: "Library", detail: libraryScope.title, symbol: .libraryShelf),
     ]
 
     let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     if !query.isEmpty {
-      lines.append(RecipeListPresetSummaryLine(title: "Search", detail: query, systemImage: "magnifyingglass"))
+      lines.append(RecipeListPresetSummaryLine(title: "Search", detail: query, symbol: AppSymbol("magnifyingglass")))
     }
     if showsFavoritesOnly {
-      lines.append(RecipeListPresetSummaryLine(title: "Favorites", detail: "Only favorites", systemImage: "star.fill"))
+      lines.append(RecipeListPresetSummaryLine(title: "Favorites", detail: "Only favorites", symbol: AppSymbol("star.fill")))
     }
     if showsPhotosOnly {
-      lines.append(RecipeListPresetSummaryLine(title: "Photos", detail: "Only recipes with photos", systemImage: "photo"))
+      lines.append(RecipeListPresetSummaryLine(title: "Photos", detail: "Only recipes with photos", symbol: AppSymbol("photo")))
     }
     if !selectedCategoryNames.isEmpty {
       lines.append(
         RecipeListPresetSummaryLine(
           title: "Categories",
           detail: selectedCategoryNames.formattedForPresetSummary(),
-          systemImage: "folder"
+          symbol: .category
         )
       )
     }
     if let selectedCuisine {
-      lines.append(RecipeListPresetSummaryLine(title: "Cuisine", detail: selectedCuisine, systemImage: "globe.americas"))
+      lines.append(RecipeListPresetSummaryLine(title: "Cuisine", detail: selectedCuisine, symbol: AppSymbol("globe.americas")))
     }
     if let selectedCourse {
-      lines.append(RecipeListPresetSummaryLine(title: "Course", detail: selectedCourse, systemImage: "fork.knife"))
+      lines.append(RecipeListPresetSummaryLine(title: "Course", detail: selectedCourse, symbol: .dish))
     }
     if !selectedSourceNames.isEmpty {
       lines.append(
         RecipeListPresetSummaryLine(
           title: "Sources",
           detail: selectedSourceNames.formattedForPresetSummary(),
-          systemImage: "book"
+          symbol: .source
         )
       )
     }
@@ -79,7 +79,7 @@ struct RecipeListPresetState: Codable, Equatable {
         RecipeListPresetSummaryLine(
           title: "Authors",
           detail: selectedAuthorNames.formattedForPresetSummary(),
-          systemImage: "person.text.rectangle"
+          symbol: AppSymbol("person.text.rectangle")
         )
       )
     }
@@ -189,9 +189,9 @@ struct RecipeListPresetState: Codable, Equatable {
 struct RecipeListPresetSummaryLine: Equatable, Identifiable {
   var title: String
   var detail: String
-  var systemImage: String
+  var symbol: AppSymbol
 
-  var id: String { "\(title)-\(detail)-\(systemImage)" }
+  var id: String { "\(title)-\(detail)-\(symbol)" }
 }
 
 enum RecipeListPresetPersistence {
@@ -341,7 +341,7 @@ struct RecipeListPresetManagementView: View {
           Button(role: .destructive) {
             deletePreset(preset)
           } label: {
-            Label("Delete", systemImage: "trash")
+            Label("Delete", symbol: .delete)
           }
         }
       }
@@ -404,7 +404,7 @@ private struct RecipeListPresetSummaryView: View {
       Label {
         Text("\(recipeCount) \(recipeCount == 1 ? "recipe" : "recipes")")
       } icon: {
-        Image(systemName: "fork.knife")
+        Image(symbol: .recipe)
       }
 
       ForEach(state.summaryLines) { line in
@@ -417,7 +417,7 @@ private struct RecipeListPresetSummaryView: View {
               .lineLimit(2)
           }
         } icon: {
-          Image(systemName: line.systemImage)
+          Image(symbol: line.symbol)
         }
       }
     }

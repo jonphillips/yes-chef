@@ -527,7 +527,7 @@ struct RecipeListView: View {
                   Button {
                     model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
                   } label: {
-                    Label("Delete…", systemImage: "trash")
+                    Label("Delete…", symbol: .delete)
                   }
                   .tint(.red)
                 }
@@ -597,14 +597,14 @@ struct RecipeListView: View {
           Button {
             model.workbenchTheseButtonTapped()
           } label: {
-            Label("Workbench These", systemImage: "hammer")
+            Label("Workbench These", symbol: .workbench)
           }
           .disabled(model.selectedWorkbenchRecipeIDs.isEmpty)
         } else {
           Button {
             model.workbenchSelectionButtonTapped()
           } label: {
-            Label("Workbench These", systemImage: "checklist")
+            Label("Workbench These", symbol: .workbench)
           }
           .disabled(model.isImporting)
         }
@@ -644,7 +644,7 @@ struct ArchivedRecipesView: View {
             Button {
               model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
             } label: {
-              Label("Delete Permanently", systemImage: "trash")
+              Label("Delete Permanently", symbol: .delete)
             }
             .tint(.red)
           }
@@ -686,7 +686,7 @@ private struct ArchivedRecipeRow: View {
       Button(role: .destructive) {
         model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
       } label: {
-        Label("Delete Permanently", systemImage: "trash")
+        Label("Delete Permanently", symbol: .delete)
       }
     }
   }
@@ -765,7 +765,7 @@ private struct RecipeFilterView: View {
           title: "Sources",
           emptyTitle: "No sources",
           summary: model.selectedSourceFilterSummary,
-          systemImage: "book",
+          symbol: .source,
           isDefaultSelection: model.selectedSourceNames.isEmpty,
           options: model.sourceFilterOptions
         ) {
@@ -776,7 +776,7 @@ private struct RecipeFilterView: View {
             remainingOptions: model.remainingSourceFilterOptions,
             countsByOption: model.sourceFilterCountsByName,
             selectedValues: model.selectedSourceNames,
-            systemImage: "book"
+            symbol: .source
           ) { sourceName in
             model.sourceFilterButtonTapped(sourceName)
           }
@@ -786,7 +786,7 @@ private struct RecipeFilterView: View {
           title: "Authors",
           emptyTitle: "No authors",
           summary: model.selectedAuthorFilterSummary,
-          systemImage: "person.text.rectangle",
+          symbol: AppSymbol("person.text.rectangle"),
           isDefaultSelection: model.selectedAuthorNames.isEmpty,
           options: model.authorFilterOptions
         ) {
@@ -797,7 +797,7 @@ private struct RecipeFilterView: View {
             remainingOptions: model.remainingAuthorFilterOptions,
             countsByOption: model.authorFilterCountsByName,
             selectedValues: model.selectedAuthorNames,
-            systemImage: "person.text.rectangle"
+            symbol: AppSymbol("person.text.rectangle")
           ) { authorName in
             model.authorFilterButtonTapped(authorName)
           }

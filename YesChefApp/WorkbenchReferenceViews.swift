@@ -42,7 +42,7 @@ struct WorkbenchReferenceRow: View {
           Button {
             model.refreshReferenceButtonTapped(reference)
           } label: {
-            Label("Manage", systemImage: "square.and.pencil")
+            Label("Manage", symbol: .edit)
           }
           .buttonStyle(.bordered)
           .controlSize(.small)
@@ -51,7 +51,7 @@ struct WorkbenchReferenceRow: View {
         Button(role: .destructive) {
           model.deleteReferenceButtonTapped(referenceID: reference.id)
         } label: {
-          Label("Delete", systemImage: "trash")
+          Label("Delete", symbol: .delete)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)

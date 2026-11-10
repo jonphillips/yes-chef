@@ -270,7 +270,7 @@ private struct PowerBrowserSourceDisclosureGroup: View {
       }
     } label: {
       HStack {
-        Label(field.title, systemImage: "book")
+        Label(field.title, symbol: .source)
         Spacer()
         Text(model.selectedSourceValues(for: field).summary)
           .foregroundStyle(model.selectedSourceValues(for: field).isEmpty ? .secondary : .primary)

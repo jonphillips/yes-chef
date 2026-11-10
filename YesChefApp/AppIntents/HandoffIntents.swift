@@ -131,7 +131,8 @@ struct HandoffAppShortcuts: AppShortcutsProvider {
       intent: CaptureRecipeFromText(),
       phrases: ["Capture a recipe from text in \(.applicationName)"],
       shortTitle: "Capture Recipe",
-      systemImageName: "square.and.pencil"
+      // AppShortcut requires a compile-time literal; use .recipe's glyph because .addRecipes is custom.
+      systemImageName: "richtext.page"
     )
   }
 }

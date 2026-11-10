@@ -118,8 +118,10 @@ struct RecipeVariationChoices: View {
       }
     }
     .swipeActions(edge: .trailing) {
-      Button("Delete", systemImage: "trash", role: .destructive) {
+      Button(role: .destructive) {
         deletingVariation = variation
+      } label: {
+        Label("Delete", symbol: .delete)
       }
     }
     .padding(.vertical, 6)

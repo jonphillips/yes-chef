@@ -70,7 +70,9 @@ struct GroceryDetailView: View {
 
           if displaySections.isEmpty {
             Section {
-              ContentUnavailableView("No Grocery Items", systemImage: "cart")
+              ContentUnavailableView {
+                Label("No Grocery Items", symbol: .groceries)
+              }
                 .frame(maxWidth: .infinity, minHeight: 220)
             }
           } else {
@@ -114,7 +116,7 @@ struct GroceryDetailView: View {
             Button {
               model.addCustomItemButtonTapped()
             } label: {
-              Label("Add Item", systemImage: "cart.badge.plus")
+              Label("Add Item", symbol: .addToGroceries)
             }
 
             GrocerySourceMenu(
@@ -142,7 +144,9 @@ struct GroceryDetailView: View {
           }
         }
       } else {
-        ContentUnavailableView("Groceries", systemImage: "cart")
+        ContentUnavailableView {
+          Label("Groceries", symbol: .groceries)
+        }
           .navigationTitle("Groceries")
           .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -172,7 +176,7 @@ private struct GrocerySourceMenu: View {
       Button {
         model.addSelectedMealRowsButtonTapped(selectedMealRows)
       } label: {
-        Label(selectedDate.formatted(.dateTime.month(.abbreviated).day()), systemImage: "calendar")
+        Label(selectedDate.formatted(.dateTime.month(.abbreviated).day()), symbol: .calendar)
       }
       .disabled(selectedMealRows.isEmpty)
 
@@ -182,7 +186,7 @@ private struct GrocerySourceMenu: View {
             Button {
               model.addMenuButtonTapped(menuID: row.menu.id)
             } label: {
-              Label(row.menu.title, systemImage: "menucard")
+              Label(row.menu.title, symbol: .menu)
             }
           }
         }
@@ -210,7 +214,7 @@ private struct GroceryListActionsMenu: View {
       Button {
         model.editListButtonTapped(listID: row.id)
       } label: {
-        Label("Edit List", systemImage: "pencil")
+        Label("Edit List", symbol: .editRow)
       }
 
       if !row.list.isDefault {
@@ -232,7 +236,7 @@ private struct GroceryListActionsMenu: View {
         Button(role: .destructive) {
           model.clearAllButtonTapped(listID: row.id)
         } label: {
-          Label("Clear All", systemImage: "trash")
+          Label("Clear All", symbol: .delete)
         }
         .disabled(totalItemCount == 0)
       }
@@ -242,7 +246,7 @@ private struct GroceryListActionsMenu: View {
           Button(role: .destructive) {
             model.deleteListButtonTapped(listID: row.id)
           } label: {
-            Label("Delete List", systemImage: "trash")
+            Label("Delete List", symbol: .delete)
           }
         }
       }
@@ -294,14 +298,14 @@ private struct GroceryItemsSection: View {
             Button {
               model.editItemButtonTapped(itemID: row.id)
             } label: {
-              Label("Edit", systemImage: "pencil")
+              Label("Edit", symbol: .editRow)
             }
             .tint(.blue)
 
             Button(role: .destructive) {
               model.deleteButtonTapped(itemID: row.id)
             } label: {
-              Label("Delete", systemImage: "trash")
+              Label("Delete", symbol: .delete)
             }
           }
         }
@@ -424,7 +428,7 @@ private struct GroceryItemActions {
       Button {
         editItem()
       } label: {
-        Label("Edit Item", systemImage: "pencil")
+        Label("Edit Item", symbol: .editRow)
       }
 
       Button {
@@ -450,7 +454,7 @@ private struct GroceryItemActions {
       Button(role: .destructive) {
         deleteItem()
       } label: {
-        Label("Delete Item", systemImage: "trash")
+        Label("Delete Item", symbol: .delete)
       }
   }
 
@@ -467,7 +471,7 @@ private struct GrocerySourceLabel: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 6) {
-      Image(systemName: source.origin.systemImage)
+      Image(symbol: source.origin.symbol)
         .foregroundStyle(.secondary)
         .frame(width: 14)
 
@@ -541,7 +545,7 @@ private extension GrocerySourceContribution {
   }
 
   var systemImage: String {
-    representativeSource?.origin.systemImage ?? "minus.square"
+    representativeSource?.origin.symbol.systemName ?? "minus.square"
   }
 }
 
@@ -578,7 +582,7 @@ struct PantrySettingsView: View {
                 Button(role: .destructive) {
                   model.deletePantryItemButtonTapped(itemID: item.id)
                 } label: {
-                  Label("Delete", systemImage: "trash")
+                  Label("Delete", symbol: .delete)
                 }
               }
             }
@@ -648,7 +652,7 @@ private extension View {
         Button {
           model.editListButtonTapped(listID: row.id)
         } label: {
-          Label("Edit", systemImage: "pencil")
+          Label("Edit", symbol: .editRow)
         }
         .tint(.blue)
 
@@ -657,7 +661,7 @@ private extension View {
           Button {
             model.deleteListButtonTapped(listID: row.id)
           } label: {
-            Label("Delete", systemImage: "trash")
+            Label("Delete", symbol: .delete)
           }
           .tint(.red)
         }
@@ -676,7 +680,7 @@ private struct GroceryListRowView: View {
         if row.list.isDefault {
           Label("Primary", systemImage: "star.fill")
         }
-        Label(itemCountTitle, systemImage: "cart")
+        Label(itemCountTitle, symbol: .groceries)
         if row.remainingItemCount > 0 {
           Label("\(row.remainingItemCount)", systemImage: "circle")
         }
@@ -901,7 +905,9 @@ struct GroceryIngredientSelectionView: View {
     // invalid-batch-update exception when the last row goes away.
     Group {
       if choices.isEmpty {
-        ContentUnavailableView("No Shoppable Ingredients", systemImage: "cart")
+        ContentUnavailableView {
+          Label("No Shoppable Ingredients", symbol: .groceries)
+        }
       } else {
         List {
           if !regularChoices.isEmpty {

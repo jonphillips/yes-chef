@@ -44,14 +44,14 @@ struct GroceryPantryReviewSection: View {
             Button {
               model.editItemButtonTapped(itemID: row.id)
             } label: {
-              Label("Edit", systemImage: "pencil")
+              Label("Edit", symbol: .editRow)
             }
             .tint(.blue)
 
             Button(role: .destructive) {
               model.deleteButtonTapped(itemID: row.id)
             } label: {
-              Label("Delete", systemImage: "trash")
+              Label("Delete", symbol: .delete)
             }
           }
         }
@@ -123,7 +123,7 @@ private struct AssumedPantryRowView: View {
       Button {
         addBack()
       } label: {
-        Label("Add Back", systemImage: "cart.badge.plus")
+        Label("Add Back", symbol: .addToGroceries)
           .labelStyle(.iconOnly)
           .frame(width: 32, height: 32)
       }
