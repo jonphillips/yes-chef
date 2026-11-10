@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-10 — Menu detail declutter (`codex/menu-detail-declutter`)
+
+- **Result:** Consolidated menu AI actions in the toolbar, added Edit Menu for menu fields and placements, removed row action buttons and the Playbook toggle, and added three custom symbol sets. No schema or migration change.
+- **Verification:** scripts/check-drift.sh passed with SwiftLint clean, 787 package tests and 15 package tests; the generic iOS build succeeded; YesChefTests passed 131 tests.
+- **Owed:** menu-detail-declutter S1 + S2 + S3 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-08 — Work-day CloudKit fields deployed (`effort/menu-absorbs-calendar-days-dispatch-2`)
 
 - **Result:** The CloudKit gate for menu-absorbs-calendar-days S3 + S4 + S5 is done, and its line is gone from `device-passes.md`. `prepPlanSteps.workDayOffset` (Encrypted Int64) and `sqlitedata_icloud_userModificationTime_workDayOffset` (Encrypted Int64) are in Production. Following jon-platform `persistence-and-sync.md` § *Adding a synced table or column*, the architect added both fields to a fresh Development export, validated it, and imported it with `cktool` after Jon's OK. Jon then deployed Development to Production in the Console.

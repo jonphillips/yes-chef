@@ -6,11 +6,11 @@ Summary: The menu screen's AI controls collapse into the house toolbar AI menu, 
 Jon's iPad pass on Thanksgiving Week 2026, 2026-11-10. He approved the comp the same day. One dispatch, one PR. No schema
 change.
 
-Decisions: [ADR-0064](../decisions/ADR-0064-menu-detail-declutter.md).
+Decisions: [ADR-0064](../../decisions/ADR-0064-menu-detail-declutter.md).
 Related: jon-platform `docs/ios/ui-and-platforms.md` § Controls (read it first: row actions, toolbars, the AI
-entry point) · [ADR-0063](../decisions/ADR-0063-menus-absorb-calendar-days.md) (placement and Bring In, unchanged in
-behavior) · [ADR-0039](../decisions/ADR-0039-playbook-column-thinking-vs-doing.md) (the Playbook column) ·
-[standing guards](../standing-guards.md).
+entry point) · [ADR-0063](../../decisions/ADR-0063-menus-absorb-calendar-days.md) (placement and Bring In, unchanged in
+behavior) · [ADR-0039](../../decisions/ADR-0039-playbook-column-thinking-vs-doing.md) (the Playbook column) ·
+[standing guards](../../standing-guards.md).
 
 ## Where things are (architect, 2026-11-10)
 
@@ -151,7 +151,7 @@ screen.
 
 - No schema, sync or migration change. `externalProjectName` stays in the schema and becomes unused.
 - Run focused tests, `scripts/check-drift.sh`, the generic device build and the `YesChefTests` app target per
-  [verification.md](../verification.md). This touches `YesChefApp/` model code.
+  [verification.md](../../verification.md). This touches `YesChefApp/` model code.
 - Check `LLMHandoffKit` too if S1 extends `HandoffMenu`: its package tests, and confirm Galavant still builds against
   the change or doesn't consume the new API.
 - Closeout per ADR-0005 D16. This dispatch archives the brief.
@@ -168,4 +168,4 @@ screen.
 
 ## Dispatch ledger
 
-- [ ] Dispatch 1 — S1 + S2 + S3, one PR. No schema.
+- [x] Dispatch 1 — S1 + S2 + S3, one PR. No schema.

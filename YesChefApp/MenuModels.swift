@@ -15,7 +15,7 @@ final class MenuLibraryModel {
   enum Destination {
     case addMenu
     case addItem(MenuItemDraftContext)
-    case placeMenu(MenuPlacementDraftContext)
+    case editMenu(MenuEditDraftContext)
     case deleteMenu(MenuDeletionContext)
     case deleteItem(MenuItemDeletionContext)
     case deletePlacement(MenuPlacementDeletionContext)
@@ -105,15 +105,18 @@ final class MenuLibraryModel {
     )
   }
 
-  func placeMenuButtonTapped(menu: CoreMenu, minimumDayCount: Int = 1) {
-    destination = .placeMenu(
-      MenuPlacementDraftContext(
+  func editMenuButtonTapped(menu: CoreMenu, detail: MenuDetailData) {
+    destination = .editMenu(
+      MenuEditDraftContext(
         menuID: menu.id,
-        menuTitle: menu.title,
-        placementID: nil,
-        startDate: Calendar.autoupdatingCurrent.startOfDay(for: now),
+        title: menu.title,
+        notes: menu.notes ?? "",
         dayCount: menu.dayCount,
-        minimumDayCount: minimumDayCount
+        minimumDayCount: max((detail.itemRows.map(\.item.dayOffset).max() ?? 0) + 1, 1),
+        placements: detail.placements.map {
+          MenuEditPlacementDraft(placementID: $0.id, startDate: $0.startDate)
+        },
+        bringInOffer: detail.bringInOffer
       )
     )
   }
@@ -140,8 +143,8 @@ final class MenuLibraryModel {
     }
   }
 
-  func bringInButtonTapped(menu: CoreMenu, offer: MenuBringInOffer) {
-    destination = .bringIn(MenuBringInPresentation(menuID: menu.id, menuTitle: menu.title, offer: offer))
+  func bringInButtonTapped(menuID: CoreMenu.ID, menuTitle: String, offer: MenuBringInOffer) {
+    destination = .bringIn(MenuBringInPresentation(menuID: menuID, menuTitle: menuTitle, offer: offer))
   }
 
   func confirmBringIn(_ presentation: MenuBringInPresentation) {
@@ -402,67 +405,83 @@ final class MenuLibraryModel {
     }
   }
 
-  func editPlacementButtonTapped(menu: CoreMenu, placement: MenuPlacement, minimumDayCount: Int = 1) {
-    destination = .placeMenu(
-      MenuPlacementDraftContext(
-        menuID: menu.id,
-        menuTitle: menu.title,
-        placementID: placement.id,
-        startDate: placement.startDate,
-        dayCount: menu.dayCount,
-        minimumDayCount: minimumDayCount
-      )
-    )
-  }
-
-  func deletePlacementButtonTapped(menu: CoreMenu, placement: MenuPlacement) {
+  func deletePlacementButtonTapped(menuTitle: String, placement: MenuEditPlacementDraft) {
+    guard let placementID = placement.placementID else { return }
     destination = .deletePlacement(
       MenuPlacementDeletionContext(
-        placementID: placement.id,
-        menuTitle: menu.title,
-        startDate: placement.startDate
+        placementID: placementID,
+        menuTitle: menuTitle,
+        startDate: placement.originalStartDate ?? placement.startDate
       )
     )
   }
 
-  func savePlacementButtonTapped(context: MenuPlacementDraftContext, startDate: Date) -> Bool {
+  func saveMenuEditsButtonTapped(context: MenuEditDraftContext) -> Bool {
     do {
-      let startDate = Calendar.autoupdatingCurrent.startOfDay(for: startDate)
-      _ = try database.write { db in
+      let calendar = Calendar.autoupdatingCurrent
+      let placements = context.placements.map { draft in
+        (draft, calendar.startOfDay(for: draft.startDate))
+      }
+      let placementChanged = placements.contains { draft, date in
+        draft.placementID == nil || draft.originalStartDate != date
+      }
+      try database.write { db in
+        try MenuRepository.updateMenu(
+          menuID: context.menuID,
+          title: context.title,
+          notes: context.notes,
+          in: db,
+          now: now
+        )
         try MenuRepository.updateMenuDayCount(
           menuID: context.menuID,
           dayCount: context.dayCount,
           in: db,
           now: now
         )
-        if let placementID = context.placementID {
-          try MenuRepository.updateMenuPlacement(
-            placementID: placementID,
-            startDate: startDate,
-            in: db,
-            now: now
-          )
-        } else {
-          try MenuRepository.placeMenu(
-            menuID: context.menuID,
-            startDate: startDate,
-            in: db,
-            now: now,
-            uuid: { uuid() }
-          )
+        for (draft, startDate) in placements {
+          guard let placementID = draft.placementID else {
+            try MenuRepository.placeMenu(
+              menuID: context.menuID,
+              startDate: startDate,
+              in: db,
+              now: now,
+              uuid: { uuid() }
+            )
+            continue
+          }
+          if draft.originalStartDate != startDate {
+            try MenuRepository.updateMenuPlacement(
+              placementID: placementID,
+              startDate: startDate,
+              in: db,
+              now: now
+            )
+          }
         }
       }
-      let offer = try database.read { db in
-        try MenuRepository.bringInOffer(menuID: context.menuID, in: db)
-      }
-      destination = offer.map {
-        .bringIn(MenuBringInPresentation(menuID: context.menuID, menuTitle: context.menuTitle, offer: $0))
+      if placementChanged {
+        presentBringInOffer(menuID: context.menuID, menuTitle: context.title)
+      } else {
+        destination = nil
       }
       return true
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
       return false
+    }
+  }
+
+  private func presentBringInOffer(menuID: CoreMenu.ID, menuTitle: String) {
+    do {
+      let offer = try database.read { db in
+        try MenuRepository.bringInOffer(menuID: menuID, in: db)
+      }
+      destination = offer.map { .bringIn(MenuBringInPresentation(menuID: menuID, menuTitle: menuTitle, offer: $0)) }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
     }
   }
 
@@ -632,22 +651,6 @@ final class MenuDetailModel {
       }
       if result == .duplicate {
         information = .alreadyImported
-      }
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-    }
-  }
-
-  func updateExternalProjectName(_ externalProjectName: String) {
-    do {
-      try database.write { db in
-        try MenuRepository.updateExternalProjectName(
-          menuID: menuID,
-          externalProjectName: externalProjectName,
-          in: db,
-          now: now
-        )
       }
     } catch {
       errorMessage = String(describing: error)
@@ -1052,30 +1055,11 @@ struct MenuItemDraftContext: Hashable, Sendable {
   var isEditing: Bool { itemID != nil }
 }
 
-struct MenuPlacementDraftContext: Hashable, Sendable {
-  var menuID: CoreMenu.ID
-  var menuTitle: String
-  var placementID: MenuPlacement.ID?
-  var startDate: Date
-  var dayCount: Int
-  var minimumDayCount: Int
-
-  var isEditing: Bool { placementID != nil }
-}
-
 struct MenuItemDeletionContext: Identifiable, Hashable, Sendable {
   var itemID: MenuItem.ID
   var title: String
 
   var id: MenuItem.ID { itemID }
-}
-
-struct MenuPlacementDeletionContext: Identifiable, Hashable, Sendable {
-  var placementID: MenuPlacement.ID
-  var menuTitle: String
-  var startDate: Date
-
-  var id: MenuPlacement.ID { placementID }
 }
 
 struct MenuBringInPresentation: Hashable, Identifiable {

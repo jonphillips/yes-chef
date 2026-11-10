@@ -329,6 +329,25 @@ public enum MenuRepository {
     return menu.id
   }
 
+  public static func updateMenu(
+    menuID: Menu.ID,
+    title: String,
+    notes: String?,
+    in db: Database,
+    now: Date
+  ) throws {
+    guard let title = title.nonEmptyMenuText else {
+      throw MenuRepositoryError.emptyTitle
+    }
+    _ = try requireMenu(menuID, in: db)
+    try Menu.find(menuID).update {
+      $0.title = #bind(title)
+      $0.notes = #bind(notes?.nonEmptyMenuText)
+      $0.dateModified = #bind(now)
+    }
+    .execute(db)
+  }
+
   @discardableResult
   public static func addRecipeItem(
     menuID: Menu.ID,
@@ -726,20 +745,6 @@ public enum MenuRepository {
   ) throws {
     _ = try requirePlacement(placementID, in: db)
     try MenuPlacement.find(placementID).delete().execute(db)
-  }
-
-  public static func updateExternalProjectName(
-    menuID: Menu.ID,
-    externalProjectName: String?,
-    in db: Database,
-    now: Date
-  ) throws {
-    _ = try requireMenu(menuID, in: db)
-    try Menu.find(menuID).update {
-      $0.externalProjectName = #bind(externalProjectName?.nonEmptyMenuText)
-      $0.dateModified = #bind(now)
-    }
-    .execute(db)
   }
 
   private static func requireMenu(_ menuID: Menu.ID, in db: Database) throws -> Menu {

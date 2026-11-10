@@ -185,21 +185,8 @@ struct MenuDishList: View {
   }
 
   private var dishHeader: some View {
-    Group {
-      Text("Dishes")
-        .font(.title2.weight(.semibold))
-
-      Button {
-        model.placeMenuButtonTapped(menu: menu, minimumDayCount: minimumDayCount)
-      } label: {
-        Label("Place", systemImage: "calendar.badge.plus")
-      }
-      .buttonStyle(.bordered)
-    }
-  }
-
-  private var minimumDayCount: Int {
-    max((detail.itemRows.map(\.item.dayOffset).max() ?? 0) + 1, 1)
+    Text("Dishes")
+      .font(.title2.weight(.semibold))
   }
 
   private var placedStartDate: Date? {
@@ -232,23 +219,34 @@ private struct MenuDaySection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .firstTextBaseline) {
-        Button(action: onToggle) {
-          HStack(spacing: 8) {
-            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-              .font(.caption.weight(.semibold))
-              .foregroundStyle(.secondary)
-              .frame(width: 12)
+        if rows.isEmpty {
+          HStack(spacing: 6) {
             dayTitle
               .font(.headline)
               .foregroundStyle(.secondary)
+            Text("— no dishes")
+              .font(.subheadline)
+              .foregroundStyle(.tertiary)
           }
+        } else {
+          Button(action: onToggle) {
+            HStack(spacing: 8) {
+              Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 12)
+              dayTitle
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            }
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(
+            isExpanded
+              ? Text("Collapse \(dayAccessibilityTitle)")
+              : Text("Expand \(dayAccessibilityTitle)")
+          )
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-          isExpanded
-            ? Text("Collapse \(dayAccessibilityTitle)")
-            : Text("Expand \(dayAccessibilityTitle)")
-        )
 
         Spacer()
 
@@ -277,16 +275,12 @@ private struct MenuDaySection: View {
           )
         } label: {
           Label("Hand off", systemImage: HandoffSymbol.handOff)
+            .labelStyle(.iconOnly)
         }
         .accessibilityLabel("Hand off actions for Day \(dayNumber)")
       }
 
-      if isExpanded, rows.isEmpty {
-        Text("No dishes")
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-      } else if isExpanded {
+      if isExpanded, !rows.isEmpty {
         VStack(spacing: 0) {
           ForEach(rows) { row in
             MenuDishRowView(
@@ -321,8 +315,8 @@ private struct MenuDaySection: View {
     }
 
     let weekday = scheduledDate.formatted(.dateTime.weekday(.wide))
-    let date = scheduledDate.formatted(.dateTime.month(.wide).day().year())
-    return Text("\(weekday) - \(date) (Day \(dayNumber))")
+    let date = scheduledDate.formatted(.dateTime.month(.abbreviated).day())
+    return Text("\(weekday), \(date) · Day \(dayNumber)")
   }
 
   private var dayAccessibilityTitle: String {
@@ -331,8 +325,8 @@ private struct MenuDaySection: View {
     }
 
     let weekday = scheduledDate.formatted(.dateTime.weekday(.wide))
-    let date = scheduledDate.formatted(.dateTime.month(.wide).day().year())
-    return String(localized: "\(weekday) - \(date) (Day \(dayNumber))")
+    let date = scheduledDate.formatted(.dateTime.month(.abbreviated).day())
+    return String(localized: "\(weekday), \(date) · Day \(dayNumber)")
   }
 }
 
@@ -347,14 +341,16 @@ private struct MenuDishRowView: View {
     detailModel.selectedTargetItemID == row.id
   }
 
+  private var isAskActive: Bool { detailModel.chatModel != nil }
+
   var body: some View {
     rowContent
-      .background(isDepositTarget ? Color.accentColor.opacity(0.12) : Color.clear)
+      .background(isAskActive && isDepositTarget ? Color.accentColor.opacity(0.12) : Color.clear)
       .contextMenu {
-        Button(role: .destructive) {
-          model.deleteMenuItemButtonTapped(row)
+        Button {
+          model.editItemButtonTapped(menu: menu, row: row)
         } label: {
-          Label("Delete", systemImage: "trash")
+          Label("Edit", systemImage: "pencil")
         }
 
         Menu {
@@ -368,6 +364,28 @@ private struct MenuDishRowView: View {
           }
         } label: {
           Label("Move to Day", systemImage: "arrow.right")
+        }
+
+        if row.item.kind == .note {
+          Button {
+            detailModel.makeRecipeFromNoteButtonTapped(row.item)
+          } label: {
+            Label("Make Recipe", image: "custom.richtext.page.arrow.in")
+          }
+        }
+
+        if isAskActive {
+          Button {
+            detailModel.targetItemTapped(row.id)
+          } label: {
+            Label(isDepositTarget ? "Clear Chat Target" : "Set as Chat Target", systemImage: "target")
+          }
+        }
+
+        Button(role: .destructive) {
+          model.deleteMenuItemButtonTapped(row)
+        } label: {
+          Label("Delete", systemImage: "trash")
         }
       }
       .swipeActions {
@@ -388,6 +406,21 @@ private struct MenuDishRowView: View {
           }
         } label: {
           Label("Move to Day", systemImage: "arrow.right")
+        }
+      }
+      .swipeActions(edge: .leading) {
+        if row.item.kind == .note {
+          Button {
+            detailModel.makeRecipeFromNoteButtonTapped(row.item)
+          } label: {
+            Label("Make Recipe", image: "custom.richtext.page.arrow.in")
+          }
+        } else {
+          Button {
+            model.editItemButtonTapped(menu: menu, row: row)
+          } label: {
+            Label("Edit", systemImage: "pencil")
+          }
         }
       }
   }
@@ -433,39 +466,11 @@ private struct MenuDishRowView: View {
 
       Spacer()
 
-      if row.item.kind == .note {
-        Button {
-          detailModel.makeRecipeFromNoteButtonTapped(row.item)
-        } label: {
-          Label("Make Recipe", systemImage: "book.badge.plus")
-            .labelStyle(.iconOnly)
-        }
-        .buttonStyle(.borderless)
-        .accessibilityLabel("Make a recipe from \(row.displayTitle)")
+      if isAskActive && isDepositTarget {
+        Image(systemName: "target")
+          .foregroundStyle(.tint)
+          .accessibilityLabel("Chat target")
       }
-
-      Button {
-        detailModel.targetItemTapped(row.id)
-      } label: {
-        Label("Deposit target", systemImage: "target")
-          .labelStyle(.iconOnly)
-      }
-      .buttonStyle(.borderless)
-      .tint(isDepositTarget ? .accentColor : .secondary)
-      .accessibilityLabel(
-        isDepositTarget
-          ? "Clear deposit target"
-          : "Set \(row.displayTitle) as chat deposit target"
-      )
-
-      Button {
-        model.editItemButtonTapped(menu: menu, row: row)
-      } label: {
-        Label("Edit Dish", systemImage: "calendar")
-          .labelStyle(.iconOnly)
-      }
-      .buttonStyle(.borderless)
-      .accessibilityLabel("Edit \(row.displayTitle)")
     }
     .padding(12)
   }
@@ -494,83 +499,6 @@ private struct MenuDishRowView: View {
         .font(.title3)
         .foregroundStyle(.secondary)
         .frame(width: 32, height: 32)
-    }
-  }
-}
-
-struct MenuPlacementList: View {
-  let model: MenuLibraryModel
-  let menu: CoreMenu
-  let minimumDayCount: Int
-  let placements: [MenuPlacement]
-  let bringInOffer: MenuBringInOffer?
-
-  var body: some View {
-    if !placements.isEmpty {
-      VStack(alignment: .leading, spacing: 12) {
-        Text("Calendar")
-          .font(.title2.weight(.semibold))
-
-        if let bringInOffer {
-          Button {
-            model.bringInButtonTapped(menu: menu, offer: bringInOffer)
-          } label: {
-            Label("Bring In Calendar Items…", systemImage: "calendar.badge.plus")
-          }
-          .buttonStyle(.bordered)
-        }
-
-        VStack(spacing: 0) {
-          ForEach(placements) { placement in
-            HStack(spacing: 12) {
-              Label {
-                Text(placement.startDate, format: .dateTime.weekday(.wide).month(.wide).day())
-              } icon: {
-                Image(systemName: "calendar.badge.checkmark")
-              }
-
-              Spacer()
-
-            }
-            .contextMenu {
-              Button {
-                model.editPlacementButtonTapped(
-                  menu: menu,
-                  placement: placement,
-                  minimumDayCount: minimumDayCount
-                )
-              } label: {
-                Label("Change Start Date", systemImage: "calendar")
-              }
-              Button(role: .destructive) {
-                model.deletePlacementButtonTapped(menu: menu, placement: placement)
-              } label: {
-                Label("Remove from Calendar", systemImage: "trash")
-              }
-            }
-            .swipeActions(edge: .trailing) {
-              Button(role: .destructive) {
-                model.deletePlacementButtonTapped(menu: menu, placement: placement)
-              } label: {
-                Label("Remove from Calendar", systemImage: "trash")
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-
-            if placement.id != placements.last?.id {
-              Divider()
-                .padding(.leading, 44)
-            }
-          }
-        }
-        .background(.background)
-        .clipShape(.rect(cornerRadius: 8))
-        .overlay {
-          RoundedRectangle(cornerRadius: 8)
-            .stroke(.quaternary)
-        }
-      }
     }
   }
 }

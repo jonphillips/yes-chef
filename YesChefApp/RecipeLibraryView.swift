@@ -120,11 +120,7 @@ struct AppContainer: View {
         MenuItemEditorView(model: menuModel, context: context)
       }
     }
-    .sheet(item: $menuModel.destination.placeMenu, id: \.self) { context in
-      NavigationStack {
-        MenuPlacementEditorView(model: menuModel, context: context)
-      }
-    }
+    .menuEditDestination(model: menuModel)
     .groceryDestinations(
       groceryModel: groceryModel,
       mealCalendarModel: mealCalendarModel,

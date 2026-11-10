@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [Menu detail declutter: one AI menu, an Edit sheet, and rows without buttons](menu-detail-declutter.md) — **Ready.** The toolbar gets the house AI menu and an Edit sheet; Place, the Calendar section, the Playbook toggle, the project field and dish-row buttons go; three custom symbols.

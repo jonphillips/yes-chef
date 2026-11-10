@@ -5,7 +5,7 @@
 > Playbook toggle, the ChatGPT Project field and the large empty states go. Three custom SF Symbols give recipes and
 > menus one glyph vocabulary.
 
-Status: **Accepted** — 2026-11-10. Effort: [`efforts/menu-detail-declutter.md`](../efforts/menu-detail-declutter.md).
+Status: **Accepted** — 2026-11-10. Effort: [`efforts/archive/menu-detail-declutter.md`](../efforts/archive/menu-detail-declutter.md).
 Origin: Jon's iPad pass on Thanksgiving Week 2026, 2026-11-10: *"There are so many buttons… I don't even remember
 what that bullseye/target button does."* He approved a comp the same day. Two details differ from the comp because
 of the house Controls rules (D2, D5).
@@ -150,8 +150,9 @@ Recipes are `richtext.page` and menus are `menucard`. Overlays have one meaning 
 | `custom.menucard.arrow.in` | bring into this menu | **Bring In Calendar Items…** |
 
 `book.badge.plus` is retired from the menu screen. The architect authored the templates from Jon's SF Symbols exports
-(`docs/design/symbols/`). They're Regular-weight static templates: the arrow and badge cut-outs can't be made
-interpolation-compatible with Ultralight and Black, so every weight draws the Regular design. That's fine for toolbar
+(`docs/design/symbols/`). The arrow and badge cut-outs can't be made interpolation-compatible across weights, so each
+template's Ultralight, Regular and Black masters are identical copies of the Regular design. Every weight draws that
+design, and Xcode derives the Small, Medium and Large scales from the masters. That's fine for toolbar
 and menu icons. A `custom.menucard.badge.plus` template exists in Jon's iCloud folder but ships only when something
 needs it.
 
