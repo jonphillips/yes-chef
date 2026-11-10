@@ -24,3 +24,5 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
+
+- [The menu row's note shows on the recipe screen](menu-row-note-on-recipe.md) — **Ready.** A recipe opened from a menu or calendar row shows that row's note in a card labeled with the menu or day; the library shows none. Read-only, no schema.
