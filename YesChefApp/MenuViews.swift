@@ -412,6 +412,7 @@ struct MenuPrepPlanSection: View {
           Button("Clear Prep Plan", role: .destructive) {
             isClearConfirmationPresented = true
           }
+          .disabled(steps.isEmpty)
         } label: {
           Label("Prep Plan Actions", systemImage: "ellipsis.circle")
             .labelStyle(.iconOnly)
@@ -866,17 +867,13 @@ struct MenuEditView: View {
         ForEach($draft.placements) { $placement in
           DatePicker("Start Date", selection: $placement.startDate, displayedComponents: .date)
             .swipeActions(edge: .trailing) {
-              if placement.placementID != nil {
-                Button(role: .destructive) { remove(placement) } label: {
-                  Label("Remove from Calendar", systemImage: "trash")
-                }
+              Button(role: .destructive) { remove(placement) } label: {
+                Label("Remove from Calendar", systemImage: "trash")
               }
             }
             .contextMenu {
-              if placement.placementID != nil {
-                Button(role: .destructive) { remove(placement) } label: {
-                  Label("Remove from Calendar", systemImage: "trash")
-                }
+              Button(role: .destructive) { remove(placement) } label: {
+                Label("Remove from Calendar", systemImage: "trash")
               }
             }
         }
@@ -908,7 +905,12 @@ struct MenuEditView: View {
   }
 
   private func remove(_ placement: MenuEditPlacementDraft) {
-    // Removal deliberately abandons unsaved edits, then presents the existing confirmation.
+    // A placement added in this sheet isn't saved yet, so removing it just drops the draft row.
+    guard placement.placementID != nil else {
+      draft.placements.removeAll { $0.id == placement.id }
+      return
+    }
+    // Removing a saved placement deliberately abandons unsaved edits, then presents the existing confirmation.
     dismiss()
     model.deletePlacementButtonTapped(menuTitle: draft.title, placement: placement)
   }

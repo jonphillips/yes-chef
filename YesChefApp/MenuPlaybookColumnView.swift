@@ -1,6 +1,5 @@
 import LLMHandoffUI
 import SwiftUI
-import UIKit
 import YesChefCore
 
 struct MenuDetailReader: View {
@@ -80,33 +79,33 @@ struct MenuDetailReader: View {
       }
       .frame(width: layout.bodyWidth(playbookWidth: livePlaybookWidth))
 
-        RecipePlaybookResizeHandle(
-          detent: detent,
-          splitAccessibilityLabel: "Dishes and Playbook split",
-          cycle: { currentPlaybookDetent = detent.next },
-          decrement: { currentPlaybookDetent = detent.previous },
-          increment: { currentPlaybookDetent = detent.next }
-        )
-        .simultaneousGesture(
-          DragGesture(minimumDistance: 2)
-            .updating($playbookDragTranslation) { value, state, _ in
-              state = value.translation.width
-            }
-            .onEnded { value in
-              let proposedWidth = layout.proposedPlaybookWidth(
-                base: basePlaybookWidth,
-                translation: value.translation.width
-              )
-              currentPlaybookDetent = layout.nearestDetent(to: proposedWidth)
-            }
-        )
+      RecipePlaybookResizeHandle(
+        detent: detent,
+        splitAccessibilityLabel: "Dishes and Playbook split",
+        cycle: { currentPlaybookDetent = detent.next },
+        decrement: { currentPlaybookDetent = detent.previous },
+        increment: { currentPlaybookDetent = detent.next }
+      )
+      .simultaneousGesture(
+        DragGesture(minimumDistance: 2)
+          .updating($playbookDragTranslation) { value, state, _ in
+            state = value.translation.width
+          }
+          .onEnded { value in
+            let proposedWidth = layout.proposedPlaybookWidth(
+              base: basePlaybookWidth,
+              translation: value.translation.width
+            )
+            currentPlaybookDetent = layout.nearestDetent(to: proposedWidth)
+          }
+      )
 
-        ScrollView {
-          menuPlaybook
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-        .frame(width: livePlaybookWidth, alignment: .topLeading)
+      ScrollView {
+        menuPlaybook
+          .padding()
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .frame(width: livePlaybookWidth, alignment: .topLeading)
     }
     .animation(.snappy(duration: 0.22), value: currentPlaybookDetent)
     .frame(width: size.width, height: size.height, alignment: .topLeading)

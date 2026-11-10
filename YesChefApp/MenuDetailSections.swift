@@ -378,7 +378,7 @@ private struct MenuDishRowView: View {
           Button {
             detailModel.targetItemTapped(row.id)
           } label: {
-            Label(isDepositTarget ? "Clear Chat Target" : "Set as Chat Target", systemImage: isDepositTarget ? "target" : "target")
+            Label(isDepositTarget ? "Clear Chat Target" : "Set as Chat Target", systemImage: "target")
           }
         }
 

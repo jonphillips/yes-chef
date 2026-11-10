@@ -143,10 +143,6 @@ final class MenuLibraryModel {
     }
   }
 
-  func bringInButtonTapped(menu: CoreMenu, offer: MenuBringInOffer) {
-    bringInButtonTapped(menuID: menu.id, menuTitle: menu.title, offer: offer)
-  }
-
   func bringInButtonTapped(menuID: CoreMenu.ID, menuTitle: String, offer: MenuBringInOffer) {
     destination = .bringIn(MenuBringInPresentation(menuID: menuID, menuTitle: menuTitle, offer: offer))
   }
@@ -407,16 +403,6 @@ final class MenuLibraryModel {
       isShowingError = true
       return false
     }
-  }
-
-  func deletePlacementButtonTapped(menu: CoreMenu, placement: MenuPlacement) {
-    destination = .deletePlacement(
-      MenuPlacementDeletionContext(
-        placementID: placement.id,
-        menuTitle: menu.title,
-        startDate: placement.startDate
-      )
-    )
   }
 
   func deletePlacementButtonTapped(menuTitle: String, placement: MenuEditPlacementDraft) {

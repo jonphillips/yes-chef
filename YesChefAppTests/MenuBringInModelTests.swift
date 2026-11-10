@@ -70,10 +70,11 @@ struct MenuBringInModelTests {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 900_150_000)
       let menuID = UUID(uuidString: "00000000-0000-0000-0000-000000000151")!
+      let calendarItemID = UUID(uuidString: "00000000-0000-0000-0000-000000000152")!
       try database.write { db in
         try Menu.insert { Menu(id: menuID, title: "Menu", dayCount: 2, dateCreated: now, dateModified: now) }.execute(db)
         try MealPlanItem.insert {
-          MealPlanItem(id: UUID(), kind: .note, title: "Calendar note", scheduledDate: now,
+          MealPlanItem(id: calendarItemID, kind: .note, title: "Calendar note", scheduledDate: now,
             mealSlot: .dinner, notes: nil, sortOrder: 0, dateCreated: now, dateModified: now)
         }.execute(db)
       }
@@ -81,10 +82,22 @@ struct MenuBringInModelTests {
       let context = MenuEditDraftContext(menuID: menuID, title: "Menu", notes: "", dayCount: 2,
         minimumDayCount: 1, placements: [MenuEditPlacementDraft(startDate: now)], bringInOffer: nil)
       #expect(model.saveMenuEditsButtonTapped(context: context))
-      guard case .bringIn = model.destination else {
+      guard case let .bringIn(presentation) = model.destination else {
         Issue.record("Expected a single new placement to present the Bring In offer")
         return
       }
+
+      // Not Now dismisses without writing: the calendar item stays put.
+      model.destination = nil
+      #expect(try database.read { db in try MealPlanItem.find(calendarItemID).fetchOne(db) } != nil)
+      #expect(try database.read { db in try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db) }.isEmpty)
+
+      // Bring In moves the calendar item into the menu.
+      model.confirmBringIn(presentation)
+      #expect(model.destination == nil)
+      let menuItems = try database.read { db in try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db) }
+      #expect(menuItems.map(\.title) == ["Calendar note"])
+      #expect(try database.read { db in try MealPlanItem.find(calendarItemID).fetchOne(db) } == nil)
     }
   }
 
