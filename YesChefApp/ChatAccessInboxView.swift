@@ -6,7 +6,7 @@ struct ChatAccessInboxSection: View {
 
   var body: some View {
     @Bindable var model = model
-    if model.inboxCount > 0 || !model.returnRows.isEmpty || !model.recipeReturnRows.isEmpty || model.message != nil {
+    if model.inboxCount > 0 || !model.returnRows.isEmpty || !model.recipeReturnRows.isEmpty || !model.menuDayRows.isEmpty || model.message != nil {
       Section {
         if let message = model.message {
           Label(message, systemImage: "exclamationmark.icloud")
@@ -91,6 +91,27 @@ struct ChatAccessInboxSection: View {
           }
           .accessibilityElement(children: .contain)
         }
+        ForEach(model.menuDayRows) { row in
+          VStack(alignment: .leading, spacing: 8) {
+            Text(row.title).font(.headline)
+            Text(row.stagedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+            if row.downloadState == .downloading { Text("Downloading…").font(.caption).foregroundStyle(.secondary) }
+            if let error = model.rowErrors[row.id] {
+              Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange)
+            }
+            HStack {
+              if row.canOpen {
+                Button("Open") { Task { await model.open(row) } }
+                  .disabled(row.downloadState != .current || model.workingIDs.contains(row.id))
+                  .buttonStyle(.bordered)
+              }
+              Button("Discard", role: .destructive) { Task { await model.discard(row) } }
+                .disabled(model.workingIDs.contains(row.id))
+                .buttonStyle(.bordered)
+            }
+          }
+          .accessibilityElement(children: .contain)
+        }
         if model.returnRows.contains(where: { if case .openable = $0.destination { false } else { true } }) {
           Text("Started on another device")
             .font(.headline)
@@ -101,14 +122,23 @@ struct ChatAccessInboxSection: View {
       } header: {
         Text("From Chat")
       } footer: {
-        Text("Open a staged recipe return or menu to review it, or discard it.")
+        Text("Open a staged recipe return, menu or menu day to review it, or discard it.")
       }
-      .sheet(item: $model.menuReview) { review in
-        ChatMenuReviewSheet(
-          model: review,
-          isCreating: model.workingIDs.contains(review.row.id),
-          create: { await model.createMenu(from: review) }
-        )
+      .sheet(item: $model.review) { review in
+        switch review {
+        case let .menu(menuReview):
+          ChatMenuReviewSheet(
+            model: menuReview,
+            isCreating: model.workingIDs.contains(menuReview.row.id),
+            create: { await model.createMenu(from: menuReview) }
+          )
+        case let .menuDay(menuDayReview):
+          ChatMenuDayReviewSheet(
+            model: menuDayReview,
+            isApplying: model.workingIDs.contains(menuDayReview.row.id),
+            apply: { await model.applyMenuDay(from: menuDayReview) }
+          )
+        }
       }
     }
   }

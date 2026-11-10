@@ -1,6 +1,5 @@
-# Next Up — `stage_menu_day`: a chat replaces one day of an existing menu
+# Next Up — nothing dispatched
 
-**Slices:** effort `stage-menu-day`
-**Briefs:** [docs/efforts/stage-menu-day.md](efforts/stage-menu-day.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

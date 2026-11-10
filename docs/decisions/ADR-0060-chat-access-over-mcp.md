@@ -638,7 +638,7 @@ Continuing D7's numbering. The two slices are independent and can go out as one 
 ## Amendment 3 — A chat can replace one day of a menu that already exists (2026-11-10)
 
 Status: **Accepted** — 2026-11-10 (#476). Answers Amd 2 OQ6 for one day at a time. Schema-free. No export change.
-Adds one staging tool, one inbox kind and one review sheet. Built by effort [`stage-menu-day`](../efforts/stage-menu-day.md).
+Adds one staging tool, one inbox kind and one review sheet. Built by effort [`stage-menu-day`](../efforts/archive/stage-menu-day.md).
 The app half that shows a row's note on the recipe screen is effort
 [`menu-row-note-on-recipe`](../efforts/archive/menu-row-note-on-recipe.md), which doesn't depend on this amendment.
 
@@ -772,7 +772,7 @@ menu's.
 
 ### Amd 3 — slice
 
-- **S6 — `stage_menu_day`** (D2–D5), one dispatch: effort [`stage-menu-day`](../efforts/stage-menu-day.md).
+- **S6 — `stage_menu_day`** (D2–D5), one dispatch: effort [`stage-menu-day`](../efforts/archive/stage-menu-day.md).
 - **Install order:** the app on both devices first, then the helper, as in Amd 2.
 
 ### Amd 3 — consequences

@@ -35,6 +35,12 @@ private struct StageMenuResult: Encodable, Sendable {
   var next: String
 }
 
+private struct StageMenuDayResult: Encodable, Sendable {
+  var staged: String
+  var dishes: Int
+  var next: String
+}
+
 private struct StageContext: Sendable {
   let home: URL
   let now: @Sendable () -> Date
@@ -93,6 +99,16 @@ private struct StageContext: Sendable {
     let inbox = HandoffInbox(root: try stagingFolder().inboxURL, fileExtension: "ycmenu")
     _ = try inbox.stage(String(decoding: data, as: UTF8.self), slug: envelope.title, now: now())
     return StageMenuResult(staged: envelope.title, recipes: recipeCount, newDishes: newDishCount, next: "Jon reviews it in Yes Chef → From Chat.")
+  }
+
+  func stageMenuDay(_ envelope: ChatAccessStagedMenuDay) throws -> StageMenuDayResult {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try encoder.encode(envelope)
+    let inbox = HandoffInbox(root: try stagingFolder().inboxURL, fileExtension: "ycmenuday")
+    _ = try inbox.stage(String(decoding: data, as: UTF8.self), slug: "\(envelope.menuTitle)-day-\(envelope.dayOffset + 1)", now: now())
+    return StageMenuDayResult(staged: "\(envelope.menuTitle), day \(envelope.dayOffset + 1)", dishes: envelope.items.count,
+      next: "Jon reviews it in Yes Chef → From Chat.")
   }
 
   private func stagingFolder() throws -> ChatAccessFolder {
@@ -201,6 +217,8 @@ public enum YesChefMCPServer {
       "note": string, "scale": .object(["type": .string("number")]),
     ]
     let itemSchema: MCPValue = .object(["type": .string("object"), "properties": .object(itemProperties), "additionalProperties": .bool(false)])
+    let menuDayItemProperties = itemProperties.filter { $0.key != "day" }
+    let menuDayItemSchema: MCPValue = .object(["type": .string("object"), "properties": .object(menuDayItemProperties), "additionalProperties": .bool(false)])
     return [
       MCPTool(
         name: "stage_recipe_return",
@@ -223,13 +241,25 @@ public enum YesChefMCPServer {
       },
       MCPTool(
         name: "stage_menu",
-        description: "Stage a new menu for Jon to review. An item with a recipe ref from `search_recipes` is a library recipe; one without a ref is a new dish, shown as a note row. `day` is 0-based, as in `get_menu`. To put a new recipe on the menu as a recipe, stage it with `stage_recipe`, wait for Jon to save it, search again, then stage the menu with its ref. This creates a new menu; it cannot add to an existing menu.",
+        description: "Stage a new menu for Jon to review. An item with a recipe ref from `search_recipes` is a library recipe; one without a ref is a new dish, shown as a note row. `day` is 0-based, as in `get_menu`. To put a new recipe on the menu as a recipe, stage it with `stage_recipe`, wait for Jon to save it, search again, then stage the menu with its ref. This creates a new menu. To change one day of a menu that already exists, use `stage_menu_day`.",
         inputSchema: .object(["type": .string("object"), "properties": .object([
           "title": string, "days": integer, "items": .object(["type": .string("array"), "items": itemSchema]),
         ]), "required": .array([.string("title"), .string("items")]), "additionalProperties": .bool(false)]),
         annotations: .init(readOnly: false, destructive: false, openWorld: false)
       ) { input in
         do { return .json(try await Self.decodeAndStageMenu(input, context: context, exportStore: exportStore)) }
+        catch { return .error(error.localizedDescription) }
+      },
+      MCPTool(
+        name: "stage_menu_day",
+        description: "Replace one day of a menu found with `list_menus`. Read the menu with `get_menu` first and send every dish for that day, with each note and scale that should stay; anything not sent is removed, including a note or scale that is not carried over. A note is for this dish on this menu only. A change to the recipe itself goes through `stage_recipe_return`. The day must already exist.",
+        inputSchema: .object(["type": .string("object"), "properties": .object([
+          "menu": string, "day": integer,
+          "items": .object(["type": .string("array"), "items": menuDayItemSchema]),
+        ]), "required": .array([.string("menu"), .string("day"), .string("items")]), "additionalProperties": .bool(false)]),
+        annotations: .init(readOnly: false, destructive: false, openWorld: false)
+      ) { input in
+        do { return .json(try await Self.decodeAndStageMenuDay(input, context: context, exportStore: exportStore)) }
         catch { return .error(error.localizedDescription) }
       },
     ]
@@ -244,22 +274,50 @@ public enum YesChefMCPServer {
     guard args["days"] == nil || args["days"]?.integerValue != nil else { throw StageInputError("Days must be a whole number from 1 to 14.") }
     let days = args["days"]?.integerValue ?? 1
     guard (1...14).contains(days) else { throw StageInputError("Days must be between 1 and 14.") }
+    let resolutions = try await exportStore.resolveRecipes(rawItems.map { $0.objectValue?["ref"]?.stringValue })
+    let decoded = decodeMenuItems(rawItems, resolutions: resolutions, dayCount: days)
+    guard decoded.problems.isEmpty else { throw StageInputError("Fix these menu items and retry: \(decoded.problems.joined(separator: "; "))") }
+    return try context.stageMenu(ChatAccessStagedMenu(title: cleanTitle, dayCount: days, items: decoded.items), recipeCount: decoded.recipes, newDishCount: decoded.newDishes)
+  }
+
+  private static func decodeAndStageMenuDay(_ input: MCPValue, context: StageContext, exportStore: ChatAccessExportStore) async throws -> StageMenuDayResult {
+    guard let args = input.objectValue, let ref = args["menu"]?.stringValue,
+      let rawItems = args["items"]?.arrayValue
+    else { throw StageInputError("Provide a menu ref, a whole-number day, and at least one menu item.") }
+    guard (1...40).contains(rawItems.count) else { throw StageInputError("Items must contain 1 to 40 entries.") }
+    let menu = try await exportStore.resolveMenu(ref)
+    guard let day = args["day"]?.integerValue else { throw StageInputError("day must be from 0 to \(menu.dayCount - 1)") }
+    guard (0..<menu.dayCount).contains(day) else { throw StageInputError("day must be from 0 to \(menu.dayCount - 1)") }
+    let resolutions = try await exportStore.resolveRecipes(rawItems.map { $0.objectValue?["ref"]?.stringValue })
+    let decoded = decodeMenuItems(rawItems, resolutions: resolutions, dayCount: menu.dayCount, fixedDay: day)
+    guard decoded.problems.isEmpty else { throw StageInputError("Fix these menu items and retry: \(decoded.problems.joined(separator: "; "))") }
+    let dayAtStage = menu.items.filter { $0.dayOffset == day }.map {
+      ChatAccessStagedMenuDay.LiveItem(kind: $0.kind, title: $0.title, recipeID: $0.recipeID, slot: $0.slot, note: $0.note, scale: $0.scale)
+    }
+    return try context.stageMenuDay(ChatAccessStagedMenuDay(menuID: menu.id, menuTitle: menu.title, dayOffset: day, items: decoded.items, dayAtStage: dayAtStage))
+  }
+
+  private static func decodeMenuItems(
+    _ rawItems: [MCPValue],
+    resolutions: [ChatAccessExportStore.RecipeResolution],
+    dayCount: Int,
+    fixedDay: Int? = nil
+  ) -> (items: [ChatAccessStagedMenu.Item], recipes: Int, newDishes: Int, problems: [String]) {
     var problems: [String] = []
     var items: [ChatAccessStagedMenu.Item] = []
     var recipes = 0
     var newDishes = 0
-    let resolutions = try await exportStore.resolveRecipes(rawItems.map { $0.objectValue?["ref"]?.stringValue })
     for (index, value) in rawItems.enumerated() {
       let row = value.objectValue ?? [:]
-      let day = row["day"]?.integerValue ?? 0
+      let day = fixedDay ?? row["day"]?.integerValue ?? 0
       let slotText = row["slot"]?.stringValue ?? MealPlanItemSlot.dinner.rawValue
       let slot = MealPlanItemSlot(rawValue: slotText)
       let note = row["note"]?.stringValue
       let scale = row["scale"]?.doubleValue
       let ref = row["ref"]?.stringValue
       let rowTitle = row["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
-      if row["day"] != nil && row["day"]?.integerValue == nil { problems.append("item \(index + 1): day must be a whole number") }
-      else if !(0..<days).contains(day) { problems.append("item \(index + 1): day must be from 0 to \(days - 1)") }
+      if fixedDay == nil && row["day"] != nil && row["day"]?.integerValue == nil { problems.append("item \(index + 1): day must be a whole number") }
+      else if !(0..<dayCount).contains(day) { problems.append("item \(index + 1): day must be from 0 to \(dayCount - 1)") }
       if slot == nil { problems.append("item \(index + 1): slot must be breakfast, lunch, dinner, or snack") }
       if let note, note.count > 500 { problems.append("item \(index + 1): note must be at most 500 characters") }
       if let scale, scale <= 0 { problems.append("item \(index + 1): scale must be greater than 0") }
@@ -283,8 +341,7 @@ public enum YesChefMCPServer {
         items.append(.init(recipeID: nil, title: rowTitle ?? "", dayOffset: day, slot: slot ?? .dinner, note: note, scale: nil))
       }
     }
-    guard problems.isEmpty else { throw StageInputError("Fix these menu items and retry: \(problems.joined(separator: "; "))") }
-    return try context.stageMenu(ChatAccessStagedMenu(title: cleanTitle, dayCount: days, items: items), recipeCount: recipes, newDishCount: newDishes)
+    return (items, recipes, newDishes, problems)
   }
 }
 

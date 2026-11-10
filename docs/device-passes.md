@@ -25,6 +25,7 @@ Dev, on CloudKit Development.
 - **app-symbol-vocabulary S1 + S2 (one PR):** Jon verifies the recipe, source, Edit, category, and Create Recipe glyphs on iPad Pro 13-inch (M5), then iPhone 17 Pro. ([brief](efforts/archive/app-symbol-vocabulary.md))
 - **chat-started-returns-and-menus S4 + S5 (one PR):** On iPhone, then iPad, in a ChatGPT chat outside the Yes Chef Project: find and choose two library recipes; stage a revision and make-ahead for one and verify the recipe review opens; stage and save a new recipe, then search again and stage a menu with the two library recipes, the new recipe by ref, and a note dish. Verify the review badges and menu creation, confirm claimed items disappear from From Chat on iPad, and confirm a stale ref asks for a fresh search and succeeds on retry. ([brief](efforts/archive/chat-started-returns-and-menus.md))
 - **menu-row-note-on-recipe (one PR):** On Thanksgiving Week, open the souvlaki from the menu (card shows), the calendar (card shows), and the library (no card); change the note in Edit Dish, reopen the recipe from the menu, and confirm the new text. ([brief](efforts/archive/menu-row-note-on-recipe.md))
+- **stage-menu-day:** In ChatGPT, read Thanksgiving Week, then restage one day: keep the souvlaki with a new note, drop one dish and add one new dish. Confirm Changed, Removed and New in review; after Apply, check the kept grocery source and the updated calendar day. ([brief](efforts/archive/stage-menu-day.md))
 
 ## Held
 

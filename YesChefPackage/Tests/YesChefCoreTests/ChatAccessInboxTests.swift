@@ -49,6 +49,22 @@ struct ChatAccessInboxTests {
     #expect(rows.last?.title == "Recipe not found on this device")
   }
 
+  @Test func unreadableMenuDayStillHasAnOpenableInboxRow() throws {
+    let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
+    let url = root.appending(path: "20261110T120000Z-week-day-2.ycmenuday")
+    let row = try #require(ChatAccessInbox.menuDayRows(from: [
+      .init(url: url, name: url.lastPathComponent, isCurrent: true),
+    ], resolve: { _, _ in (false, nil) }).first)
+    #expect(!row.isReadable)
+    #expect(row.canOpen)
+    #expect(row.title.contains("Unreadable menu day"))
+    let missing = try #require(ChatAccessInbox.menuDayRows(from: [
+      .init(url: url, name: url.lastPathComponent, isCurrent: true, menuTitle: "Week", menuDayMenuID: UUID(), menuDayOffset: 1),
+    ], resolve: { _, _ in (false, nil) }).first)
+    #expect(missing.title == "Menu not found on this device")
+    #expect(!missing.canOpen)
+  }
+
   @Test func returnsStagedInSameSecondUseCollisionSequence() throws {
     let id = UUID()
     let handoff = AIHandoff(id: id, sourceType: .menu, sourceID: UUID(), taskType: .prepPlan,
@@ -123,6 +139,8 @@ struct ChatAccessInboxTests {
     #expect(opening.contains("stage_handoff_return"))
     #expect(opening.contains("stage_recipe_return"))
     #expect(opening.contains("stage_menu"))
+    #expect(opening.contains("stage_menu_day"))
+    #expect(opening.count <= 512)
     #expect(text.contains(RecipeReturnLabels.deliverableLines))
     #expect(text.contains(AIHandoffReturnContract.projectInstructions))
     #expect(text.contains("If a tool call fails or times out, print the return block or the JSON-LD object for Jon to paste instead."))

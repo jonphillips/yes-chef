@@ -6,10 +6,10 @@ Summary: A new MCP staging tool, `stage_menu_day`, sends the whole of one day of
 Origin: Jon planning one dinner of the 7-day Thanksgiving Week menu with ChatGPT (2026-11-10). One dispatch, one PR.
 **No schema change.**
 
-Decisions: [ADR-0060 Amendment 3](../decisions/ADR-0060-chat-access-over-mcp.md#amendment-3--a-chat-can-replace-one-day-of-a-menu-that-already-exists-2026-11-10)
+Decisions: [ADR-0060 Amendment 3](../../decisions/ADR-0060-chat-access-over-mcp.md#amendment-3--a-chat-can-replace-one-day-of-a-menu-that-already-exists-2026-11-10)
 (D1–D5; read it first). Builds on Amd 2-D4 (`stage_menu`, the `ycmenu` inbox kind and its review). Related:
-[archived `chat-started-returns-and-menus` brief](archive/chat-started-returns-and-menus.md) (S5 is the closest
-precedent, and most of this slice copies its shape) · [`menu-row-note-on-recipe`](archive/menu-row-note-on-recipe.md)
+[archived `chat-started-returns-and-menus` brief](chat-started-returns-and-menus.md) (S5 is the closest
+precedent, and most of this slice copies its shape) · [`menu-row-note-on-recipe`](menu-row-note-on-recipe.md)
 (independent; shows the row's note on the recipe screen).
 
 ## Where things are (architect, 2026-11-10, `origin/main` 9ac187a)
@@ -174,7 +174,7 @@ file. This touches `YesChefApp/` model code, so the target runs (guardrail #9).
 - The app's review shows Kept, Changed, New and Removed, plus the drift banner.
 - Apply replaces the day in one transaction, and a dish that stays keeps its row.
 - No ids in tool output. The opening is per Amd 3-D5.
-- Tests above; verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above; verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`; closeout (ADR-0005 D16). The PR body gives Jon the install order: the app on both devices
   first, then the helper.
 - **Jon's device gate:** in ChatGPT, read Thanksgiving Week, then restage one day:

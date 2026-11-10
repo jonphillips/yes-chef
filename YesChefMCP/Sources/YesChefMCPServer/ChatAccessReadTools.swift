@@ -91,6 +91,12 @@ actor ChatAccessExportStore {
       }
     }
   }
+
+  func resolveMenu(_ ref: String?) async throws -> ChatAccessExport.MenuRecord {
+    let snapshot = try await load()
+    let index = try ChatAccessReadTools.resolveIndex(ref, expectedKind: .menu, snapshot: snapshot, count: snapshot.value.menus.count)
+    return snapshot.value.menus[index]
+  }
 }
 
 private struct ReadToolError: LocalizedError {

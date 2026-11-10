@@ -14,13 +14,17 @@ public enum ChatAccessInbox {
     public let isCurrent: Bool
     public let recipeName: String?
     public let menuTitle: String?
+    public let menuDayMenuID: UUID?
+    public let menuDayOffset: Int?
 
-    public init(url: URL, name: String, isCurrent: Bool, recipeName: String? = nil, menuTitle: String? = nil) {
+    public init(url: URL, name: String, isCurrent: Bool, recipeName: String? = nil, menuTitle: String? = nil, menuDayMenuID: UUID? = nil, menuDayOffset: Int? = nil) {
       self.url = url
       self.name = name
       self.isCurrent = isCurrent
       self.recipeName = recipeName
       self.menuTitle = menuTitle
+      self.menuDayMenuID = menuDayMenuID
+      self.menuDayOffset = menuDayOffset
     }
   }
 
@@ -65,6 +69,36 @@ public enum ChatAccessInbox {
     public var id: String { url.path }
   }
 
+  public struct MenuDayRow: Equatable, Identifiable, Sendable {
+    public let url: URL
+    public let menuID: UUID?
+    public let dayOffset: Int?
+    public let menuTitle: String
+    public let dayTitle: String
+    public let isMenuAvailable: Bool
+    public let isReadable: Bool
+    public let stagedAt: Date
+    public let downloadState: DownloadState
+    public var id: String { url.path }
+    public var canOpen: Bool { isReadable ? isMenuAvailable : true }
+    public var title: String {
+      guard isReadable else { return "Unreadable menu day · \(menuTitle)" }
+      return isMenuAvailable ? "Menu day · \(menuTitle), \(dayTitle)" : "Menu not found on this device"
+    }
+
+    public init(url: URL, menuID: UUID?, dayOffset: Int?, menuTitle: String, dayTitle: String, isMenuAvailable: Bool, isReadable: Bool = true, stagedAt: Date, downloadState: DownloadState) {
+      self.url = url
+      self.menuID = menuID
+      self.dayOffset = dayOffset
+      self.menuTitle = menuTitle
+      self.dayTitle = dayTitle
+      self.isMenuAvailable = isMenuAvailable
+      self.isReadable = isReadable
+      self.stagedAt = stagedAt
+      self.downloadState = downloadState
+    }
+  }
+
   public static func recipeReturnRows(from snapshots: [MetadataSnapshot], resolve: (UUID) -> Recipe?) -> [RecipeReturnRow] {
     snapshots.compactMap { snapshot in
       guard snapshot.url.pathExtension == "ycrecipereturn", let staged = StagedHandoff(url: snapshot.url),
@@ -84,6 +118,31 @@ public enum ChatAccessInbox {
       return MenuRow(url: snapshot.url, title: "Menu · \(title)", stagedAt: staged.stagedAt,
         downloadState: snapshot.isCurrent ? .current : .downloading)
     }.sorted { $0.stagedAt > $1.stagedAt }
+  }
+
+  public static func menuDayRows(
+    from snapshots: [MetadataSnapshot],
+    resolve: (UUID, Int) -> (menuExists: Bool, date: Date?)
+  ) -> [MenuDayRow] {
+    snapshots.compactMap { snapshot in
+      guard snapshot.url.pathExtension == "ycmenuday", let staged = StagedHandoff(url: snapshot.url) else { return nil }
+      let menuID = snapshot.menuDayMenuID
+      let day = snapshot.menuDayOffset
+      let availability = menuID.flatMap { id in day.map { resolve(id, $0) } }
+      let dateTitle = availability?.date.map { $0.formatted(date: .abbreviated, time: .omitted) } ?? day.map { "Day \($0 + 1)" } ?? "Day"
+      let trimmedTitle = snapshot.menuTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+      let menuTitle = trimmedTitle.flatMap { $0.isEmpty ? nil : $0 } ?? displayName(slug: staged.slug, recipeName: nil)
+      return MenuDayRow(url: snapshot.url, menuID: menuID, dayOffset: day, menuTitle: menuTitle,
+        dayTitle: dateTitle, isMenuAvailable: availability?.menuExists ?? false,
+        isReadable: menuID != nil && day != nil, stagedAt: staged.stagedAt,
+        downloadState: snapshot.isCurrent ? .current : .downloading)
+    }.sorted { $0.stagedAt > $1.stagedAt }
+  }
+
+  public static func menuDayMetadata(from text: String) -> (menuID: UUID, menuTitle: String, dayOffset: Int)? {
+    guard let data = text.data(using: .utf8),
+      let envelope = try? JSONDecoder().decode(ChatAccessStagedMenuDay.self, from: data) else { return nil }
+    return (envelope.menuID, envelope.menuTitle, envelope.dayOffset)
   }
 
   public static func menuTitle(from text: String) -> String? {

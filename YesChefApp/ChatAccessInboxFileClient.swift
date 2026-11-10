@@ -17,7 +17,8 @@ extension ChatAccessInboxFileClient: DependencyKey {
     let handoff = ChatInboxItemKind(fileExtension: "ycreturn", expiresUnclaimed: true, datesProcessedByClaim: true)
     let recipeReturn = ChatInboxItemKind(fileExtension: "ycrecipereturn", expiresUnclaimed: false, datesProcessedByClaim: false)
     let menu = ChatInboxItemKind(fileExtension: "ycmenu", expiresUnclaimed: false, datesProcessedByClaim: false)
-    let kinds = [recipe, handoff, recipeReturn, menu]
+    let menuDay = ChatInboxItemKind(fileExtension: "ycmenuday", expiresUnclaimed: false, datesProcessedByClaim: false)
+    let kinds = [recipe, handoff, recipeReturn, menu, menuDay]
     return Self(
       read: client.read,
       openAndClaim: { folder, url in
