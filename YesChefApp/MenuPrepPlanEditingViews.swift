@@ -233,6 +233,7 @@ struct LearningsSection: View {
         }
       },
       addButtonLabel: "Add Learning",
+      addButtonIconOnly: true,
       updateItem: updateLearning,
       deleteItem: { deleteLearning($0.id) },
       reorderItems: { sourceIDs, destinationID in
@@ -243,11 +244,8 @@ struct LearningsSection: View {
       }
     ) {
       if showsEmptyPlaceholder {
-        ContentUnavailableView(
-          "No Learnings Yet",
-          systemImage: "lightbulb",
-          description: Text("Add a cooking observation or keep useful ideas from an AI handoff here.")
-        )
+        Text("None yet.")
+          .foregroundStyle(.tertiary)
       } else {
         EmptyView()
       }

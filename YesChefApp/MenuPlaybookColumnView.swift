@@ -9,12 +9,8 @@ struct MenuDetailReader: View {
   let detail: MenuDetailData
   let handoffTransport: HandoffInAppTransport
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
-  var isAskActive: Bool
-  var askButtonTapped: () -> Void
   var regeneratePrepPlan: () -> Void
 
-  @AppStorage(MenuPlaybookColumnPreferences.visibilityStorageKey)
-  private var isPlaybookColumnVisible = true
   @AppStorage(MenuPlaybookColumnPreferences.detentsStorageKey)
   private var persistedPlaybookDetentsData = Data()
   @GestureState private var playbookDragTranslation: CGFloat = 0
@@ -25,8 +21,6 @@ struct MenuDetailReader: View {
     detail: MenuDetailData,
     handoffTransport: HandoffInAppTransport,
     onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil,
-    isAskActive: Bool,
-    askButtonTapped: @escaping () -> Void,
     regeneratePrepPlan: @escaping () -> Void
   ) {
     self.model = model
@@ -34,8 +28,6 @@ struct MenuDetailReader: View {
     self.detail = detail
     self.handoffTransport = handoffTransport
     self.onRecipeSelected = onRecipeSelected
-    self.isAskActive = isAskActive
-    self.askButtonTapped = askButtonTapped
     self.regeneratePrepPlan = regeneratePrepPlan
   }
 
@@ -53,20 +45,6 @@ struct MenuDetailReader: View {
         }
       }
       .swipeActionsContainer()
-      .toolbar {
-        if proxy.size.width >= MenuPlaybookColumnMetrics.twoColumnThreshold {
-          ToolbarItem(placement: .primaryAction) {
-            Button {
-              isPlaybookColumnVisible.toggle()
-            } label: {
-              Label(
-                isPlaybookColumnVisible ? "Hide Playbook" : "Show Playbook",
-                systemImage: "sidebar.trailing"
-              )
-            }
-          }
-        }
-      }
     }
   }
 
@@ -84,8 +62,7 @@ struct MenuDetailReader: View {
 
   private func wideMenuColumns(in size: CGSize) -> some View {
     let layout = MenuWideColumnLayout(
-      width: size.width,
-      isPlaybookVisible: isPlaybookColumnVisible
+      width: size.width
     )
     let detent = currentPlaybookDetent
     let basePlaybookWidth = layout.playbookWidth(for: detent)
@@ -103,7 +80,6 @@ struct MenuDetailReader: View {
       }
       .frame(width: layout.bodyWidth(playbookWidth: livePlaybookWidth))
 
-      if isPlaybookColumnVisible {
         RecipePlaybookResizeHandle(
           detent: detent,
           splitAccessibilityLabel: "Dishes and Playbook split",
@@ -131,7 +107,6 @@ struct MenuDetailReader: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(width: livePlaybookWidth, alignment: .topLeading)
-      }
     }
     .animation(.snappy(duration: 0.22), value: currentPlaybookDetent)
     .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -161,10 +136,6 @@ struct MenuDetailReader: View {
   private var menuBody: some View {
     VStack(alignment: .leading, spacing: 24) {
       MenuDetailHeader(detail: detail)
-      MenuExternalProjectField(
-        externalProjectName: detail.menu.externalProjectName,
-        save: detailModel.updateExternalProjectName
-      )
       MenuDishList(
         model: model,
         detailModel: detailModel,
@@ -174,28 +145,18 @@ struct MenuDetailReader: View {
         isInitiallyExpanded: !isServiceDateTodayOrPast,
         onRecipeSelected: onRecipeSelected
       )
-      MenuPlacementList(
-        model: model,
-        menu: detail.menu,
-        minimumDayCount: max((detail.itemRows.map(\.item.dayOffset).max() ?? 0) + 1, 1),
-        placements: detail.placements,
-        bringInOffer: detail.bringInOffer
-      )
     }
   }
 
   private var menuPlaybook: some View {
     VStack(alignment: .leading, spacing: 24) {
-      menuPlaybookHeader
       MenuPrepPlanSection(
         steps: detail.prepPlanSteps,
         dayCount: detail.menu.dayCount,
         placementStartDate: detail.placements.count == 1 ? detail.placements[0].startDate : nil,
         today: detailModel.now,
         itemRows: detail.itemRows,
-        handoffSource: .menu(detailModel.menuID),
-        regenerateHandoffSource: .menu(detailModel.menuID, prepPlanIntent: .regenerate),
-        handoffTransport: handoffTransport,
+        regeneratePrepPlan: regeneratePrepPlan,
         onRecipeSelected: onRecipeSelected,
         clearPrepPlan: {
           model.clearPrepPlanButtonTapped(menuID: detailModel.menuID)
@@ -216,28 +177,4 @@ struct MenuDetailReader: View {
     }
   }
 
-  private var menuPlaybookHeader: some View {
-    HStack(alignment: .top, spacing: 12) {
-      Spacer()
-      HandoffMenu(
-        handOff: { Task { await handoffTransport.copyPrompt(for: .menu(detailModel.menuID)) } },
-        paste: {
-          let results = UIPasteboard.general.string.map { [$0] } ?? []
-          Task { await handoffTransport.pastedResultsReceived(results, source: .menu(detailModel.menuID)) }
-        },
-        isAskActive: Binding(
-          get: { isAskActive },
-          set: { if $0 != isAskActive { askButtonTapped() } }
-        )
-      )
-      .accessibilityValue(isAskActive ? "Panel open" : "Panel closed")
-      Button(action: regeneratePrepPlan) {
-        Label("Regenerate whole plan", systemImage: "arrow.clockwise")
-      }
-      .buttonStyle(.bordered)
-      .disabled(detail.prepPlanSteps.isEmpty)
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel("Playbook actions")
-  }
 }

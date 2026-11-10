@@ -765,6 +765,45 @@ extension RecipeCoreTests {
         }
       }
     }
+
+    @Test
+    func updatesMenuTitleAndNotesWithNormalization() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 804_600_000)
+      let modifiedAt = now.addingTimeInterval(60)
+      try database.write { db in
+        let menuID = try MenuRepository.addMenu(
+          title: "Original",
+          notes: "Old notes",
+          dayCount: 2,
+          in: db,
+          now: now,
+          uuid: { SampleUUIDSequence.uuid(11_101) }
+        )
+        try MenuRepository.updateMenu(
+          menuID: menuID,
+          title: "  Updated Menu  ",
+          notes: "  New notes  ",
+          in: db,
+          now: modifiedAt
+        )
+        let maybeUpdated = try Menu.find(menuID).fetchOne(db)
+        let updated = try #require(maybeUpdated)
+        #expect(updated.title == "Updated Menu")
+        #expect(updated.notes == "New notes")
+        #expect(updated.dateModified == modifiedAt)
+
+        try MenuRepository.updateMenu(menuID: menuID, title: "Final", notes: "   ", in: db, now: modifiedAt)
+        #expect(try Menu.find(menuID).fetchOne(db)?.notes == nil)
+
+        do {
+          try MenuRepository.updateMenu(menuID: menuID, title: "  ", notes: nil, in: db, now: modifiedAt)
+          Issue.record("Expected an empty title to be rejected")
+        } catch let error as MenuRepositoryError {
+          expectNoDifference(error, .emptyTitle)
+        }
+      }
+    }
   }
 
   @Suite

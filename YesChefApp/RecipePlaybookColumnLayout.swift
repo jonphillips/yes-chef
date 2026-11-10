@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 
 enum MenuPlaybookColumnPreferences {
-  static let visibilityStorageKey = "MenuReader.isPlaybookColumnVisible"
   static let detentsStorageKey = "MenuReader.playbookColumnDetents"
 
   static func detents(from data: Data) -> [String: RecipePlaybookColumnDetent] {
@@ -58,14 +57,12 @@ struct MenuWideColumnLayout {
   private static let bodyMinimumFraction: CGFloat = 0.30
 
   let width: CGFloat
-  let isPlaybookVisible: Bool
 
   var bodyMinimumWidth: CGFloat {
     width * Self.bodyMinimumFraction
   }
 
   private var maximumPlaybookWidth: CGFloat {
-    guard isPlaybookVisible else { return 0 }
     return max(
       0,
       width
@@ -81,7 +78,7 @@ struct MenuWideColumnLayout {
   }
 
   func bodyWidth(playbookWidth: CGFloat) -> CGFloat {
-    width - (isPlaybookVisible ? PlaybookColumnMetrics.resizeHandleWidth + playbookWidth : 0)
+    width - PlaybookColumnMetrics.resizeHandleWidth - playbookWidth
   }
 
   func proposedPlaybookWidth(base: CGFloat, translation: CGFloat) -> CGFloat {

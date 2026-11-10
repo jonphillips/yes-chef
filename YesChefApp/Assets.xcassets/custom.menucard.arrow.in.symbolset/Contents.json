@@ -1,0 +1,12 @@
+{
+  "symbols" : [
+    {
+      "filename" : "custom.menucard.arrow.in.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

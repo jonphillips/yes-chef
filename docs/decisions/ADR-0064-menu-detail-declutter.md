@@ -5,7 +5,7 @@
 > Playbook toggle, the ChatGPT Project field and the large empty states go. Three custom SF Symbols give recipes and
 > menus one glyph vocabulary.
 
-Status: **Accepted** — 2026-11-10. Effort: [`efforts/menu-detail-declutter.md`](../efforts/menu-detail-declutter.md).
+Status: **Accepted** — 2026-11-10. Effort: [`efforts/archive/menu-detail-declutter.md`](../efforts/archive/menu-detail-declutter.md).
 Origin: Jon's iPad pass on Thanksgiving Week 2026, 2026-11-10: *"There are so many buttons… I don't even remember
 what that bullseye/target button does."* He approved a comp the same day. Two details differ from the comp because
 of the house Controls rules (D2, D5).
