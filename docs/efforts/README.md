@@ -26,3 +26,4 @@ discoverable"):
 ## Live
 
 - [Menu detail declutter: one AI menu, an Edit sheet, and rows without buttons](menu-detail-declutter.md) — **Ready.** The toolbar gets the house AI menu and an Edit sheet; Place, the Calendar section, the Playbook toggle, the project field and dish-row buttons go; three custom symbols.
+- [One glyph per concept: `AppSymbol`](app-symbol-vocabulary.md) — **Ready.** `AppSymbol` owns concept glyphs; recipe is `richtext.page`, `book` means source, two Edit glyphs; a lint rule rejects concept literals. After #468.

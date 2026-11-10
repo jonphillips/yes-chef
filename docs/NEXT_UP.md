@@ -1,8 +1,8 @@
-# Next Up — Menu detail declutter
+# Next Up — One glyph per concept: AppSymbol
 
-**Slices:** menu-detail-declutter · S1 + S2 + S3 (one PR)
-**Briefs:** [Menu detail declutter](efforts/menu-detail-declutter.md)
-**Done when:** Per the brief: the menu toolbar carries Cook these · Add Recipes · Edit · the house AI menu (Hand off submenu, Paste, Ask now) and the Playbook column has no AI controls or toggle; an Edit Menu sheet edits title, notes, days and placements and replaces Place and the Calendar section; dish rows have no trailing action buttons; day headers and empty states are quiet; the ChatGPT Project field and entity property are gone; three custom symbol sets ship; tests, required builds, closeout.
+**Slices:** app-symbol-vocabulary · S1 + S2 (one PR)
+**Briefs:** [One glyph per concept](efforts/app-symbol-vocabulary.md)
+**Done when:** Per the brief: `AppSymbol` holds ADR-0065 D2's vocabulary; every concept use in the app goes through it (recipe is `richtext.page` everywhere, `book` only for sources, `.edit` vs `.editRow`); `MealPlanItemKind` and `GroceryItemOrigin` drop their Core glyphs for app-side `symbol`; a SwiftLint rule rejects concept glyph literals and is shown firing; every changed glyph is listed in the PR; tests, required builds, closeout.
 
 **Owed:** see [device-passes.md](device-passes.md)
-**Notes:** Decisions are ADR-0064 D1–D8 (Jon, 2026-11-10). No schema, sync or migration change: `Menu.externalProjectName` stays in the schema, unused. Symbol templates are in `docs/design/symbols/`; use them as given. UI acceptance is a Jon device gate.
+**Notes:** Decisions are ADR-0065 D1–D5 (Jon, 2026-11-10). Starts after #468 merges (it uses #468's custom symbol sets). No schema change. Non-concept glyphs stay literals (D3); don't convert them. UI acceptance is a Jon device gate.
