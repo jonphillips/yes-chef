@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [Menu detail declutter: one AI menu, an Edit sheet, and rows without buttons](menu-detail-declutter.md) — **Ready.** The toolbar gets the house AI menu and an Edit sheet; Place, the Calendar section, the Playbook toggle, the project field and dish-row buttons go; three custom symbols.
+- [Chat-started recipe returns and `stage_menu`](chat-started-returns-and-menus.md) — **Ready.** `stage_recipe_return` sends labeled changes to a searched recipe; `stage_menu` stages a new menu of library recipes and note rows; the helper resolves refs, the app reviews. No schema.
