@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-"${JON_PLATFORM:-$HOME/code/jon-platform}/scripts/install-mcp-helper" "$repo_root/YesChefMCP" yeschef-mcp
-rm -rf "$HOME/Library/Application Support/YesChefMCP"
