@@ -42,7 +42,7 @@ The configuration is shared through the ChatGPT account, so it is reasonable to 
 
 ## Chat access over MCP
 
-On the Mac, build and install the local helper with `scripts/install-yeschef-mcp`. It installs at `~/.local/bin/yeschef-mcp`, the path used by the existing `yeschef` tunnel profile (health port **8081**). On first use, allow iCloud Drive access for **tunnel-client** so the helper can reach the shared Yes Chef container. Refresh the Yes Chef plugin in ChatGPT to load its tools:
+On the Mac, build and install the local helper by running `install-mcp-helper` in this repo (jon-platform's shared installer, linked into `~/code/bin`; see jon-platform `docs/ios/mcp-access.md` step 5). It installs at `~/.local/bin/yeschef-mcp`, the path used by the existing `yeschef` tunnel profile (health port **8081**). On first use, allow iCloud Drive access for **tunnel-client** so the helper can reach the shared Yes Chef container. Refresh the Yes Chef plugin in ChatGPT to load its tools:
 
 - `stage_recipe` sends a recipe to Yes Chef's inbox (below).
 - `stage_recipe_return` sends labeled changes to a recipe found with `search_recipes`.
@@ -67,11 +67,10 @@ Create a separate tunnel in Platform, then run `~/code/jon-platform/scripts/mcp-
 
 ### After a helper update
 
-The helper doesn't update itself. After any merge that touches `YesChefMCP/` or the export code in `YesChefCore`, reinstall it, or ChatGPT keeps the old tool list. The tunnel also keeps one helper process running, so restart it after installing a new binary:
+The helper doesn't update itself. After any merge that touches `YesChefMCP/` or the export code in `YesChefCore`, reinstall it, or ChatGPT keeps the old tool list:
 
-1. From a fresh `main`, run `scripts/install-yeschef-mcp`.
-2. Restart the tunnel: `~/code/jon-platform/scripts/mcp-tunnel uninstall-agent yeschef`, then `~/code/jon-platform/scripts/mcp-tunnel install-agent yeschef`. `mcp-tunnel status yeschef` should then read `live` and `ready`.
-3. Refresh the Yes Chef plugin in ChatGPT.
+1. From a fresh `main`, run `install-mcp-helper` in this repo. The tunnel keeps one helper process running, so the installer also restarts the `yeschef` tunnel and waits until it reads `live` and `ready`. A Yes Chef Dev tunnel runs the `yeschef-mcp-dev` wrapper, which the installer doesn't match, so restart it too: `tunnel-restart yeschef-dev`.
+2. Refresh the Yes Chef plugin in ChatGPT.
 
 If ChatGPT still shows an old tool list, check what the installed helper offers by piping an MCP `initialize` and a `tools/list` request into `~/.local/bin/yeschef-mcp`. If that list is wrong, the binary is stale. If it's right, the tunnel or ChatGPT is stale.
 
