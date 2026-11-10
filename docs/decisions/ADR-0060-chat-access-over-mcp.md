@@ -16,6 +16,9 @@ sits outside `Documents/`, so it stays hidden.
 **[Amendment 1](#amendment-1--a-handoff-return-is-routed-by-its-yc-handoff-token-2026-11-03) — Accepted
 2026-11-03:** answers OQ3. A return may carry the app-minted `YC-HANDOFF` token and nothing else that names a
 row; `stage_handoff_return` stages the whole return block, and only the device that minted the token opens it.
+**[Amendment 2](#amendment-2--a-chat-that-starts-in-chatgpt-can-return-to-a-recipe-and-stage-a-menu-2026-11-10) —
+Proposed 2026-11-10:** answers OQ4. The helper resolves a read ref to its recipe when it stages, so a chat that
+started in ChatGPT can return changes to a recipe (`stage_recipe_return`) and stage a new menu (`stage_menu`).
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
@@ -414,6 +417,216 @@ the `YC-HANDOFF:` line (`AIHandoffToken.finalizeInstruction`). A printed return 
 
 ### Amd 1 — open questions
 
-- **OQ4 — revisions from chats that start in ChatGPT (D5).** One shape: the app resolves a read ref against the
+- **OQ4 — revisions from chats that start in ChatGPT (D5).** *(Answered by
+  [Amendment 2](#amendment-2--a-chat-that-starts-in-chatgpt-can-return-to-a-recipe-and-stage-a-menu-2026-11-10):
+  the helper resolves the ref, not the app.)* One shape: the app resolves a read ref against the
   export it wrote, and asks Jon to confirm the target recipe before the review. Decide when dogfooding shows
   that tapping **Adjust Recipe** to mint a token costs something real.
+
+## Amendment 2 — A chat that starts in ChatGPT can return to a recipe and stage a menu (2026-11-10)
+
+Status: **Proposed** — 2026-11-10. Answers Amd 1 OQ4. Schema-free. No contract bump. Adds two staging tools and
+one inbox kind each, and adds the Playbook text that's already in the export to `get_recipe`.
+
+### Context
+
+Origin: Jon, planning a Thanksgiving dinner for his boys in ChatGPT (2026-11-10). The chat talked about the meal
+and its dishes in the same breath: two grilled meats, two sauces, a roasted vegetable, a salad, and flatbread.
+Jon wanted it to "search to see if I already have recipes like these, … select which recipes we want to use,
+what Chat needs to make up on the fly, how to improve the recipes I do have, and then stage the resulting
+recipes and a menu."
+
+Mapped onto the tools as of `origin/main` a67b92f:
+
+| Step | Tool | Today |
+|---|---|---|
+| Find what's already in the library | `search_recipes`, `get_recipe` | Works |
+| Choose | the conversation | Works |
+| Make up the missing dishes | `stage_recipe`, called once per recipe | Works |
+| Improve a recipe Jon already has | — | **Gap: Amd 1-D5** |
+| Stage the menu | — | **Gap: no tool** |
+
+The workaround for the first gap is the one Amd 1-D5 names: tap **Hand off** on each recipe in Yes Chef and
+paste the prompt into the same chat. A menu chat touches several recipes, so that's one trip out of the chat per
+dish. OQ4's trigger was "when dogfooding shows that tapping **Adjust Recipe** to mint a token costs something
+real." This is that case. The second gap has no workaround except building the menu by hand.
+
+The code already has most of what's needed:
+
+- **A read ref already pins its target.** `<generation>.r<index>` is checked against the export's generation,
+  and a ref from any other export fails with "search again" (`ChatAccessReadTools.resolveIndex`). The export's
+  recipe bundles carry the full `Recipe` row, so **the helper can turn a ref into a recipe id**, the id every
+  device shares, because recipes sync. It never has to show that id to the model.
+- **The return grammar exists.** ADR-0061's `.recipe` task takes labeled deliverables (`YC-REVISION:`,
+  `YC-MAKE-AHEAD:`, `YC-CHEF-IT-UP:`, `YC-SERVE-WITH:`, `YC-LEARNINGS:`). They're parsed by
+  `labeledRecipeReview` into the existing review sheets, and a revision stays a prose brief that's drafted
+  in-app against live rows (ADR-0042 Amd 1-D2).
+- **That review needs a handoff row, and only for its id.** `stageReview` loads an `AIHandoff` row by id and
+  routes on its source and task. `AIHandoff` is device-local, so the device that opens an item can create one.
+- **Menus have a commit path and a note-to-recipe swap.** `MenuRepository.addMenu` creates a menu, and
+  `MenuRepository.replaceNoteItemWithRecipe` (ADR-0036 S2) turns a note row into a recipe row. The menu item
+  editor already lets Jon pick a recipe for a row.
+- **The inbox already sorts by extension.** `ChatInboxItemKind` in jon-platform `ChatAccessKit` matches files by
+  extension, and shipped builds list only `json` and `ycreturn`. A new extension is invisible to an older build:
+  it isn't opened as the wrong thing.
+
+### Amd 2-D1 — The helper resolves a read ref when it stages, and Jon confirms on the device
+
+Amd 1-D5 kept read refs out because "the export's index would become a write target, and nothing on the device
+would confirm the target." Both halves have an answer:
+
+- **The ref resolves once, in the helper, at staging time,** against the same export generation that issued
+  it. A stale ref fails the call with "search again," as reads do now. The staged file records the recipe's id
+  and its title as the export had it. The model supplies the ref, never the id, so it can't name a recipe it
+  wasn't shown. Nothing indexes into an export later.
+- **The device confirms the target.** The inbox row names the recipe, and so does the review it opens. Opening
+  the row is the confirmation, the same way opening a `json` row is the confirmation for a new recipe. A
+  recipe that's gone or archived on this device can't be opened. The row says so and offers **Discard**.
+- **jon-platform ADR-0007 D5 holds.** The id goes from the helper to the app in a file. It never reaches the
+  model.
+- **ADR-0042 Amd 1-D2 holds.** The model supplies prose and labels only: no anchors, no line ids, no rewritten
+  recipe. The paste door still never carries identity. This isn't the paste door.
+
+**Rejected: the app resolves the ref** (OQ4's sketch). The app would have to keep every export generation it
+wrote. And the ref may have come from the other device's export, since the helper reads the newest file. The
+helper already holds the generation the ref came from.
+
+**Rejected: `stage_handoff_return` also accepts a ref** (as Amd 1-D5 already decided). It's a different envelope:
+no token line, no marker. One tool with two ways to name a target is harder for the model to use correctly than
+two tools with one way each.
+
+### Amd 2-D2 — `stage_recipe_return` returns changes to a recipe found with `search_recipes`
+
+- **Input: `ref`** (a recipe ref from `search_recipes`) **and `text`:** one or more of the `.recipe` task's labeled
+  deliverables. They are `YC-REVISION:`, `YC-MAKE-AHEAD:`, `YC-CHEF-IT-UP:`, `YC-SERVE-WITH:`, and
+  `YC-LEARNINGS:`. There's no token line and no `YC-CONTRACT` marker.
+- **The helper checks the envelope:** the ref resolves to a recipe in the current export, the text isn't empty,
+  and it has no `YC-NEW-RECIPE:` block. A new dish goes through `stage_recipe`, and the error says so. As in Amd
+  1-D2, the helper doesn't parse the body. The app parses it on open, with the parser the paste door uses.
+- **The file:** `HandoffInbox(root: …/MCP/Inbox, fileExtension: "ycrecipereturn")`, with the recipe id as the
+  slug. The body is a small JSON envelope written by the helper: format, version, recipe id, the export's
+  title, and `text`. The slug lets the app label the row from the live recipe without reading the file.
+- **Opening the row:**
+  1. Claim the file. Any device may claim it, because the recipe is synced. That's the `json` claim rule
+     (D3), not Amd 1-D3's minting-device rule.
+  2. Create a device-local `AIHandoff` row: `sourceType .recipe`, `sourceID` the recipe, `taskType .recipe`,
+     no variation, and an empty `exportedPrompt`, because nothing was exported.
+  3. Call `stageReview(handoffID:, result: text, …)`, and present the review exactly as a pasted `.recipe`
+     return would be presented.
+
+  The review rebuilds against live rows, so an edit made after the export was written isn't lost.
+- **The base recipe only.** A ref names a recipe, not a variation. This matches ADR-0061's guard: the `.recipe`
+  prompt exports the base recipe.
+- **More than one return per recipe is fine.** Each call is its own item and opens its own review, as with
+  `.recipe`'s `acceptsRepeatReturns`.
+- **Annotations:** `readOnlyHint: false, destructiveHint: false`, as for every staging tool.
+- **The deliverable grammar travels with the server.** The labeled-deliverable lines in
+  `AIHandoffContext.prompt(forTask: .recipe)` become one Core constant. Both the prompt and
+  `ChatAccessServerInstructions` read it, and a test fails if they drift (D6's rule).
+
+### Amd 2-D3 — `get_recipe` returns the Playbook text that's already exported
+
+A handoff prompt carries the recipe's Make-ahead and Chef It Up text, so the model refines them and doesn't
+start over. `get_recipe` leaves them out today, even though `Recipe.makeAhead` and `Recipe.chefItUp` are already
+in the export. `get_recipe` adds `makeAhead` and `chefItUp`. **No export version bump.**
+
+Serve With, learnings, and the taste profile aren't in the export. Adding them is a version bump, and the
+helper fails loudly on a newer version (D4), so that's an install-order step. It's left out until it's needed
+(OQ5). The reviews already show the current text next to the proposal, and learnings dedupe on ingest.
+
+### Amd 2-D4 — `stage_menu` stages a new menu that Jon reviews before it's created
+
+- **Input:** `title`, optional `days` (default 1), and `items`. Each item has an optional `ref`, a `title`, `day`
+  (0-based, the same as `get_menu`'s `day`), `slot` (default `dinner`), an optional short `note`, and an optional
+  `scale` (default 1).
+  - **An item with a `ref` is a recipe row.** The helper resolves it as in D1 and records the recipe's id and
+    title.
+  - **An item without one is a note row**, titled with `title`, with `note` as its notes. That's the
+    MenuItem invariant: only a resolved recipe gets `kind .recipe`
+    ([[menu-item-recipe-id-invariant]]).
+- **The helper checks everything it can:** there's a title; there's at least one item; `days` is between 1
+  and 14; each `day` is inside `days`; each `slot` is a real `MealPlanItemSlot`; each scale is greater than 0;
+  and every ref resolves to a recipe in the current export. Any failure returns `isError` and stages
+  nothing, so a menu is never half-resolved.
+- **The file:** `HandoffInbox(…, fileExtension: "ycmenu")`, a helper-written JSON envelope with the slug from
+  the menu title. Any device may claim it.
+- **Opening the row opens a review sheet** (ADR-0026's collection sheet). It has an editable title and one row
+  per item, each marked **In your library** or **New dish**, and Jon can drop rows. On this device, an item whose
+  recipe is missing or archived becomes a note row with the recorded title, and it's flagged. **Create Menu** writes
+  the menu and its items in one transaction through `MenuRepository`. That's the only write. The menu is
+  created unplaced. Placing it on the calendar stays in the app, along with ADR-0063's bring-in offer.
+- **No menu-level notes.** The reasoning for the menu stays in the chat. `Menu.notes` isn't written. Per-dish
+  notes go on the dish's own row, which is their typed home.
+- **New menus only.** Adding to an existing menu would make a `list_menus` ref a write target for menus. That's
+  D1's argument again, but the review would be a merge, not a create. Out (OQ6).
+
+### Amd 2-D5 — A dish that's both new and on the menu: stage the recipe first, or link it afterward
+
+`stage_recipe` and `stage_menu` don't know about each other. A dish Chat makes up can reach the menu in either of
+two ways:
+
+- **Recipe first.** Chat stages the recipe. Jon saves it. Returning to ChatGPT backgrounds the app, which
+  writes a fresh export, or Jon taps **Refresh**. Then Chat searches again and stages the menu with refs. The
+  server instructions describe this order.
+- **Menu first.** The dish goes on the menu as a note row. Once the recipe is saved, Jon picks it for that row in
+  the menu item editor.
+
+**Rejected for now: a `stage_menu` item that carries its recipe inline, and links to its row when it's saved.**
+Create Recipe would have to carry a menu-row target through the save and then run
+`replaceNoteItemWithRecipe`. The referral transport (ADR-0058) is a precedent, but this would be new state
+across two reviews. **Revisit** if the recipe-first order turns out to be a real cost in dogfooding.
+
+### Amd 2-D6 — The server's instructions name every tool in their opening
+
+Amd 1-D4 requires the first 512 characters to stand alone. The new opening:
+
+> These are Yes Chef's recipe tools. Read with `search_recipes`, `get_recipe`, `list_menus`, `get_menu`,
+> `get_meal_plan`. In a conversation with a `YC-HANDOFF:` line, finalize through `stage_handoff_return`. Without
+> one: `stage_recipe` stages a new recipe, `stage_recipe_return` returns changes to a recipe found with
+> `search_recipes`, and `stage_menu` stages a new menu. Nothing is saved until Jon reviews it in the app.
+
+The test for the 512-character opening gains the two new tool names. The rule for a failed call or a timeout
+still applies: print the return for Jon to paste. For a menu, that's a plain list, which Jon builds by hand.
+
+### Amd 2 — slices
+
+Continuing D7's numbering. The two slices are independent and can go out as one dispatch.
+
+- **S4 — recipe returns from a ChatGPT-started chat** (D1–D3, D6).
+  - **Helper:** `stage_recipe_return`, ref resolution, envelope checks, the `.ycrecipereturn` file, `get_recipe`'s
+    Playbook fields, and the instructions.
+  - **Core:** the shared deliverable-label constant and its drift test.
+  - **App:** the `ycrecipereturn` inbox kind, rows labeled from the live recipe, opening (claim, create the
+    handoff row, `stageReview`), and the row for a missing recipe.
+  - **Tests:** a stale ref, a menu ref passed as a recipe ref, `YC-NEW-RECIPE:` rejected, the 512-character
+    opening, the app opening against a live recipe, and against an archived one.
+- **S5 — `stage_menu`** (D4, D5).
+  - **Helper:** the tool, validation, and the `.ycmenu` file.
+  - **App:** the `ycmenu` kind, the review sheet, and Create Menu.
+  - **Tests:** every validation error, the invariant (no recipe row without a resolved id), a recipe missing on
+    the device becoming a note row, and one transaction for the whole menu.
+  - Touches `YesChefApp/` model code, so `YesChefTests` runs (guardrail #9).
+- **Install order:** update the app on both devices before installing the new helper. An older build ignores the
+  new extensions rather than mis-opening them, so getting it wrong costs only the wait.
+- **Device pass:** a menu chat in ChatGPT outside the `Yes Chef` Project. Search, pick two library recipes,
+  return a revision and a make-ahead for one of them, stage one new recipe, save it, and stage the menu with it
+  by ref and one dish as a note. On the iPhone, the revision opens the brief sheet and the menu opens its review.
+  On the iPad, the other items are already gone from **From Chat**.
+
+### Amd 2 — consequences
+
+- A menu chat stays in ChatGPT from search to staging. Each write is still a confirmation tap in ChatGPT and a
+  review in Yes Chef.
+- Refs go stale every time a device writes an export, which happens whenever Yes Chef goes to the background.
+  A long chat will see "search again" more often now that refs are write targets. That's the guard working,
+  and a search costs a tool call.
+- `AIHandoff` gains rows with no exported prompt. They're local, and they go straight to `imported`.
+- No lift into `LLMHandoffKit` or `ChatAccessKit` beyond the new item kinds. Resolving a read ref into a write
+  target is evidence for jon-platform `SEAM-LEDGER.md`'s "LLM handoff envelope" row, whose trigger hasn't fired.
+
+### Amd 2 — open questions
+
+- **OQ5 — Serve With, learnings, and the taste profile in the export.** Bump the export version and add them to
+  `get_recipe` if dogfooding shows returns repeating known learnings or ignoring the taste profile.
+- **OQ6 — staging into an existing menu.** Needs a merge review, not a create. Decide when a chat about a menu
+  that's already planned wants it.
