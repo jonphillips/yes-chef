@@ -19,6 +19,9 @@ row; `stage_handoff_return` stages the whole return block, and only the device t
 **[Amendment 2](#amendment-2--a-chat-that-starts-in-chatgpt-can-return-to-a-recipe-and-stage-a-menu-2026-11-10) —
 Accepted 2026-11-10 (#471):** answers OQ4. The helper resolves a read ref to its recipe when it stages, so a chat that
 started in ChatGPT can return changes to a recipe (`stage_recipe_return`) and stage a new menu (`stage_menu`).
+**[Amendment 3](#amendment-3--a-chat-can-replace-one-day-of-a-menu-that-already-exists-2026-11-10) — Accepted
+2026-11-10 (#476):** answers OQ6 one day at a time. A menu row's note is where a menu-specific annotation lives, and
+`stage_menu_day` replaces one day of an existing menu; a dish that stays keeps its row.
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
@@ -631,3 +634,157 @@ Continuing D7's numbering. The two slices are independent and can go out as one 
   `get_recipe` if dogfooding shows returns repeating known learnings or ignoring the taste profile.
 - **OQ6 — staging into an existing menu.** Needs a merge review, not a create. Decide when a chat about a menu
   that's already planned wants it.
+
+## Amendment 3 — A chat can replace one day of a menu that already exists (2026-11-10)
+
+Status: **Accepted** — 2026-11-10 (#476). Answers Amd 2 OQ6 for one day at a time. Schema-free. No export change.
+Adds one staging tool, one inbox kind and one review sheet. Built by effort [`stage-menu-day`](../efforts/stage-menu-day.md).
+The app half that shows a row's note on the recipe screen is effort
+[`menu-row-note-on-recipe`](../efforts/menu-row-note-on-recipe.md), which doesn't depend on this amendment.
+
+### Context
+
+Origin: Jon, planning one dinner of a 7-day menu that already exists with ChatGPT (2026-11-10). The chat chose
+the dishes for that day. It also decided that Cook's Country's grilled chicken souvlaki, a family favorite, gets
+its tahini-butter sauce on the side **for this menu only**, because muhammara and tzatziki are also on the table.
+
+`stage_menu` can't put that day on the existing menu. It only creates menus (Amd 2-D4, "New menus only"), so the
+day would arrive as a separate one-day menu, and Jon would rebuild it by hand. OQ6 said this "needs a merge
+review, not a create." Jon's call is that **complete replacement of the day is fine**: Chat sends the whole day,
+and that's what the day becomes. That's a far smaller review than a merge.
+
+There are three kinds of information in a chat like this, and the app already has a home for each:
+
+| Kind | Example | Home |
+|---|---|---|
+| The recipe | ingredients, method, refinements | the recipe, changed through `stage_recipe_return` (Amd 2) |
+| This dish on this menu | "serve the sauce on the side" | **the menu row's note** (`MenuItem.notes`) |
+| The menu's sequencing | make-ahead, work sessions, service order | the menu's prep plan (ADR-0034, ADR-0063) |
+
+What the code already has, as of `origin/main` 9ac187a:
+
+- **Every row has its own note, recipe rows included.** A row's id is separate from its `recipeID`, so the same
+  recipe twice in one menu gives two rows with two notes. It syncs with the row. Edit Dish's **Serving Notes**
+  edits it, and the menu and calendar rows show it.
+- **`get_menu` returns each row's day, slot, note and scale,** and the export's `MenuRecord` carries the menu's id,
+  so the helper can resolve a menu ref the way it resolves a recipe ref (Amd 2-D1).
+- **Other rows point at a row's id.** `GroceryItemSource.menuItemID` and `PrepPlanStepRecord.sourceDish` both do,
+  and so does a row's own scale. So "replace" can't mean delete-all and reinsert: a dish that stays on the day
+  must keep its row (AGENTS.md guardrail #4).
+
+### Amd 3-D1 — A menu row's note is where a menu-specific annotation lives
+
+- A contextual decision about one dish on one menu (serving, a substitution, a presentation change, a quantity
+  note) goes in **that row's note, as plain text.** The recipe isn't touched.
+- **No structured overrides.** No ingredient or step overrides, no automatic application of a note to the recipe,
+  no recipe forks, and no grocery effect. Grocery generation keeps ignoring row notes.
+- If the decision should change the recipe everywhere, it's a recipe return (`stage_recipe_return`). If it
+  sequences several dishes, it's the prep plan. The tool descriptions say so (D5).
+
+### Amd 3-D2 — `stage_menu_day` stages the whole of one day
+
+- **Input:** `menu` (a ref from `list_menus`), `day` (0-based, as in `get_menu`), and `items`, 1 to 40 entries.
+  Each item has the same shape as a `stage_menu` item, without `day`: an optional recipe `ref`, a `title`, `slot`
+  (default `dinner`), an optional `note`, and an optional `scale`.
+- **The items are the whole day, every slot.** Whatever is on that day now and isn't sent goes away. A note or
+  scale that isn't sent is gone too: no `note` means no note, and no `scale` means 1. The description tells Chat to
+  read the menu with `get_menu` first and to carry over every dish, note and scale that should stay.
+- **The day must already exist** (`day` is less than the menu's day count). Adding days stays in the app.
+- **Checks**, all-or-nothing, as in Amd 2-D4: the menu ref resolves; `day` is in range; and every item passes
+  `stage_menu`'s item checks (slot, the 500-character note cap, scale, the recipe ref resolves and isn't archived,
+  a dish without a ref has a title). Any failure stages nothing.
+- **The file:** `HandoffInbox(…, fileExtension: "ycmenuday")`, a helper-written JSON envelope with:
+  - the menu's id and title, and the day;
+  - the proposed items, in the order sent;
+  - **the day as the export had it** (`dayAtStage`): each row's kind, title, recipe id, slot, note and scale,
+    with no row ids.
+
+  It decodes loudly, like the other envelopes. Any device may claim it.
+- **The result** names the menu and the day, counts the dishes, and says Jon reviews it in **From Chat**. No ids.
+
+### Amd 3-D3 — Apply replaces the day, and a dish that stays keeps its row
+
+Apply runs in one transaction. It matches each proposed item to a live row on that day, at most once each:
+
+1. **A recipe item** matches a live recipe row with the same recipe, preferring one in the same slot.
+2. **A dish without a ref** matches a live note or reservation row with the same title (trimmed,
+   case-insensitive), preferring the same slot. A matched reservation stays a reservation.
+3. A **matched** row keeps its id and gets the proposal's slot, note and scale. A recipe item whose recipe is
+   missing or archived on this device becomes a note row with its title, as in Amd 2-D4, and it's flagged.
+4. An **unmatched** proposed item is added as a new row.
+5. An **unmatched** live row is deleted, through the same `MenuRepository.deleteItem` the app uses.
+6. Within each slot, rows take the proposal's order.
+
+**A deleted row behaves exactly as if Jon deleted it in the app.** Grocery items and prep steps that pointed at it
+are left as they are today. Nothing new cleans them up, and the review says how many dishes go.
+
+If the menu is placed on the calendar, the calendar shows the new day at once. Its rows are a projection of the
+menu's.
+
+### Amd 3-D4 — The review shows the day before and after
+
+- **Opening the inbox row** looks up the menu on this device.
+  - **Not found:** the row reads **"Menu not found on this device"** and offers **Discard** only. It's never
+    claimed automatically; the menu may still be syncing in.
+  - **Found:** a review sheet in the house collection-sheet style (ADR-0026), titled with the menu and the day's
+    date (or "Day N" for an unplaced menu).
+- **The sheet shows the day as it will be, and marks each row:**
+  - **Kept**: a matched row whose slot, note and scale don't change.
+  - **Changed**: a matched row. It shows each change, such as the new note, "note removed", or "scale 2× → 1×".
+  - **New**: an unmatched proposed item, marked **In your library** or **New dish**, as in Amd 2-D4.
+- **A "Removed" section** lists the live rows that will be deleted.
+- **One flag, never silent:** if the day on this device differs from `dayAtStage`, a banner says **"This day
+  changed since Chat read it."** Jon decides.
+- Jon can **drop a proposed row**, which means it's not on the day after Apply. A removed row can't be rescued from
+  the sheet. To keep it, Jon discards and asks Chat again, or adds it back in the app. That's the cost of complete
+  replacement, and Jon accepted it.
+- **Apply** writes the day, then claims the file and opens the menu.
+- No `AIHandoff` row and no hand-off token. This is a staging inbox kind like `ycmenu`, not a hand-off.
+
+### Amd 3-D5 — The descriptions route between the three kinds
+
+- `stage_menu_day`'s description: use it to replace one day of a menu found with `list_menus`. Read it with
+  `get_menu` first. Send every dish for the day, with every note and scale that should stay; anything not sent is
+  removed. A row's note is for this dish on this menu only. A change to the recipe itself goes through
+  `stage_recipe_return`. The day must exist.
+- `stage_menu`'s description: "This creates a new menu; it cannot add to an existing menu" becomes "This creates a
+  new menu. To change one day of a menu that already exists, use `stage_menu_day`."
+- The instructions' opening (Amd 2-D6) becomes, at 474 characters:
+
+  > These are Yes Chef's recipe tools. Read with `search_recipes`, `get_recipe`, `list_menus`, `get_menu`,
+  > `get_meal_plan`. In a conversation with a `YC-HANDOFF:` line, finalize through `stage_handoff_return`. Without
+  > one: `stage_recipe` stages a new recipe, `stage_recipe_return` returns changes to a recipe found with
+  > `search_recipes`, `stage_menu` stages a new menu, and `stage_menu_day` replaces one day of an existing menu.
+  > Nothing is saved until Jon reviews it in the app.
+
+- The `stage_menu` paragraph after the opening gains one sentence for the day: read the menu first, then send the
+  whole day.
+
+### Amd 3 — rejected
+
+- **A notes-only tool with row refs** (this amendment's first draft, the same day). It needed row ids in the export
+  and a second review sheet, and it only changed notes. Replacing a day covers a note change too: Chat resends the
+  day with the new note, the souvlaki's row is matched and kept, and the review shows one **Changed** row.
+- **A merge** (OQ6's original framing): Chat sends only additions and changes. It needs a rule for every
+  conflict, and Jon doesn't want one.
+- **Delete the day, then insert the proposal.** It's simpler, but it breaks grocery sources, prep-step
+  links and per-row scale for every dish that stays (guardrail #4).
+
+### Amd 3 — slice
+
+- **S6 — `stage_menu_day`** (D2–D5), one dispatch: effort [`stage-menu-day`](../efforts/stage-menu-day.md).
+- **Install order:** the app on both devices first, then the helper, as in Amd 2.
+
+### Amd 3 — consequences
+
+- A chat about a planned menu can rework a day, and annotate its dishes, without leaving ChatGPT. The note reaches
+  the cook on the recipe screen through `menu-row-note-on-recipe`.
+- A note change costs Chat a resend of the whole day. A day is a handful of rows, and the review shows only what
+  changed.
+- The recipe is never written by this path.
+- Menu refs go stale with every export, like recipe refs. A long chat will see "read the menu again" more often.
+
+### Amd 3 — open questions
+
+- **OQ7 — adding days, or replacing several days at once.** One day per call, inside the existing day count. Revisit
+  if a chat keeps making several calls in a row, or needs a day past the end.

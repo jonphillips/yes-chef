@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [The menu row's note shows on the recipe screen](menu-row-note-on-recipe.md) — **Ready.** A recipe opened from a menu or calendar row shows that row's note in a card labeled with the menu or day; the library shows none. Read-only, no schema.
+- [`stage_menu_day`: a chat replaces one day of an existing menu](stage-menu-day.md) — **Ready.** Chat sends a whole day; the app reviews before/after and Apply replaces it in one transaction, keeping the row of every dish that stays. No schema, no export change.
