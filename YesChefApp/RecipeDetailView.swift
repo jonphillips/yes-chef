@@ -363,6 +363,9 @@ private struct RecipeReaderView: View {
                 if !model.activeVariationUnresolvedAnchors.isEmpty {
                   RecipeVariationRepairNotice(anchors: model.activeVariationUnresolvedAnchors, blocksSaving: false)
                 }
+                if let rowNote = model.rowNote {
+                  RecipeRowNoteCard(note: rowNote)
+                }
                 compactRecipeBody
               }
               .padding()
@@ -713,6 +716,9 @@ private struct RecipeReaderView: View {
             VStack(alignment: .leading, spacing: 16) {
               wideColumnHeader(recipe, contentWidth: directionsContentWidth)
                 .id("recipe-directions-top")
+              if let rowNote = model.rowNote {
+                RecipeRowNoteCard(note: rowNote)
+              }
               directionsColumn
             }
 
@@ -838,6 +844,35 @@ private struct RecipeReaderView: View {
         .font(.title3.bold())
       Text(note)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .attentionCard()
+  }
+}
+
+private struct RecipeRowNoteCard: View {
+  let note: RecipeRowNote
+
+  private var title: String {
+    switch note.origin {
+    case let .menu(title): "For \(title)"
+    case let .day(date, slot): "For \(date.formatted(.dateTime.weekday(.wide).month(.wide).day())) · \(slot.title)"
+    }
+  }
+
+  private var symbol: AppSymbol {
+    switch note.origin {
+    case .menu: .menu
+    case .day: .calendar
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label(title, symbol: symbol)
+        .font(.title3.bold())
+      Text(note.text)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .textSelection(.enabled)
     }
     .attentionCard()
   }

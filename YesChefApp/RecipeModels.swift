@@ -735,6 +735,8 @@ final class RecipeDetailModel {
   @Fetch var workbenchCandidateLinks: [WorkbenchCandidateLink] = []
   @ObservationIgnored
   @Fetch var persistedScale: Double?
+  @ObservationIgnored
+  @Fetch var rowNote: RecipeRowNote?
 
   var destination: Destination? {
     didSet {
@@ -805,6 +807,11 @@ final class RecipeDetailModel {
     _persistedScale = Fetch(
       wrappedValue: nil,
       RecipeScaleRequest(context: self.scaleContext),
+      animation: .default
+    )
+    _rowNote = Fetch(
+      wrappedValue: nil,
+      RecipeRowNoteRequest(context: self.scaleContext, recipeID: recipeID),
       animation: .default
     )
   }

@@ -30,6 +30,75 @@ public struct RecipeScaleRequest: FetchKeyRequest {
   }
 }
 
+public struct RecipeRowNote: Equatable, Sendable {
+  public enum Origin: Equatable, Sendable {
+    case menu(title: String)
+    case day(date: Date, slot: MealPlanItemSlot)
+  }
+
+  public var text: String
+  public var origin: Origin
+
+  public init(text: String, origin: Origin) {
+    self.text = text
+    self.origin = origin
+  }
+}
+
+public struct RecipeRowNoteRequest: FetchKeyRequest {
+  public var context: ScaleContext
+  public var recipeID: Recipe.ID
+
+  public init(context: ScaleContext, recipeID: Recipe.ID) {
+    self.context = context
+    self.recipeID = recipeID
+  }
+
+  public func fetch(_ db: Database) throws -> RecipeRowNote? {
+    try RecipeRowNoteRepository.note(for: context, recipeID: recipeID, in: db)
+  }
+}
+
+public enum RecipeRowNoteRepository {
+  public static func note(
+    for context: ScaleContext,
+    recipeID: Recipe.ID,
+    in db: Database
+  ) throws -> RecipeRowNote? {
+    let text: String?
+    let origin: RecipeRowNote.Origin
+
+    switch context {
+    case .recipe:
+      return nil
+    case let .menuItem(itemID):
+      guard
+        let item = try MenuItem.find(itemID).fetchOne(db),
+        item.recipeID == recipeID,
+        let menu = try Menu.find(item.menuID).fetchOne(db)
+      else {
+        return nil
+      }
+      text = item.notes
+      origin = .menu(title: menu.title)
+    case let .mealPlanItem(itemID):
+      guard
+        let item = try MealPlanItem.find(itemID).fetchOne(db),
+        item.recipeID == recipeID
+      else {
+        return nil
+      }
+      text = item.notes
+      origin = .day(date: item.scheduledDate, slot: item.mealSlot)
+    }
+
+    guard let trimmedText = text?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedText.isEmpty else {
+      return nil
+    }
+    return RecipeRowNote(text: trimmedText, origin: origin)
+  }
+}
+
 public enum RecipeScaleRepository {
   public static func scale(for context: ScaleContext, in db: Database) throws -> Double? {
     switch context {

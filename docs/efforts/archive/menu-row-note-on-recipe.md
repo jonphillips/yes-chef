@@ -9,9 +9,9 @@ the menu row's note. Today the note shows in the menu and on the calendar, but i
 recipe opens, which is exactly when the cook needs it. One dispatch, one PR. **No schema change.**
 
 Decisions: none new. A menu row's note is already where a menu-specific annotation lives, and the recipe stays
-canonical; this brief only shows it. [ADR-0060](../decisions/ADR-0060-chat-access-over-mcp.md) Amendment 3, proposed in a
-separate plan PR, writes that down as its D1 and adds the chat tool. This brief doesn't depend on it. Related: [ADR-0063](../decisions/ADR-0063-menus-absorb-calendar-days.md) (calendar rows that come
-from a menu) · [ADR-0064](../decisions/ADR-0064-menu-detail-declutter.md) (menu rows without buttons) ·
+canonical; this brief only shows it. [ADR-0060](../../decisions/ADR-0060-chat-access-over-mcp.md) Amendment 3, proposed in a
+separate plan PR, writes that down as its D1 and adds the chat tool. This brief doesn't depend on it. Related: [ADR-0063](../../decisions/ADR-0063-menus-absorb-calendar-days.md) (calendar rows that come
+from a menu) · [ADR-0064](../../decisions/ADR-0064-menu-detail-declutter.md) (menu rows without buttons) ·
 [[decompose-notes-into-typed-homes]] (the row note is this annotation's typed home, not the recipe's notes).
 
 ## Where things are (architect, 2026-11-10, `origin/main` 9ac187a)
@@ -105,7 +105,7 @@ from a menu) · [ADR-0064](../decisions/ADR-0064-menu-detail-declutter.md) (menu
 - Opening a recipe from a menu row that has a note shows the card labeled with the menu, in both layouts and in the
   cook session. Opening it from the library shows nothing.
 - No write path touches the recipe.
-- Tests above; verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above; verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`; closeout (ADR-0005 D16).
 - **Jon's device gate:** on Thanksgiving Week, open the souvlaki from the menu (card shows), from the calendar
   (card shows), and from the library (no card); then change the note in Edit Dish, reopen the recipe from the

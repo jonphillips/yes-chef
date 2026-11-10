@@ -640,7 +640,7 @@ Continuing D7's numbering. The two slices are independent and can go out as one 
 Status: **Accepted** — 2026-11-10 (#476). Answers Amd 2 OQ6 for one day at a time. Schema-free. No export change.
 Adds one staging tool, one inbox kind and one review sheet. Built by effort [`stage-menu-day`](../efforts/stage-menu-day.md).
 The app half that shows a row's note on the recipe screen is effort
-[`menu-row-note-on-recipe`](../efforts/menu-row-note-on-recipe.md), which doesn't depend on this amendment.
+[`menu-row-note-on-recipe`](../efforts/archive/menu-row-note-on-recipe.md), which doesn't depend on this amendment.
 
 ### Context
 
