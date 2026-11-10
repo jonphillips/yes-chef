@@ -416,6 +416,8 @@ The menu Playbook **cannot be hidden and has no toolbar toggle.** On wide it is 
 Dishes body; its width is set by drag + the Comfortable/Wide detents only. This **supersedes Amendment 2's
 show/hide toggle for the menu** and deletes the `isPlaybookColumnVisible` state Slice D shipped.
 
+*(2026-11-10: the 2026-07-25 dogfood ferry restored the toggle; [ADR-0064 D7](ADR-0064-menu-detail-declutter.md#d7--the-playbook-column-is-always-there-and-quiet-when-empty) removes it again.)*
+
 Why the menu loses the toggle the recipe keeps — a **principled asymmetry**, not drift:
 
 - **The menu Body earns nothing from full width.** The Dishes list at 1400pt is whitespace; there is "no value

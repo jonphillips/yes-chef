@@ -71,3 +71,4 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0061](ADR-0061-one-recipe-handoff.md) — One recipe hand-off: one button, one prompt, and the cook picks what comes back at finalize *(Accepted, 2026-11-03)*
 - [ADR-0062](ADR-0062-serve-with-recipe-links.md) — A Serve With row can link to a recipe *(Accepted, 2026-11-04)*
 - [ADR-0063](ADR-0063-menus-absorb-calendar-days.md) — A menu takes in the calendar days it covers, and a multi-day prep plan runs by work day *(Accepted, 2026-11-08)*
+- [ADR-0064](ADR-0064-menu-detail-declutter.md) — Menu detail: one AI menu, an Edit sheet, and rows without buttons *(Accepted, 2026-11-10)*
