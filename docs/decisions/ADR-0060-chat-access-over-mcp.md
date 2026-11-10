@@ -19,6 +19,9 @@ row; `stage_handoff_return` stages the whole return block, and only the device t
 **[Amendment 2](#amendment-2--a-chat-that-starts-in-chatgpt-can-return-to-a-recipe-and-stage-a-menu-2026-11-10) —
 Accepted 2026-11-10 (#471):** answers OQ4. The helper resolves a read ref to its recipe when it stages, so a chat that
 started in ChatGPT can return changes to a recipe (`stage_recipe_return`) and stage a new menu (`stage_menu`).
+**[Amendment 3](#amendment-3--a-chat-can-change-the-dish-notes-on-a-menu-that-already-exists-2026-11-10) — Proposed
+2026-11-10:** narrows Amd 2 OQ6. A menu row's note is where a menu-specific annotation lives; `get_menu` gives rows
+refs, and `stage_menu_notes` stages note changes on an existing menu for a review that writes only notes.
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
@@ -631,3 +634,138 @@ Continuing D7's numbering. The two slices are independent and can go out as one 
   `get_recipe` if dogfooding shows returns repeating known learnings or ignoring the taste profile.
 - **OQ6 — staging into an existing menu.** Needs a merge review, not a create. Decide when a chat about a menu
   that's already planned wants it.
+
+## Amendment 3 — A chat can change the dish notes on a menu that already exists (2026-11-10)
+
+Status: **Proposed** — 2026-11-10. Narrows Amd 2 OQ6: changing a row's note is in; adding, removing or moving rows
+on an existing menu stays out. Schema-free. No export version bump (D2 adds an optional field). Adds one staging
+tool, one inbox kind and one review sheet. The app half that shows the note on the recipe screen is effort
+[`menu-row-note-on-recipe`](../efforts/menu-row-note-on-recipe.md), which doesn't depend on this amendment.
+
+### Context
+
+Origin: Jon, planning a Mediterranean dinner with ChatGPT (2026-11-10), on a 7-day menu that already exists. The
+chat decided that Cook's Country's grilled chicken souvlaki, a family favorite, gets its tahini-butter sauce on the
+side **for this menu only**, because muhammara and tzatziki are also on the table. That isn't a recipe revision.
+It's a fact about this dish on this menu.
+
+There are three kinds of information here, and the app already has a home for each:
+
+| Kind | Example | Home |
+|---|---|---|
+| The recipe | ingredients, method, refinements | the recipe, changed through `stage_recipe_return` (Amd 2) |
+| This dish on this menu | "serve the sauce on the side" | **the menu row's note** (`MenuItem.notes`) |
+| The menu's sequencing | make-ahead, work sessions, service order | the menu's prep plan (ADR-0034, ADR-0063) |
+
+What works as of `origin/main` 9ac187a:
+
+- **The row note exists on every row, recipe rows included.** A row's id is its own, separate from its `recipeID`,
+  so the same recipe twice in one menu gives two rows with two notes. It syncs with the row.
+- **The app edits and shows it:** Edit Dish's **Serving Notes**, the menu row, and the calendar row.
+- **`get_menu` returns each row's `note`,** and `stage_menu` writes `note` on a recipe row (Amd 2-D4).
+
+What doesn't:
+
+- **The recipe screen doesn't show the note.** That's the effort above.
+- **A chat can't change a note on a menu that already exists.** `stage_menu` only creates menus (Amd 2-D4, "New
+  menus only"), and the export gives rows no id, so nothing can name "the souvlaki on day 3."
+
+Staging a whole new menu to change one note would make a second menu. Restaging the 7-day menu would replace Jon's
+edits since it was created. Neither is acceptable, so the gap is real, and it's narrower than OQ6: **no row is
+added, removed or moved**, so the review is a list of note changes, not a merge.
+
+### Amd 3-D1 — A menu row's note is where a menu-specific annotation lives
+
+- A contextual decision about one dish on one menu (serving, a substitution, a presentation change, a quantity
+  note) goes in **that row's note, as plain text.** The recipe isn't touched.
+- **No structured overrides.** No ingredient or step overrides, no automatic application of a note to the recipe,
+  no recipe forks, and no grocery effect. Grocery generation keeps ignoring row notes.
+- If the decision should change the recipe everywhere, it's a recipe return (`stage_recipe_return`). If it
+  sequences several dishes, it's the prep plan. The tool descriptions say so (D5).
+
+### Amd 3-D2 — `get_menu` gives each row a ref
+
+- Each row in `get_menu`'s `items` gains a `ref`, pinned to the export's generation like every other read ref.
+  It resolves to the row's id inside the helper, and **the id is never shown to the model** (the `containsUUID`
+  test covers it).
+- `ChatAccessExport.MenuItemRecord` gains `id: UUID?`. It's optional, so this isn't a version bump: an older
+  helper ignores the field, and a newer helper reading an older export gives those rows no `ref`, so
+  `stage_menu_notes` says to update Yes Chef.
+- The ref also pins its menu. A row ref passed with a different menu's ref is an error.
+- The exact spelling of the ref is the brief's call, inside `resolveIndex`'s existing generation check.
+
+### Amd 3-D3 — `stage_menu_notes` stages note changes for Jon to review
+
+- **Input:** `menu` (a ref from `list_menus`) and `items`, 1 to 40 entries, each `{ref, note}`.
+  - `note` is the row's **whole new note**, at most 500 characters, the same cap as `stage_menu`. It replaces the
+    note; it doesn't append. `get_menu` gives Chat the current note, so the description tells it to carry over
+    anything it wants to keep.
+  - An empty `note` clears the row's note. The review shows that as **Remove note**.
+  - Any row kind may be named. A note row's note is its details, and its title isn't changed.
+- **Checks**, all-or-nothing as in Amd 2-D4: the menu ref resolves; every row ref resolves, belongs to that menu,
+  and appears once; each note is within the cap. Any failure stages nothing.
+- **The file:** `HandoffInbox(…, fileExtension: "ycmenunotes")`, a helper-written JSON envelope:
+  - the menu's id and title;
+  - per row: its id, its display title, its `day` and `slot`, the note the export had (`noteAtStage`), and the new
+    note.
+
+  It decodes loudly, like the other envelopes. Any device may claim it.
+- **The result** names the menu and the number of rows, and says Jon reviews it in **From Chat**. No ids.
+
+### Amd 3-D4 — The review shows the live note next to the proposal, and Apply writes only notes
+
+- **Opening the inbox row** looks up the menu on this device.
+  - **Not found:** the row reads **"Menu not found on this device"** and offers **Discard** only. It's never
+    claimed automatically; the menu may still be syncing in.
+  - **Found:** a review sheet in the house collection-sheet style (ADR-0026). It has one row per change: the dish,
+    its day and meal, the **current note on this device**, and the proposed note. Each row can be dropped.
+- **Two flags, never silent:**
+  - A row deleted on this device is shown as **"No longer on this menu"** and can't be applied.
+  - A row whose live note differs from `noteAtStage` is marked **"Changed since Chat read it."** Jon decides; the
+    proposal replaces the live note only if he keeps the row.
+- **Apply** writes the kept rows' `notes` (and `dateModified`) in one transaction, through a new `MenuRepository`
+  function that touches nothing else on the row. Then it claims the file and opens the menu.
+- No `AIHandoff` row and no hand-off token. This is a staging inbox kind like `ycmenu`, not a hand-off: a hand-off
+  exists to carry a prompt out and a return back, and here the conversation started in ChatGPT.
+
+### Amd 3-D5 — The descriptions route between the three kinds
+
+- `stage_menu_notes`'s description: use it to change the notes on dishes of a menu found with `list_menus`; a note
+  is for this dish on this menu only; a change to the recipe itself goes through `stage_recipe_return`; the note
+  replaces the current one.
+- `stage_menu`'s description gains: "To change notes on a menu that already exists, use `stage_menu_notes`." Its
+  "it cannot add to an existing menu" stays true.
+- `get_menu`'s description gains: each item's `ref` is for `stage_menu_notes`.
+- The instructions' opening (Amd 2-D6) becomes, at 478 characters:
+
+  > These are Yes Chef's recipe tools. Read with `search_recipes`, `get_recipe`, `list_menus`, `get_menu`,
+  > `get_meal_plan`. In a conversation with a `YC-HANDOFF:` line, finalize through `stage_handoff_return`. Without
+  > one: `stage_recipe` stages a new recipe, `stage_recipe_return` returns changes to a recipe found with
+  > `search_recipes`, `stage_menu` stages a new menu, and `stage_menu_notes` changes dish notes on an existing
+  > menu. Nothing is saved until Jon reviews it in the app.
+
+### Amd 3 — slice
+
+- **S6 — `stage_menu_notes`** (D2–D5), one dispatch, brief written when this amendment is accepted.
+  - **Core:** `MenuItemRecord.id`, the `ycmenunotes` envelope, and the notes-only `MenuRepository` write.
+  - **Helper:** row refs in `get_menu`, the tool and its checks, the descriptions, and the opening.
+  - **App:** the inbox kind, the not-found row, the review sheet, and Apply.
+  - **Tests:** every check; a row ref from another menu; a stale generation; an old export without row ids; the
+    review against a deleted row and a changed note; Apply writes only `notes` and `dateModified`; no ids in tool
+    output; the 512-character opening.
+  - Touches `YesChefApp/` model code, so `YesChefTests` runs.
+- **Install order:** the app on both devices first, then the helper, as in Amd 2.
+
+### Amd 3 — consequences
+
+- A chat about a planned menu can annotate its dishes without leaving ChatGPT, and the note reaches the cook on the
+  recipe screen through the effort above.
+- Row refs go stale with every export, like recipe refs. A long chat will see "read the menu again" more often.
+- The recipe is never written by this path, so it can't change the recipe by accident.
+
+### Amd 3 — open questions
+
+- **OQ6, narrowed — adding dishes to an existing menu.** Jon's 2026-11-10 case was planning one day of a 7-day menu.
+  `stage_menu` would make a separate one-day menu. Adding rows needs a merge review (where each new row lands,
+  what happens to rows already on that day), and this amendment doesn't decide it. Decide when that chat recurs and
+  building the day by hand from a staged one-day menu costs something real.
