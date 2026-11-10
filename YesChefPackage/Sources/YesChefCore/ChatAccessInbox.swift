@@ -13,12 +13,14 @@ public enum ChatAccessInbox {
     public let name: String
     public let isCurrent: Bool
     public let recipeName: String?
+    public let menuTitle: String?
 
-    public init(url: URL, name: String, isCurrent: Bool, recipeName: String? = nil) {
+    public init(url: URL, name: String, isCurrent: Bool, recipeName: String? = nil, menuTitle: String? = nil) {
       self.url = url
       self.name = name
       self.isCurrent = isCurrent
       self.recipeName = recipeName
+      self.menuTitle = menuTitle
     }
   }
 
@@ -36,6 +38,57 @@ public enum ChatAccessInbox {
       self.stagedAt = stagedAt
       self.downloadState = downloadState
     }
+  }
+
+  public enum RecipeReturnDestination: Equatable, Sendable {
+    case openable(Recipe)
+    case missing
+  }
+
+  public struct RecipeReturnRow: Equatable, Identifiable, Sendable {
+    public let url: URL
+    public let stagedAt: Date
+    public let downloadState: DownloadState
+    public let destination: RecipeReturnDestination
+    public var id: String { url.path }
+    public var title: String {
+      if case let .openable(recipe) = destination { return "Changes · \(recipe.title)" }
+      return "Recipe not found on this device"
+    }
+  }
+
+  public struct MenuRow: Equatable, Identifiable, Sendable {
+    public let url: URL
+    public let title: String
+    public let stagedAt: Date
+    public let downloadState: DownloadState
+    public var id: String { url.path }
+  }
+
+  public static func recipeReturnRows(from snapshots: [MetadataSnapshot], resolve: (UUID) -> Recipe?) -> [RecipeReturnRow] {
+    snapshots.compactMap { snapshot in
+      guard snapshot.url.pathExtension == "ycrecipereturn", let staged = StagedHandoff(url: snapshot.url),
+        let recipeID = UUID(uuidString: staged.slug) else { return nil }
+      let recipe = resolve(recipeID).flatMap { $0.archived ? nil : $0 }
+      return RecipeReturnRow(url: snapshot.url, stagedAt: staged.stagedAt,
+        downloadState: snapshot.isCurrent ? .current : .downloading,
+        destination: recipe.map(RecipeReturnDestination.openable) ?? .missing)
+    }.sorted { $0.stagedAt < $1.stagedAt }
+  }
+
+  public static func menuRows(from snapshots: [MetadataSnapshot]) -> [MenuRow] {
+    snapshots.compactMap { snapshot in
+      guard snapshot.url.pathExtension == "ycmenu", let staged = StagedHandoff(url: snapshot.url) else { return nil }
+      let name = snapshot.menuTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+      let title = name.flatMap { $0.isEmpty ? nil : $0 } ?? displayName(slug: staged.slug, recipeName: nil)
+      return MenuRow(url: snapshot.url, title: "Menu · \(title)", stagedAt: staged.stagedAt,
+        downloadState: snapshot.isCurrent ? .current : .downloading)
+    }.sorted { $0.stagedAt > $1.stagedAt }
+  }
+
+  public static func menuTitle(from text: String) -> String? {
+    guard let data = text.data(using: .utf8), let envelope = try? JSONDecoder().decode(ChatAccessStagedMenu.self, from: data) else { return nil }
+    return envelope.title
   }
 
   public enum ReturnDestination: Equatable, Sendable {

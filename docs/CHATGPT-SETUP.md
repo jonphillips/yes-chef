@@ -45,6 +45,8 @@ The configuration is shared through the ChatGPT account, so it is reasonable to 
 On the Mac, build and install the local helper with `scripts/install-yeschef-mcp`. It installs at `~/.local/bin/yeschef-mcp`, the path used by the existing `yeschef` tunnel profile (health port **8081**). On first use, allow iCloud Drive access for **tunnel-client** so the helper can reach the shared Yes Chef container. Refresh the Yes Chef plugin in ChatGPT to load its tools:
 
 - `stage_recipe` sends a recipe to Yes Chef's inbox (below).
+- `stage_recipe_return` sends labeled changes to a recipe found with `search_recipes`.
+- `stage_menu` stages a new menu of library recipes and note rows for review.
 - `stage_handoff_return` stages a return from a conversation that began with a Yes Chef hand-off prompt.
 - `search_recipes`, `get_recipe`, `list_menus`, `get_menu` and `get_meal_plan` read the library export that the app writes to iCloud (Settings → **Chat Access**).
 
@@ -75,7 +77,7 @@ If ChatGPT still shows an old tool list, check what the installed helper offers 
 
 ### Staging a recipe
 
-When `stage_recipe` is available, ask ChatGPT to send a recipe to Yes Chef. ChatGPT asks before staging it; the item then appears under **From Chat** in Create Recipe on the iPhone and iPad. Open it to review and save it, or discard it. With the plugin on, a hand-off pasted into any chat returns through `stage_handoff_return`. The **Yes Chef** Project remains the home for chats without the tools, and paste is the fallback when the helper is unavailable.
+When `stage_recipe` is available, ask ChatGPT to send a recipe to Yes Chef. ChatGPT asks before staging it; the item then appears under **From Chat** in Create Recipe on the iPhone and iPad. Open it to review and save it, or discard it. In a chat that starts with the tools, use `search_recipes` to find recipes, `stage_recipe_return` to send labeled changes to an existing recipe, and `stage_menu` to stage a new menu. For a new recipe that should be linked into a menu, stage and save it first, refresh or search again, then stage the menu with its ref. With the plugin on, a hand-off pasted into any chat returns through `stage_handoff_return`. The **Yes Chef** Project remains the home for chats without the tools, and paste is the fallback when the helper is unavailable.
 
 ## Smoke test
 

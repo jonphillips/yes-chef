@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [Chat-started recipe returns and `stage_menu`](chat-started-returns-and-menus.md) — **Ready.** `stage_recipe_return` sends labeled changes to a searched recipe; `stage_menu` stages a new menu of library recipes and note rows; the helper resolves refs, the app reviews. No schema.

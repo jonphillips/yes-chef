@@ -3,7 +3,7 @@ import Foundation
 import MCPServerKit
 import YesChefCore
 
-private struct ExportSnapshot: Sendable {
+struct ExportSnapshot: Sendable {
   var value: ChatAccessExport
   var generatedAt: Date
   var ageMinutes: Int
@@ -11,7 +11,12 @@ private struct ExportSnapshot: Sendable {
   var generation: Int64
 }
 
-private actor ChatAccessExportStore {
+actor ChatAccessExportStore {
+  struct RecipeResolution: Sendable {
+    var recipe: (id: UUID, title: String, archived: Bool)?
+    var error: String?
+  }
+
   private let reader: ChatAccessExportReader
   let now: @Sendable () -> Date
   private var cachedModifiedAt: Date?
@@ -64,6 +69,28 @@ private actor ChatAccessExportStore {
     cachedSnapshot = snapshot
     return snapshot
   }
+
+  func resolveRecipe(_ ref: String?) async throws -> (id: UUID, title: String, archived: Bool) {
+    let snapshot = try await load()
+    let index = try ChatAccessReadTools.resolveIndex(ref, expectedKind: .recipe, snapshot: snapshot, count: snapshot.value.recipes.count)
+    let recipe = snapshot.value.recipes[index].recipe
+    return (recipe.id, recipe.title, recipe.archived)
+  }
+
+  func resolveRecipes(_ refs: [String?]) async throws -> [RecipeResolution] {
+    guard refs.contains(where: { $0 != nil }) else { return refs.map { _ in RecipeResolution(recipe: nil, error: nil) } }
+    let snapshot = try await load()
+    return refs.map { ref in
+      guard ref != nil else { return RecipeResolution(recipe: nil, error: nil) }
+      do {
+        let index = try ChatAccessReadTools.resolveIndex(ref, expectedKind: .recipe, snapshot: snapshot, count: snapshot.value.recipes.count)
+        let recipe = snapshot.value.recipes[index].recipe
+        return RecipeResolution(recipe: (recipe.id, recipe.title, recipe.archived), error: nil)
+      } catch {
+        return RecipeResolution(recipe: nil, error: error.localizedDescription)
+      }
+    }
+  }
 }
 
 private struct ReadToolError: LocalizedError {
@@ -72,7 +99,7 @@ private struct ReadToolError: LocalizedError {
 }
 
 enum ChatAccessReadTools {
-  private enum RefKind: String {
+  enum RefKind: String {
     case recipe = "r"
     case menu = "m"
   }
@@ -84,7 +111,20 @@ enum ChatAccessReadTools {
     materialize: (@Sendable (URL) async throws -> Data)? = nil,
     materializationDeadline: Duration = .seconds(60)
   ) -> [MCPTool] {
-    let store = ChatAccessExportStore(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: materialize, materializationDeadline: materializationDeadline)
+    make(store: makeStore(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: materialize, materializationDeadline: materializationDeadline))
+  }
+
+  static func makeStore(
+    containerURL: URL,
+    isDevelopment: Bool,
+    now: @escaping @Sendable () -> Date,
+    materialize: (@Sendable (URL) async throws -> Data)? = nil,
+    materializationDeadline: Duration = .seconds(60)
+  ) -> ChatAccessExportStore {
+    ChatAccessExportStore(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: materialize, materializationDeadline: materializationDeadline)
+  }
+
+  static func make(store: ChatAccessExportStore) -> [MCPTool] {
     return [
       tool("search_recipes", "Search recipes by name, ingredients, categories, and notes.", schema: objectSchema(["query": stringSchema, "limit": integerSchema], required: ["query"])) { input in
         let args = arguments(input)
@@ -104,6 +144,7 @@ enum ChatAccessReadTools {
         let bundle = snapshot.value.recipes[index]
         return .json(["export": exportMeta(snapshot), "recipe": .object([
           "name": .string(bundle.recipe.title), "description": optional(bundle.recipe.summary), "yield": optional(bundle.recipe.yieldText ?? bundle.recipe.servingsText),
+          "makeAhead": optional(bundle.recipe.makeAhead), "chefItUp": optional(bundle.recipe.chefItUp),
           "prepTime": formattedMinutes(bundle.recipe.prepTimeMinutes), "cookTime": formattedMinutes(bundle.recipe.cookTimeMinutes), "totalTime": formattedMinutes(bundle.recipe.totalTimeMinutes),
           "ingredientSections": .array(bundle.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }.map { section in .object(["name": optional(section.name), "ingredients": .array(bundle.ingredientLines.filter { $0.sectionID == section.id }.sorted { $0.sortOrder < $1.sortOrder }.map { .string($0.originalText) })]) }),
           "instructionSections": .array(bundle.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.map { section in .object(["name": optional(section.name), "steps": .array(bundle.instructionSteps.filter { $0.sectionID == section.id }.sorted { $0.sortOrder < $1.sortOrder }.map { .string($0.text) })]) }),
@@ -160,7 +201,7 @@ enum ChatAccessReadTools {
   }
   private static func arguments(_ input: MCPValue) -> [String: MCPValue] { input.objectValue ?? [:] }
   private static func ref(_ snapshot: ExportSnapshot, kind: RefKind, index: Int) -> MCPValue { .string("\(snapshot.generation).\(kind.rawValue)\(index)") }
-  private static func resolveIndex(_ ref: String?, expectedKind: RefKind, snapshot: ExportSnapshot, count: Int) throws -> Int {
+  static func resolveIndex(_ ref: String?, expectedKind: RefKind, snapshot: ExportSnapshot, count: Int) throws -> Int {
     guard let ref else { throw ReadToolError("That reference is from an older export; search again.") }
     let pieces = ref.split(separator: ".")
     guard pieces.count == 2, let generation = Int64(pieces[0]), let typedIndex = pieces[1].first, let index = Int(pieces[1].dropFirst()) else {

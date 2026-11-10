@@ -83,6 +83,12 @@ struct AppContainer: View {
       },
       onRecipeCreated: recipeCreated
     )
+    .onAppear {
+      chatAccessInboxModel.onMenuSelected = { menuID in
+        menuModel.selectMenu(menuID)
+        selectedSection = .menus
+      }
+    }
     .task {
       await syncActivityRecorder.scenePhaseChanged(isForeground: scenePhase == .active)
       if scenePhase == .active { await automaticBackupModel.runIfDue() }

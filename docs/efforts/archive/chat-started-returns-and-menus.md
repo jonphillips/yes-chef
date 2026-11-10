@@ -5,11 +5,11 @@ Summary: Two new MCP staging tools for a chat that starts in ChatGPT. `stage_rec
 
 Origin: Jon planning a Thanksgiving dinner in ChatGPT (2026-11-10). One dispatch, one PR. **No schema change.**
 
-Decisions: [ADR-0060 Amendment 2](../decisions/ADR-0060-chat-access-over-mcp.md#amendment-2--a-chat-that-starts-in-chatgpt-can-return-to-a-recipe-and-stage-a-menu-2026-11-10)
+Decisions: [ADR-0060 Amendment 2](../../decisions/ADR-0060-chat-access-over-mcp.md#amendment-2--a-chat-that-starts-in-chatgpt-can-return-to-a-recipe-and-stage-a-menu-2026-11-10)
 (D1–D6; read it first). Builds on Amd 1 (`stage_handoff_return`, the token-routed inbox) and
-[ADR-0061](../decisions/ADR-0061-one-recipe-handoff.md) (the `.recipe` task and its labeled return).
-Related: [archived chat-access brief](archive/chat-access-mcp.md) (S3a/S3b are the closest precedent) ·
-[ADR-0036](../decisions/ADR-0036-promote-note-to-recipe.md) (note → recipe swap) ·
+[ADR-0061](../../decisions/ADR-0061-one-recipe-handoff.md) (the `.recipe` task and its labeled return).
+Related: [archived chat-access brief](chat-access-mcp.md) (S3a/S3b are the closest precedent) ·
+[ADR-0036](../../decisions/ADR-0036-promote-note-to-recipe.md) (note → recipe swap) ·
 [[menu-item-recipe-id-invariant]] in `MenuRepository`.
 
 ## Where things are (architect, 2026-11-10, `origin/main` f29343f)
@@ -259,7 +259,7 @@ lowercases the slug, and `UUID(uuidString:)` still parses it. **No change to eit
 - **Package:** focused tests, then `scripts/check-drift.sh`.
 - **Helper:** `swift test --package-path YesChefMCP`.
 - **App:** the generic device build, and the **`YesChefTests`** target, because inbox model code changes. Exact
-  commands are in [verification.md](../verification.md). Run every build and test elevated from the first attempt.
+  commands are in [verification.md](../../verification.md). Run every build and test elevated from the first attempt.
   A sandbox-shaped failure gets one elevated rerun. If an elevated run fails, stop and report.
 - **Install order** (put it in the PR body for Jon): update the app on both devices, then run
   `scripts/install-yeschef-mcp` and restart the tunnel, per `CHATGPT-SETUP.md` § reinstall. Update
@@ -278,4 +278,4 @@ lowercases the slug, and `UUID(uuidString:)` still parses it. **No change to eit
 
 ## Dispatch ledger
 
-- [ ] Dispatch 1 — S4 + S5, one PR. No schema.
+- [x] Dispatch 1 — S4 + S5, one PR. No schema.

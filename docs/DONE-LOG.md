@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-10 — Chat-started recipe returns and menu staging (`effort/chat-started-returns-and-menus`)
+
+- **Result:** Added ChatGPT-started recipe return and menu staging through one helper export snapshot, versioned envelopes, local review flows, and one-transaction menu creation. Added Playbook fields to get_recipe and updated the server instructions and ChatGPT setup guide.
+- **Verification:** scripts/check-drift.sh passed: lint clean, 791 Core tests, 17 helper tests, and app test-target build. Generic iOS build passed; YesChefTests simulator target passed 134 tests.
+- **Owed:** chat-started-returns-and-menus S4 + S5 (one PR)'s device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-10 — One glyph per concept: AppSymbol (`effort/app-symbol-vocabulary`)
 
 - **Result:** Added AppSymbol for the D2 vocabulary, converted concept uses and moved Core glyph mappings into the app.

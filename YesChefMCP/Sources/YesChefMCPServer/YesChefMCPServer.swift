@@ -23,6 +23,18 @@ private struct StageRecipeResult: Encodable, Sendable {
   var next: String
 }
 
+private struct StageRecipeReturnResult: Encodable, Sendable {
+  var staged: String
+  var next: String
+}
+
+private struct StageMenuResult: Encodable, Sendable {
+  var staged: String
+  var recipes: Int
+  var newDishes: Int
+  var next: String
+}
+
 private struct StageContext: Sendable {
   let home: URL
   let now: @Sendable () -> Date
@@ -66,6 +78,23 @@ private struct StageContext: Sendable {
     )
   }
 
+  func stageRecipeReturn(recipeID: UUID, title: String, text: String) throws -> StageRecipeReturnResult {
+    let envelope = ChatAccessStagedRecipeReturn(recipeID: recipeID, recipeTitle: title, text: text)
+    let data = try JSONEncoder().encode(envelope)
+    let inbox = HandoffInbox(root: try stagingFolder().inboxURL, fileExtension: "ycrecipereturn")
+    _ = try inbox.stage(String(decoding: data, as: UTF8.self), slug: recipeID.uuidString, now: now())
+    return StageRecipeReturnResult(staged: title, next: "Jon reviews it in Yes Chef → From Chat.")
+  }
+
+  func stageMenu(_ envelope: ChatAccessStagedMenu, recipeCount: Int, newDishCount: Int) throws -> StageMenuResult {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try encoder.encode(envelope)
+    let inbox = HandoffInbox(root: try stagingFolder().inboxURL, fileExtension: "ycmenu")
+    _ = try inbox.stage(String(decoding: data, as: UTF8.self), slug: envelope.title, now: now())
+    return StageMenuResult(staged: envelope.title, recipes: recipeCount, newDishes: newDishCount, next: "Jon reviews it in Yes Chef → From Chat.")
+  }
+
   private func stagingFolder() throws -> ChatAccessFolder {
     try ChatAccessHelperFolder.existing(
       containerIdentifier: "iCloud.com.jonphillips.yeschef", isDevelopment: isDevelopment, home: home
@@ -104,6 +133,7 @@ public enum YesChefMCPServer {
       "type": .string("object"),
       "additionalProperties": .bool(true),
     ])
+    let exportStore = ChatAccessReadTools.makeStore(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: exportMaterializer, materializationDeadline: materializationDeadline)
     return MCPServer(
       name: "yeschef",
       version: "0.1.0",
@@ -111,7 +141,7 @@ public enum YesChefMCPServer {
       tools: [
         MCPTool(
           name: "stage_recipe",
-          description: "Stage one schema.org Recipe in Yes Chef for review and saving. Only for a conversation with no `\(AIHandoffToken.prefix)` line; a hand-off conversation finalizes through `stage_handoff_return`.",
+          description: "Stage one schema.org Recipe in Yes Chef for review and saving. Only for a conversation with no `\(AIHandoffToken.prefix)` line; a hand-off conversation finalizes through `stage_handoff_return`. Changes to a recipe already in your library go through `stage_recipe_return`.",
           inputSchema: .object([
             "type": .string("object"),
             "properties": .object(["recipe": recipeSchema]),
@@ -158,7 +188,115 @@ public enum YesChefMCPServer {
             return .error(error.localizedDescription)
           }
         },
-      ] + ChatAccessReadTools.make(containerURL: containerURL, isDevelopment: isDevelopment, now: now, materialize: exportMaterializer, materializationDeadline: materializationDeadline)
+      ] + Self.stagingTools(context: context, exportStore: exportStore) + ChatAccessReadTools.make(store: exportStore)
     )
+  }
+
+  private static func stagingTools(context: StageContext, exportStore: ChatAccessExportStore) -> [MCPTool] {
+    let string: MCPValue = .object(["type": .string("string")])
+    let integer: MCPValue = .object(["type": .string("integer")])
+    let itemProperties: [String: MCPValue] = [
+      "ref": string, "title": string, "day": integer,
+      "slot": .object(["type": .string("string"), "enum": .array(MealPlanItemSlot.allCases.map { .string($0.rawValue) })]),
+      "note": string, "scale": .object(["type": .string("number")]),
+    ]
+    let itemSchema: MCPValue = .object(["type": .string("object"), "properties": .object(itemProperties), "additionalProperties": .bool(false)])
+    return [
+      MCPTool(
+        name: "stage_recipe_return",
+        description: "Use this to send changes to a recipe found with `search_recipes`. Do not use it in a conversation with a `YC-HANDOFF:` line; use `stage_handoff_return`. Do not use it for `YC-NEW-RECIPE:`; a new dish goes through `stage_recipe`. Then add these deliverable lines exactly:\n\(RecipeReturnLabels.deliverableLines)\nOne call per recipe; several calls are fine.",
+        inputSchema: .object(["type": .string("object"), "properties": .object(["ref": string, "text": string]), "required": .array([.string("ref"), .string("text")]), "additionalProperties": .bool(false)]),
+        annotations: .init(readOnly: false, destructive: false, openWorld: false)
+      ) { input in
+        let args = input.objectValue ?? [:]
+        let ref = args["ref"]?.stringValue
+        let text = args["text"]?.stringValue ?? ""
+        do {
+          let recipe = try await exportStore.resolveRecipe(ref)
+          guard !recipe.archived else { return .error("That recipe is archived in Yes Chef.") }
+          guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .error("There's nothing to stage.") }
+          let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+          guard !lines.contains(where: { $0.hasPrefix("YC-HANDOFF:") }) else { return .error("This conversation has a hand-off token; finalize with `stage_handoff_return`.") }
+          guard !lines.contains(where: { $0.hasPrefix("YC-NEW-RECIPE:") }) else { return .error("A new dish goes through `stage_recipe`, not `stage_recipe_return`.") }
+          return .json(try context.stageRecipeReturn(recipeID: recipe.id, title: recipe.title, text: text))
+        } catch { return .error(error.localizedDescription) }
+      },
+      MCPTool(
+        name: "stage_menu",
+        description: "Stage a new menu for Jon to review. An item with a recipe ref from `search_recipes` is a library recipe; one without a ref is a new dish, shown as a note row. `day` is 0-based, as in `get_menu`. To put a new recipe on the menu as a recipe, stage it with `stage_recipe`, wait for Jon to save it, search again, then stage the menu with its ref. This creates a new menu; it cannot add to an existing menu.",
+        inputSchema: .object(["type": .string("object"), "properties": .object([
+          "title": string, "days": integer, "items": .object(["type": .string("array"), "items": itemSchema]),
+        ]), "required": .array([.string("title"), .string("items")]), "additionalProperties": .bool(false)]),
+        annotations: .init(readOnly: false, destructive: false, openWorld: false)
+      ) { input in
+        do { return .json(try await Self.decodeAndStageMenu(input, context: context, exportStore: exportStore)) }
+        catch { return .error(error.localizedDescription) }
+      },
+    ]
+  }
+
+  private static func decodeAndStageMenu(_ input: MCPValue, context: StageContext, exportStore: ChatAccessExportStore) async throws -> StageMenuResult {
+    guard let args = input.objectValue, let title = args["title"]?.stringValue,
+      let rawItems = args["items"]?.arrayValue else { throw StageInputError("Provide a title and at least one menu item.") }
+    let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !cleanTitle.isEmpty else { throw StageInputError("The menu title cannot be empty.") }
+    guard (1...40).contains(rawItems.count) else { throw StageInputError("Items must contain 1 to 40 entries.") }
+    guard args["days"] == nil || args["days"]?.integerValue != nil else { throw StageInputError("Days must be a whole number from 1 to 14.") }
+    let days = args["days"]?.integerValue ?? 1
+    guard (1...14).contains(days) else { throw StageInputError("Days must be between 1 and 14.") }
+    var problems: [String] = []
+    var items: [ChatAccessStagedMenu.Item] = []
+    var recipes = 0
+    var newDishes = 0
+    let resolutions = try await exportStore.resolveRecipes(rawItems.map { $0.objectValue?["ref"]?.stringValue })
+    for (index, value) in rawItems.enumerated() {
+      let row = value.objectValue ?? [:]
+      let day = row["day"]?.integerValue ?? 0
+      let slotText = row["slot"]?.stringValue ?? MealPlanItemSlot.dinner.rawValue
+      let slot = MealPlanItemSlot(rawValue: slotText)
+      let note = row["note"]?.stringValue
+      let scale = row["scale"]?.doubleValue
+      let ref = row["ref"]?.stringValue
+      let rowTitle = row["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+      if row["day"] != nil && row["day"]?.integerValue == nil { problems.append("item \(index + 1): day must be a whole number") }
+      else if !(0..<days).contains(day) { problems.append("item \(index + 1): day must be from 0 to \(days - 1)") }
+      if slot == nil { problems.append("item \(index + 1): slot must be breakfast, lunch, dinner, or snack") }
+      if let note, note.count > 500 { problems.append("item \(index + 1): note must be at most 500 characters") }
+      if let scale, scale <= 0 { problems.append("item \(index + 1): scale must be greater than 0") }
+      if scale != nil && ref == nil { problems.append("item \(index + 1): scale applies to a library recipe") }
+      if ref == nil && (rowTitle?.isEmpty != false) { problems.append("item \(index + 1): a new dish needs a title") }
+      if ref != nil {
+        let resolution = resolutions[index]
+        if let error = resolution.error {
+          problems.append("item \(index + 1): \(error)")
+        } else if let recipe = resolution.recipe {
+          if recipe.archived { problems.append("item \(index + 1): That recipe is archived in Yes Chef.") }
+          else {
+            recipes += 1
+            items.append(.init(recipeID: recipe.id, title: recipe.title, dayOffset: day, slot: slot ?? .dinner, note: note, scale: scale))
+          }
+        } else {
+          problems.append("item \(index + 1): That reference is from an older export; search again.")
+        }
+      } else {
+        newDishes += 1
+        items.append(.init(recipeID: nil, title: rowTitle ?? "", dayOffset: day, slot: slot ?? .dinner, note: note, scale: nil))
+      }
+    }
+    guard problems.isEmpty else { throw StageInputError("Fix these menu items and retry: \(problems.joined(separator: "; "))") }
+    return try context.stageMenu(ChatAccessStagedMenu(title: cleanTitle, dayCount: days, items: items), recipeCount: recipes, newDishCount: newDishes)
+  }
+}
+
+private struct StageInputError: LocalizedError {
+  var errorDescription: String?
+  init(_ message: String) { errorDescription = message }
+}
+
+private extension MCPValue {
+  var integerValue: Int? { if case let .integer(value) = self { value } else { nil } }
+  var arrayValue: [MCPValue]? { if case let .array(value) = self { value } else { nil } }
+  var doubleValue: Double? {
+    switch self { case let .number(value): value; case let .integer(value): Double(value); default: nil }
   }
 }

@@ -10,6 +10,7 @@ extension AIHandoffTests {
       title: "Soup", makeAhead: "Chill overnight."
     ))
     let prompt = context.prompt(forTask: .recipe)
+    #expect(prompt.contains(RecipeReturnLabels.deliverableLines))
     for label in ["YC-REVISION:", "YC-NEW-RECIPE:", "YC-MAKE-AHEAD:", "YC-CHEF-IT-UP:",
                   "YC-SERVE-WITH:", "YC-LEARNINGS:"] {
       #expect(prompt.contains(label))

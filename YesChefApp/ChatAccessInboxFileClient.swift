@@ -15,6 +15,9 @@ extension ChatAccessInboxFileClient: DependencyKey {
     let client = ChatInboxFileClient.live
     let recipe = ChatInboxItemKind(fileExtension: "json", expiresUnclaimed: false, datesProcessedByClaim: false)
     let handoff = ChatInboxItemKind(fileExtension: "ycreturn", expiresUnclaimed: true, datesProcessedByClaim: true)
+    let recipeReturn = ChatInboxItemKind(fileExtension: "ycrecipereturn", expiresUnclaimed: false, datesProcessedByClaim: false)
+    let menu = ChatInboxItemKind(fileExtension: "ycmenu", expiresUnclaimed: false, datesProcessedByClaim: false)
+    let kinds = [recipe, handoff, recipeReturn, menu]
     return Self(
       read: client.read,
       openAndClaim: { folder, url in
@@ -22,9 +25,12 @@ extension ChatAccessInboxFileClient: DependencyKey {
         try await client.claim(folder, url, recipe)
         return text
       },
-      claim: { folder, url in try await client.claim(folder, url, url.pathExtension == "ycreturn" ? handoff : recipe) },
+      claim: { folder, url in
+        let kind = kinds.first { $0.fileExtension == url.pathExtension } ?? recipe
+        try await client.claim(folder, url, kind)
+      },
       maintain: { folder, now, removesProbe in
-        try await client.maintain(folder, [recipe, handoff], now)
+        try await client.maintain(folder, kinds, now)
         if removesProbe {
           try await Task.detached(priority: .utility) {
             let url = folder.url.appending(path: "Probe", directoryHint: .isDirectory)

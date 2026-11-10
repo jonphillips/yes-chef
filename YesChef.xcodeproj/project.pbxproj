@@ -56,6 +56,7 @@
 		39910D0EBA5752CE0EF217D8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 517D768EFBEA670F5B8416DE /* GRDB */; };
 		3AF6F47B328D293D8DDEB2C5 /* RecipeDetailModel+Enrichment.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */; };
 		3B43FC000CAA77FE2FCBAD93 /* HandoffIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75337F357939E23B8A594784 /* HandoffIntents.swift */; };
+		3BCF7556FAE56F85B54A62F8 /* ChatMenuReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFB4013A912F27F5A588B38 /* ChatMenuReviewSheet.swift */; };
 		405995E434055C9790D6B594 /* EditableRowsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */; };
 		410DE555132BA6ED513C55C6 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 23B55C4E25C2510FF2AB49D3 /* GRDB */; };
 		44F69263795B85BC859E1591 /* PantryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870CDB16B3140953C11EFDDC /* PantryViews.swift */; };
@@ -408,6 +409,7 @@
 		F84AAEC891DC74D674D7B576 /* PowerBrowserModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerBrowserModelTests.swift; sourceTree = "<group>"; };
 		F8744801C40184D7AD84C071 /* ChatAccessFolderClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccessFolderClient.swift; sourceTree = "<group>"; };
 		F9FE33039715323689ED24FD /* RecipeCategoryFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCategoryFilterView.swift; sourceTree = "<group>"; };
+		FBFB4013A912F27F5A588B38 /* ChatMenuReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMenuReviewSheet.swift; sourceTree = "<group>"; };
 		FC48B146F8E70CD1E9903EBC /* YesChef.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = YesChef.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE43F12069919277037EDE55 /* RecipeDetailModel+Enrichment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeDetailModel+Enrichment.swift"; sourceTree = "<group>"; };
 		FF86C88A023D5D19CDE64102 /* FocusToolbarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusToolbarButton.swift; sourceTree = "<group>"; };
@@ -585,6 +587,7 @@
 				45D75CF362451D2A5C111E03 /* ChatAccessInboxFileClient.swift */,
 				D5CF2E4CD06DD145A24B8CA4 /* ChatAccessInboxModel.swift */,
 				D623DFA6C9D545A4DCFF71B7 /* ChatAccessInboxView.swift */,
+				FBFB4013A912F27F5A588B38 /* ChatMenuReviewSheet.swift */,
 				3A9BA1822C178E165616DFE6 /* ChatStarterMenu.swift */,
 				F23F8E8EAB36E54DADF23A71 /* ChatSurface.swift */,
 				90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */,
@@ -937,6 +940,7 @@
 				C9C5BCB9FCD07E7ACCB7728A /* ChatAccessInboxFileClient.swift in Sources */,
 				2C0DCDE2A1119185E53B6540 /* ChatAccessInboxModel.swift in Sources */,
 				C5E6DBA4137BB6C113CFD100 /* ChatAccessInboxView.swift in Sources */,
+				3BCF7556FAE56F85B54A62F8 /* ChatMenuReviewSheet.swift in Sources */,
 				B2021B723DFF4B090A0EDFBF /* ChatStarterMenu.swift in Sources */,
 				BE4BD3C03012A0A5F11A6852 /* ChatSurface.swift in Sources */,
 				CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */,
