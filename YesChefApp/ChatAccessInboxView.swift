@@ -6,7 +6,7 @@ struct ChatAccessInboxSection: View {
 
   var body: some View {
     @Bindable var model = model
-    if model.inboxCount > 0 || !model.returnRows.isEmpty || model.message != nil {
+    if model.inboxCount > 0 || !model.returnRows.isEmpty || !model.recipeReturnRows.isEmpty || model.message != nil {
       Section {
         if let message = model.message {
           Label(message, systemImage: "exclamationmark.icloud")

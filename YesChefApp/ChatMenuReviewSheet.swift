@@ -10,6 +10,7 @@ final class ChatMenuReviewModel: Identifiable {
   var title: String
   let dayCount: Int
   var items: [ChatMenuImport.ResolvedItem]
+  var errorMessage: String?
 
   init(row: ChatAccessInbox.MenuRow, title: String, dayCount: Int, items: [ChatMenuImport.ResolvedItem]) {
     self.row = row
@@ -43,6 +44,11 @@ struct ChatMenuReviewSheet: View {
             .accessibilityLabel("Menu title")
           if model.dayCount > 1 {
             LabeledContent("Days", value: "\(model.dayCount)")
+          }
+          if let errorMessage = model.errorMessage {
+            Label(errorMessage, systemImage: "exclamationmark.triangle")
+              .font(.footnote)
+              .foregroundStyle(.orange)
           }
         }
 

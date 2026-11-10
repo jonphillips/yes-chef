@@ -101,6 +101,8 @@ public enum ChatRecipeReturnImportError: Error, Equatable, Sendable {
 
 public enum ChatRecipeReturnImport {
   /// Stages a recipe return against the live recipe row; any parse failure rolls back the local hand-off row.
+  /// A model that also knows the hand-off contract may echo its `YC-CONTRACT:` marker; strip it so the labeled
+  /// parser doesn't file it as an unfiled deliverable. No marker is expected here, so its absence isn't a warning.
   public static func stageReview(
     _ envelope: ChatAccessStagedRecipeReturn,
     in db: Database,
@@ -110,13 +112,14 @@ public enum ChatRecipeReturnImport {
     guard let recipe = try Recipe.find(envelope.recipeID).fetchOne(db), !recipe.archived else {
       throw ChatRecipeReturnImportError.recipeUnavailable
     }
+    let text = try AIHandoffReturnContract.strippingMarker(from: envelope.text).text
     let handoff = AIHandoff(
       id: uuid(), sourceType: .recipe, sourceID: recipe.id, taskType: .recipe,
       dayOffset: nil, variationID: nil, createdAt: now, status: .awaitingReturn,
       schemaVersion: AIHandoff.initialSchemaVersion, regenerates: false, exportedPrompt: ""
     )
     try AIHandoffRepository.create(handoff, in: db)
-    return try AIHandoffIntentImport.stageReview(handoffID: handoff.id, result: envelope.text, in: db, now: now)
+    return try AIHandoffIntentImport.stageReview(handoffID: handoff.id, result: text, in: db, now: now)
   }
 }
 

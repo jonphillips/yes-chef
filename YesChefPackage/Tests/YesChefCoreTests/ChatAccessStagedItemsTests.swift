@@ -56,6 +56,22 @@ struct ChatAccessStagedItemsTests {
     #expect(try database.read { db in try AIHandoff.fetchAll(db).count } == 1)
   }
 
+  @Test func recipeReturnDropsAnEchoedContractMarker() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_150_000)
+    let recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+      let envelope = ChatAccessStagedRecipeReturn(
+        recipeID: recipeID, recipeTitle: "Beans", text: "\(AIHandoffReturnContract.marker)\nYC-REVISION:\nToast the spices"
+      )
+      let review = try ChatRecipeReturnImport.stageReview(envelope, in: db, now: now, uuid: { UUID() })
+      guard case let .recipeItems(_, items) = review else { Issue.record("Expected a recipe review"); return }
+      #expect(items.count == 1)
+      guard case .recipeAdjustmentBrief = items.first else { Issue.record("Expected only the revision brief"); return }
+    }
+  }
+
   @Test func menuImportPreservesOrderKindsAndScales() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 840_200_000)

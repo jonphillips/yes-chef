@@ -250,6 +250,8 @@ final class ChatAccessInboxModel {
       review.items.contains(where: \.isKept), !workingIDs.contains(review.row.id) else { return }
     workingIDs.insert(review.row.id)
     defer { workingIDs.remove(review.row.id) }
+    review.errorMessage = nil
+    let menuID: Menu.ID
     do {
       let title = review.title
       let items = review.items
@@ -257,21 +259,30 @@ final class ChatAccessInboxModel {
       let currentNow = now
       let generator = uuid
       let makeUUID: @Sendable () -> UUID = { generator() }
-      let menuID = try await database.write { db in
+      menuID = try await database.write { db in
         try ChatMenuImport.create(title: title, dayCount: dayCount, items: items, in: db, now: currentNow, uuid: makeUUID)
       }
+    } catch {
+      // The sheet covers the inbox row, so a failed write is reported in the sheet.
+      review.errorMessage = error.localizedDescription
+      return
+    }
+    // The menu exists now. Close the review before claiming, so a failed claim can't invite a second Create Menu.
+    menuReview = nil
+    toastCenter?.postSuccess("Menu created.")
+    onMenuSelected?(menuID)
+    do {
       try await fileClient.claim(folder, review.row.url)
       forget([review.row.url])
       menuRows.removeAll { $0.id == review.row.id }
       rowErrors[review.row.id] = nil
-      menuReview = nil
-      toastCenter?.postSuccess("Menu created.")
-      onMenuSelected?(menuID)
     } catch let error as HandoffInboxError where error == .alreadyClaimed {
       forget([review.row.url])
       menuRows.removeAll { $0.id == review.row.id }
-      menuReview = nil
-    } catch { rowErrors[review.row.id] = error.localizedDescription }
+      rowErrors[review.row.id] = nil
+    } catch {
+      rowErrors[review.row.id] = "Menu created, but this item couldn't be cleared: \(error.localizedDescription) Discard it."
+    }
   }
 
   func copy(_ row: ChatAccessInbox.ReturnRow) async {
