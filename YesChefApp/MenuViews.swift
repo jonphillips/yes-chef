@@ -1,3 +1,4 @@
+import LLMHandoffUI
 import SwiftUI
 import UniformTypeIdentifiers
 import YesChefCore
@@ -131,8 +132,6 @@ struct MenuDetailView: View {
           detail: detail,
           handoffTransport: handoffTransport,
           onRecipeSelected: onRecipeSelected,
-          isAskActive: isAskActive,
-          askButtonTapped: askButtonTapped,
           regeneratePrepPlan: regeneratePrepPlan
         )
         .navigationTitle(detail.menu.title)
@@ -181,7 +180,25 @@ struct MenuDetailView: View {
           Button {
             detailModel.recipeBrowserButtonTapped()
           } label: {
-            Label("Browse Recipes", systemImage: "book.badge.plus")
+            Label("Add Recipes", image: "custom.richtext.page.badge.plus")
+          }
+          Button {
+            if let detail = detailModel.detail { model.editMenuButtonTapped(menu: detail.menu, detail: detail) }
+          } label: {
+            Label("Edit", systemImage: "square.and.pencil")
+          }
+          HandoffMenu(
+            paste: {
+              let results = UIPasteboard.general.string.map { [$0] } ?? []
+              Task { await handoffTransport.pastedResultsReceived(results, source: .menu(detailModel.menuID)) }
+            },
+            isAskActive: isAskActiveBinding
+          ) {
+            Button("Menu") { Task { await handoffTransport.copyPrompt(for: .menu(detailModel.menuID)) } }
+            Button("Fresh prep plan") {
+              Task { await handoffTransport.copyPrompt(for: .menu(detailModel.menuID, prepPlanIntent: .regenerate)) }
+            }
+            Button("Recipe capture request") { handoffTransport.copyRecipeCaptureRequest() }
           }
         }
       }
@@ -244,16 +261,18 @@ struct MenuDetailView: View {
     WideLayout.isEnabled(horizontalSizeClass: horizontalSizeClass)
   }
 
+  private var isAskActiveBinding: Binding<Bool> {
+    Binding(
+      get: { detailModel.chatModel != nil },
+      set: { active in
+        guard active != (detailModel.chatModel != nil) else { return }
+        detailModel.askButtonTapped()
+      }
+    )
+  }
+
   private var cookSessionPresentation: CookSessionPresentation? {
     detailModel.detail.flatMap(CookSessionPresentation.init(menuDetail:))
-  }
-
-  private var isAskActive: Bool {
-    detailModel.chatModel != nil
-  }
-
-  private func askButtonTapped() {
-    detailModel.askButtonTapped()
   }
 
   private func regeneratePrepPlan() {
@@ -332,9 +351,7 @@ struct MenuPrepPlanSection: View {
   let placementStartDate: Date?
   let today: Date
   let itemRows: [MenuItemRowData]
-  let handoffSource: HandoffExportSource
-  let regenerateHandoffSource: HandoffExportSource
-  let handoffTransport: HandoffInAppTransport
+  var regeneratePrepPlan: () -> Void
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var clearPrepPlan: () -> Void
   var createStep: (PrepPlanStep) -> Void
@@ -378,27 +395,19 @@ struct MenuPrepPlanSection: View {
         .buttonStyle(.plain)
         .accessibilityLabel(isExpanded ? "Collapse Prep Plan" : "Expand Prep Plan")
 
+        Button {
+          editor = PrepPlanStepEditorDraft()
+        } label: {
+          Label("Add Step", systemImage: "plus").labelStyle(.iconOnly)
+        }
+        .accessibilityLabel("Add Step")
+        .buttonStyle(.borderless)
+
         Spacer()
 
         Menu {
-          Button("Copy Recipe Capture Request") {
-            handoffTransport.copyRecipeCaptureRequest()
-          }
-          Divider()
-          Button("Hand off · Prep") {
-            Task { await handoffTransport.copyPrompt(for: handoffSource) }
-          }
-          Button("Hand off · Regenerate") {
-            Task { await handoffTransport.copyPrompt(for: regenerateHandoffSource) }
-          }
-          Button("Paste · Prep") {
-            Task {
-              await handoffTransport.pastedResultsReceived(
-                [UIPasteboard.general.string ?? ""],
-                source: handoffSource
-              )
-            }
-          }
+          Button("Rebuild with Yes Chef…", systemImage: "arrow.clockwise", action: regeneratePrepPlan)
+            .disabled(steps.isEmpty)
           Divider()
           Button("Clear Prep Plan", role: .destructive) {
             isClearConfirmationPresented = true
@@ -412,21 +421,9 @@ struct MenuPrepPlanSection: View {
       }
 
       if isExpanded {
-        HStack {
-          Button {
-            editor = PrepPlanStepEditorDraft()
-          } label: {
-            Label("Add Step", systemImage: "plus")
-          }
-          .buttonStyle(.bordered)
-        }
-
         if steps.isEmpty {
-          ContentUnavailableView(
-            "No Prep Plan Yet",
-            systemImage: "checklist",
-            description: Text("Paste a plan grouped under session headers, then refine it with chat.")
-          )
+          Text("No steps yet.")
+            .foregroundStyle(.tertiary)
         } else {
           VStack(alignment: .leading, spacing: 8) {
             ForEach(sessionBands) { band in
@@ -551,12 +548,9 @@ struct MenuDetailHeader: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 12) {
-        Label(dayCountTitle, systemImage: "calendar")
-        Label(itemCountTitle, systemImage: "fork.knife")
-      }
-      .font(.subheadline)
-      .foregroundStyle(.secondary)
+      Text(metadata)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
 
       if let notes = detail.menu.notes {
         Text(notes)
@@ -565,54 +559,28 @@ struct MenuDetailHeader: View {
     }
   }
 
+  private var metadata: String {
+    var parts: [String] = []
+    if detail.placements.count == 1, let placement = detail.placements.first,
+      let endDate = MenuPlacementDay.date(for: detail.menu.dayCount - 1, from: placement)
+    {
+      let start = placement.startDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+      let end = endDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+      parts.append("\(start) – \(end)")
+    } else if detail.placements.count > 1 {
+      parts.append("On the calendar \(detail.placements.count) times")
+    }
+    parts.append(dayCountTitle)
+    parts.append(itemCountTitle)
+    return parts.joined(separator: " · ")
+  }
+
   private var dayCountTitle: String {
     detail.menu.dayCount == 1 ? "1 day" : "\(detail.menu.dayCount) days"
   }
 
   private var itemCountTitle: String {
     detail.itemRows.count == 1 ? "1 dish" : "\(detail.itemRows.count) dishes"
-  }
-}
-
-struct MenuExternalProjectField: View {
-  let externalProjectName: String?
-  let save: (String) -> Void
-
-  @State private var draft: String
-
-  init(externalProjectName: String?, save: @escaping (String) -> Void) {
-    self.externalProjectName = externalProjectName
-    self.save = save
-    _draft = State(wrappedValue: externalProjectName ?? "")
-  }
-
-  private var normalizedDraft: String {
-    draft.trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  private var normalizedStoredValue: String {
-    (externalProjectName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      StackedTextField(
-        title: "ChatGPT Project",
-        text: $draft,
-        prompt: "Emerald Isle Beach"
-      )
-      HStack {
-        Text("Reminder of which ChatGPT project to open for this menu — Shortcuts can't pick it for you.")
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-        Spacer()
-        Button("Save Project") {
-          save(draft)
-        }
-        .buttonStyle(.bordered)
-        .disabled(normalizedDraft == normalizedStoredValue)
-      }
-    }
   }
 }
 
@@ -872,45 +840,78 @@ private struct MenuRecipeSelectionRow: View {
   }
 }
 
-struct MenuPlacementEditorView: View {
+struct MenuEditView: View {
   @Environment(\.dismiss) private var dismiss
-  @State private var startDate: Date
-  @State private var dayCount: Int
-
+  @State private var draft: MenuEditDraftContext
   let model: MenuLibraryModel
-  let context: MenuPlacementDraftContext
 
-  init(model: MenuLibraryModel, context: MenuPlacementDraftContext) {
+  init(model: MenuLibraryModel, context: MenuEditDraftContext) {
     self.model = model
-    self.context = context
-    _startDate = State(wrappedValue: context.startDate)
-    _dayCount = State(wrappedValue: context.dayCount)
+    _draft = State(initialValue: context)
+  }
+
+  private var canSave: Bool {
+    !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   var body: some View {
     Form {
-      Section(context.menuTitle) {
-        DatePicker("Start Date", selection: $startDate, displayedComponents: .date)
-        Stepper("Days: \(dayCount)", value: $dayCount, in: context.minimumDayCount...14)
+      Section("Menu") {
+        StackedTextField(title: "Title", text: $draft.title)
+        StackedTextEditor(title: "Notes", text: $draft.notes, minHeight: 100)
       }
-    }
-    .navigationTitle(context.isEditing ? "Edit Placement" : "Place Menu")
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button("Cancel") {
-          dismiss()
+      Section("Days") {
+        Stepper("Days: \(draft.dayCount)", value: $draft.dayCount, in: draft.minimumDayCount...14)
+      }
+      Section("Calendar") {
+        ForEach($draft.placements) { $placement in
+          DatePicker("Start Date", selection: $placement.startDate, displayedComponents: .date)
+            .swipeActions(edge: .trailing) {
+              Button(role: .destructive) { remove(placement) } label: {
+                Label("Remove from Calendar", systemImage: "trash")
+              }
+            }
+            .contextMenu {
+              Button(role: .destructive) { remove(placement) } label: {
+                Label("Remove from Calendar", systemImage: "trash")
+              }
+            }
         }
-      }
-      ToolbarItem(placement: .confirmationAction) {
-        Button("Save") {
-          var updatedContext = context
-          updatedContext.dayCount = dayCount
-          if model.savePlacementButtonTapped(context: updatedContext, startDate: startDate) {
+        Button("Place on Calendar…") {
+          draft.placements.append(MenuEditPlacementDraft(startDate: Calendar.autoupdatingCurrent.startOfDay(for: .now)))
+        }
+        if let bringInOffer = draft.bringInOffer {
+          Button {
+            // Close the editor before handing control to the existing Bring In confirmation.
             dismiss()
+            model.bringInButtonTapped(menuID: draft.menuID, menuTitle: draft.title, offer: bringInOffer)
+          } label: {
+            Label("Bring In Calendar Items…", image: "custom.menucard.arrow.in")
           }
         }
       }
     }
+    .navigationTitle("Edit Menu")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+      ToolbarItem(placement: .confirmationAction) {
+        Button("Save") {
+          if model.saveMenuEditsButtonTapped(context: draft) { dismiss() }
+        }
+        .disabled(!canSave)
+      }
+    }
+  }
+
+  private func remove(_ placement: MenuEditPlacementDraft) {
+    // A placement added in this sheet isn't saved yet, so removing it just drops the draft row.
+    guard placement.placementID != nil else {
+      draft.placements.removeAll { $0.id == placement.id }
+      return
+    }
+    // Removing a saved placement deliberately abandons unsaved edits, then presents the existing confirmation.
+    dismiss()
+    model.deletePlacementButtonTapped(menuTitle: draft.title, placement: placement)
   }
 }

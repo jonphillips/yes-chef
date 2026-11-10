@@ -9,6 +9,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
   let itemText: KeyPath<Item, String>
   var addItem: ((String) -> Bool)? = nil
   var addButtonLabel: String? = nil
+  var addButtonIconOnly = false
   var editItem: ((Item) -> Void)? = nil
   let updateItem: (Item, String) -> Void
   let deleteItem: (Item) -> Void
@@ -29,6 +30,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
     itemText: KeyPath<Item, String>,
     addItem: ((String) -> Bool)? = nil,
     addButtonLabel: String? = nil,
+    addButtonIconOnly: Bool = false,
     editItem: ((Item) -> Void)? = nil,
     updateItem: @escaping (Item, String) -> Void,
     deleteItem: @escaping (Item) -> Void,
@@ -44,6 +46,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
     self.itemText = itemText
     self.addItem = addItem
     self.addButtonLabel = addButtonLabel
+    self.addButtonIconOnly = addButtonIconOnly
     self.editItem = editItem
     self.updateItem = updateItem
     self.deleteItem = deleteItem
@@ -61,6 +64,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
     itemText: KeyPath<Item, String>,
     addItem: ((String) -> Bool)? = nil,
     addButtonLabel: String? = nil,
+    addButtonIconOnly: Bool = false,
     editItem: ((Item) -> Void)? = nil,
     updateItem: @escaping (Item, String) -> Void,
     deleteItem: @escaping (Item) -> Void,
@@ -76,6 +80,7 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
       itemText: itemText,
       addItem: addItem,
       addButtonLabel: addButtonLabel,
+      addButtonIconOnly: addButtonIconOnly,
       editItem: editItem,
       updateItem: updateItem,
       deleteItem: deleteItem,
@@ -112,8 +117,14 @@ struct EditableRowsSection<Item: Identifiable, EmptyState: View, ItemContent: Vi
         Button {
           isAdding = true
         } label: {
-          Label(addButtonLabel ?? "Add \(title)", systemImage: "plus")
+          if addButtonIconOnly {
+            Label(addButtonLabel ?? "Add \(title)", systemImage: "plus")
+              .labelStyle(.iconOnly)
+          } else {
+            Label(addButtonLabel ?? "Add \(title)", systemImage: "plus")
+          }
         }
+        .accessibilityLabel(addButtonLabel ?? "Add \(title)")
       }
     }
   }

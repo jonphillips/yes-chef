@@ -580,7 +580,6 @@ enum HandoffAppOperations {
     handoffID: AIHandoff.ID
   ) async throws -> HandoffExport {
     let handoff: AIHandoff
-    var externalProjectName: String? = nil
     let metadata = source.metadata(handoffID: handoffID)
 
     switch source {
@@ -598,7 +597,6 @@ enum HandoffAppOperations {
         handoffID: handoffID,
         prepPlanIntent: prepPlanIntent
       )
-      externalProjectName = detail.menu.externalProjectName
 
     case let .menuComplement(menuID):
       guard let detail = try await database.read({ db in
@@ -613,7 +611,6 @@ enum HandoffAppOperations {
         now: now,
         handoffID: handoffID
       )
-      externalProjectName = detail.menu.externalProjectName
 
     case let .menuDay(menuID, dayOffset):
       guard let detail = try await database.read({ db in
@@ -629,7 +626,6 @@ enum HandoffAppOperations {
         now: now,
         handoffID: handoffID
       )
-      externalProjectName = detail.menu.externalProjectName
 
     case let .menuDayComplement(menuID, dayOffset):
       guard let detail = try await database.read({ db in
@@ -645,7 +641,6 @@ enum HandoffAppOperations {
         now: now,
         handoffID: handoffID
       )
-      externalProjectName = detail.menu.externalProjectName
 
     case let .recipeSection(recipeID, section):
       guard let detail = try await database.read({ db in
@@ -757,8 +752,7 @@ enum HandoffAppOperations {
     }
     return HandoffExport(
       id: handoff.id,
-      prompt: handoff.exportedPrompt,
-      externalProjectName: externalProjectName
+      prompt: handoff.exportedPrompt
     )
   }
 

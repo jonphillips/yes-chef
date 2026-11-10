@@ -721,40 +721,6 @@ extension AIHandoffTests {
     }
   }
 
-  @Test
-  func menuExternalProjectNameIsTrimmedAndCanBeCleared() throws {
-    @Dependency(\.defaultDatabase) var database
-    let menuID = SampleUUIDSequence.uuid(38_030)
-    let now = Date(timeIntervalSinceReferenceDate: 840_000_000)
 
-    try database.write { db in
-      try Menu.insert {
-        Menu(
-          id: menuID,
-          title: "Beach Menu",
-          dayCount: 2,
-          dateCreated: now,
-          dateModified: now
-        )
-      }
-      .execute(db)
-
-      try MenuRepository.updateExternalProjectName(
-        menuID: menuID,
-        externalProjectName: "  Emerald Isle Beach  ",
-        in: db,
-        now: now
-      )
-      #expect(try Menu.find(menuID).fetchOne(db)?.externalProjectName == "Emerald Isle Beach")
-
-      try MenuRepository.updateExternalProjectName(
-        menuID: menuID,
-        externalProjectName: "   ",
-        in: db,
-        now: now
-      )
-      #expect(try Menu.find(menuID).fetchOne(db)?.externalProjectName == nil)
-    }
-  }
 
 }

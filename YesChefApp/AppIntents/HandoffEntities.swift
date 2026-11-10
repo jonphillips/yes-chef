@@ -204,19 +204,13 @@ struct HandoffExport: AppEntity {
   let id: AIHandoff.ID
   @Property(title: "Handoff ID") var handoffID: String
   @Property(title: "Prompt") var prompt: String
-  @Property(title: "ChatGPT Project") var externalProjectName: String?
 
-  init(id: AIHandoff.ID, prompt: String, externalProjectName: String?) {
+  init(id: AIHandoff.ID, prompt: String) {
     self.id = id
     self._handoffID = EntityProperty(identifier: "handoffID", title: "Handoff ID")
     self._handoffID.wrappedValue = id.uuidString
     self._prompt = EntityProperty(identifier: "prompt", title: "Prompt")
     self._prompt.wrappedValue = prompt
-    self._externalProjectName = EntityProperty(
-      identifier: "externalProjectName",
-      title: "ChatGPT Project"
-    )
-    self._externalProjectName.wrappedValue = externalProjectName
   }
 
   var displayRepresentation: DisplayRepresentation {
