@@ -39,7 +39,7 @@ struct YesChefMCPTests {
     let server = YesChefMCPServer.make(home: temporary) { fixedDate }
     let list = try #require(await server.handle(line: request("tools/list")))
     let tools = try object(list)["result"]?.objectValue?["tools"]?.arrayValue ?? []
-    #expect(Set(tools.compactMap { $0.objectValue?["name"]?.stringValue }) == Set(["stage_recipe", "stage_handoff_return", "search_recipes", "get_recipe", "list_menus", "get_menu", "get_meal_plan"]))
+    #expect(Set(tools.compactMap { $0.objectValue?["name"]?.stringValue }) == Set(["stage_recipe", "stage_handoff_return", "stage_recipe_return", "stage_menu", "search_recipes", "get_recipe", "list_menus", "get_menu", "get_meal_plan"]))
 
     let response = try #require(await server.handle(line: toolCall("stage_recipe", recipe: validRecipe)))
     let responseObject = try object(response)["result"]?.objectValue ?? [:]
@@ -283,6 +283,15 @@ struct YesChefMCPTests {
     let recipe = tool("stage_recipe")["description"]?.stringValue ?? ""
     #expect(recipe.contains("Only for a conversation with no `YC-HANDOFF:` line"))
     #expect(recipe.contains("`stage_handoff_return`"))
+    #expect(recipe.contains("`stage_recipe_return`"))
+    let recipeReturn = tool("stage_recipe_return")["description"]?.stringValue ?? ""
+    #expect(recipeReturn.contains("search_recipes"))
+    #expect(recipeReturn.contains("YC-HANDOFF:"))
+    #expect(recipeReturn.contains("YC-NEW-RECIPE:"))
+    #expect(recipeReturn.contains(RecipeReturnLabels.deliverableLines))
+    let menu = tool("stage_menu")["description"]?.stringValue ?? ""
+    #expect(menu.contains("stage_recipe"))
+    #expect(menu.contains("search again"))
 
     let handoff = tool("stage_handoff_return")
     let description = handoff["description"]?.stringValue ?? ""
@@ -290,6 +299,119 @@ struct YesChefMCPTests {
     #expect(description.contains("line 1 is the exact `YC-HANDOFF:` line from the prompt, line 2 is `YC-CONTRACT: v3`"))
     let text = handoff["inputSchema"]?.objectValue?["properties"]?.objectValue?["text"]?.objectValue
     #expect(text?["description"]?.stringValue == "The whole return: the `YC-HANDOFF:` line, then `YC-CONTRACT: v3`, then the deliverable.")
+  }
+
+  @Test func chatStartedRecipeReturnAndMenuResolveAgainstOneExport() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let folder = ChatAccessFolder(containerURL: container, isDevelopment: false)
+    try FileManager.default.createDirectory(at: folder.exportsURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let recipeID = UUID()
+    let recipe = Recipe(id: recipeID, title: "Braised Beans", dateCreated: now, dateModified: now,
+      makeAhead: "Soak overnight", chefItUp: "Brown the aromatics")
+    let bundle = RecipeBundleCoding.RecipeBundle(recipe: recipe)
+    try ChatAccessExportCoding.encode(.init(generatedAt: now, device: "iPhone", recipes: [bundle], menus: [], mealPlan: []))
+      .write(to: folder.exportsURL.appending(path: "install.json"))
+    let server = YesChefMCPServer.make(home: temporary, now: { now })
+    let search = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("beans")])))
+    let ref = try #require(object(toolText(search))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+
+    let returnedText = "YC-REVISION:\nToast the spices"
+    let returned = try #require(await server.handle(line: genericToolCall("stage_recipe_return", args: ["ref": .string(ref), "text": .string(returnedText)])))
+    let returnResult = try toolText(returned)
+    #expect(!containsUUID(returnResult))
+    #expect(returnResult.contains("Braised Beans"))
+    let stagedReturn = try #require(HandoffInbox(root: folder.inboxURL, fileExtension: "ycrecipereturn").list().first)
+    let returnEnvelope = try JSONDecoder().decode(ChatAccessStagedRecipeReturn.self, from: Data(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycrecipereturn").read(stagedReturn).utf8))
+    #expect(returnEnvelope.recipeID == recipeID)
+    #expect(returnEnvelope.text == returnedText)
+
+    let menuCall = genericToolCall("stage_menu", args: [
+      "title": .string("Sunday Supper"), "days": .integer(2),
+      "items": .array([
+        .object(["ref": .string(ref), "day": .integer(0), "slot": .string("dinner"), "scale": .number(1.5)]),
+        .object(["title": .string("Green salad"), "day": .integer(1), "slot": .string("lunch"), "note": .string("Dress just before serving")]),
+      ]),
+    ])
+    let stagedMenu = try #require(await server.handle(line: menuCall))
+    let menuResult = try toolText(stagedMenu)
+    #expect(!containsUUID(menuResult))
+    #expect(menuResult.contains("\"recipes\":1"))
+    #expect(menuResult.contains("\"newDishes\":1"))
+    let menuFile = try #require(HandoffInbox(root: folder.inboxURL, fileExtension: "ycmenu").list().first)
+    let menu = try JSONDecoder().decode(ChatAccessStagedMenu.self, from: Data(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycmenu").read(menuFile).utf8))
+    #expect(menu.items.map(\.recipeID) == [recipeID, nil])
+
+    let get = try #require(await server.handle(line: genericToolCall("get_recipe", args: ["ref": .string(ref)])))
+    let recipeValue = try object(toolText(get))["recipe"]?.objectValue
+    #expect(recipeValue?["makeAhead"]?.stringValue == "Soak overnight")
+    #expect(recipeValue?["chefItUp"]?.stringValue == "Brown the aromatics")
+  }
+
+  @Test func recipeReturnAndMenuValidationRejectBadInputsWithoutStaging() async throws {
+    let temporary = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    let container = ChatAccessHelperFolder.containerURL(for: "iCloud.com.jonphillips.yeschef", home: temporary)
+    let folder = ChatAccessFolder(containerURL: container, isDevelopment: false)
+    try FileManager.default.createDirectory(at: folder.exportsURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let now = Date(timeIntervalSince1970: 1_800_000_100)
+    let recipe = Recipe(id: UUID(), title: "Soup", dateCreated: now, dateModified: now)
+    let archived = Recipe(id: UUID(), title: "Old stew", archived: true, dateCreated: now, dateModified: now)
+    let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Existing menu", notes: nil, dayCount: 1, modified: now, items: [])
+    try ChatAccessExportCoding.encode(.init(generatedAt: now, device: "iPhone", recipes: [
+      RecipeBundleCoding.RecipeBundle(recipe: recipe), RecipeBundleCoding.RecipeBundle(recipe: archived),
+    ], menus: [menu], mealPlan: []))
+      .write(to: folder.exportsURL.appending(path: "install.json"))
+    let server = YesChefMCPServer.make(home: temporary, now: { now })
+    let search = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("soup")])))
+    let ref = try #require(object(toolText(search))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let oldRecipeReference = "0.r0"
+    let menuList = try #require(await server.handle(line: genericToolCall("list_menus", args: [:])))
+    let menuRef = try #require(object(toolText(menuList))["menus"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    for text in ["", "YC-HANDOFF: token\nYC-REVISION:\nChange it", "YC-NEW-RECIPE:\n{}"] {
+      let result = try #require(await server.handle(line: genericToolCall("stage_recipe_return", args: ["ref": .string(ref), "text": .string(text)])))
+      #expect(try object(result)["result"]?.objectValue?["isError"] == .bool(true))
+    }
+    for badRef in [oldRecipeReference, menuRef] {
+      let result = try #require(await server.handle(line: genericToolCall("stage_recipe_return", args: ["ref": .string(badRef), "text": .string("YC-REVISION:\nChange it")])))
+      #expect(try object(result)["result"]?.objectValue?["isError"] == .bool(true))
+    }
+    let archivedSearch = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("old stew")])))
+    let archivedRef = try #require(object(toolText(archivedSearch))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let archivedReturn = try #require(await server.handle(line: genericToolCall("stage_recipe_return", args: ["ref": .string(archivedRef), "text": .string("YC-REVISION:\nChange it")])))
+    #expect(try object(archivedReturn)["result"]?.objectValue?["isError"] == .bool(true))
+    let invalidMenu = try #require(await server.handle(line: genericToolCall("stage_menu", args: [
+      "title": .string("Dinner"), "items": .array([
+        .object(["title": .string(""), "day": .integer(4), "slot": .string("brunch")]),
+        .object(["ref": .string(ref), "scale": .number(0)]),
+      ]),
+    ])))
+    let response = try object(invalidMenu)["result"]?.objectValue ?? [:]
+    #expect(response["isError"] == .bool(true))
+    let message = response["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue ?? ""
+    #expect(message.contains("item 1"))
+    #expect(message.contains("item 2"))
+    #expect(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycrecipereturn").list().isEmpty)
+    #expect(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycmenu").list().isEmpty)
+
+    let invalidMenus: [[String: MCPValue]] = [
+      ["title": .string(" "), "items": .array([.object(["title": .string("Salad")])])],
+      ["title": .string("Dinner"), "items": .array([])],
+      ["title": .string("Dinner"), "days": .integer(0), "items": .array([.object(["title": .string("Salad")])])],
+      ["title": .string("Dinner"), "days": .integer(15), "items": .array([.object(["title": .string("Salad")])])],
+      ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "day": .integer(1)])])],
+      ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "slot": .string("brunch")])])],
+      ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "note": .string(String(repeating: "x", count: 501))])])],
+      ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "scale": .number(2)])])],
+      ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad")]), .object(["ref": .string("0.r0")])])],
+    ]
+    for args in invalidMenus {
+      let invalid = try #require(await server.handle(line: genericToolCall("stage_menu", args: args)))
+      #expect(try object(invalid)["result"]?.objectValue?["isError"] == .bool(true))
+    }
+    #expect(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycmenu").list().isEmpty)
   }
 
   @Test func handoffReturnsPreserveTextAndAllowRepeatedTokens() async throws {

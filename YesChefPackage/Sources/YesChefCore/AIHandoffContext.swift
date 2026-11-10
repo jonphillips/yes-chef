@@ -1,6 +1,16 @@
 import Dependencies
 import Foundation
 
+public enum RecipeReturnLabels {
+  public static let deliverableLines = """
+    YC-REVISION: \(RecipeHandoffContext.revisionFormat)
+    YC-MAKE-AHEAD: \(RecipeHandoffContext.makeAheadFormat)
+    YC-CHEF-IT-UP: \(RecipeHandoffContext.lineListFormat("upgrade"))
+    YC-SERVE-WITH: \(RecipeHandoffContext.serveWithFormat)
+    YC-LEARNINGS: Only new durable constraints or rejected ideas, not changes already in the brief.
+    """
+}
+
 public struct RecipeHandoffContext: Equatable, Sendable {
   public let recipe: RecipeChatRecipeContext
 
@@ -70,14 +80,10 @@ public struct RecipeHandoffContext: Equatable, Sendable {
       return """
       Discuss this recipe freely. When the cook asks to finalize, return only the deliverables requested.
       If the request is ambiguous, ask one short question. Prefix each deliverable with its label on a line:
-      YC-REVISION: \(Self.revisionFormat)
       YC-NEW-RECIPE: A standalone schema.org Recipe JSON-LD for a different dish. Put the YC-NEW-RECIPE: label
       on its own line first, followed by the JSON-LD object. The following object-only rule applies after the label:
       \(RecipeJSONLDContract.outputInstructions)
-      YC-MAKE-AHEAD: \(Self.makeAheadFormat)
-      YC-CHEF-IT-UP: \(Self.lineListFormat("upgrade"))
-      YC-SERVE-WITH: \(Self.serveWithFormat)
-      YC-LEARNINGS: Only new durable constraints or rejected ideas, not changes already in the brief.
+      \(RecipeReturnLabels.deliverableLines)
       A new recipe must stand alone, without any other deliverable or learnings. If a revision travels with
       section notes, those notes describe the recipe as revised. The Playbook sections below are currently
       saved; the cook may want them replaced instead of refined.
@@ -114,7 +120,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
   /// which every Playbook hand-off uses — the retired per-verb examples never shaped these prompts, so the shape
   /// contract has to live here in the section prompt, the way Serve With's already does. Without it the model
   /// returns a report with headings and nested bullets, and the section renders it as bulleted nonsense.
-  private static func lineListFormat(_ itemNoun: String) -> String {
+  fileprivate static func lineListFormat(_ itemNoun: String) -> String {
     """
     Return format: one \(itemNoun) per line, each a single concrete action the cook can take. No headings, no \
     section titles, no nested or Markdown bullets, no emphasis, no introduction, and no assessment of what the \
@@ -122,7 +128,7 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     """
   }
 
-  private static let makeAheadFormat = """
+  fileprivate static let makeAheadFormat = """
     Return format: one make-ahead step per line as `When: task` — a timing label, a colon, then a single \
     concrete action the cook can take before cooking or serving. Order steps from earliest to just before \
     serving, and use only these timing labels, exactly: \(MakeAheadTiming.canonicalLabelList) (replace N with \
@@ -130,12 +136,12 @@ public struct RecipeHandoffContext: Equatable, Sendable {
     does well. Six steps at most — fewer if there is less worth saying.
     """
 
-  private static let serveWithFormat = """
+  fileprivate static let serveWithFormat = """
     Return one suggestion per line, exactly as `title: note` (or `title` when no note is useful). Do not use \
     bullets, Markdown emphasis, an introduction, JSON, or any other text.
     """
 
-  private static let revisionFormat = """
+  fileprivate static let revisionFormat = """
     revision brief: plain prose stating what to change and why, in a cook's language, one change per line, in the
     order the change happens. Refer to ingredients and steps by their existing wording. Return only the brief
     itself, with no title or summary. Do not return a rewritten recipe, an ingredient list, JSON, IDs, or any

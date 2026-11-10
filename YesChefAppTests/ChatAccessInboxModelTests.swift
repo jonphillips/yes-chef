@@ -325,6 +325,111 @@ struct ChatAccessInboxModelTests {
     #expect(try String(contentsOf: #require(processed.first), encoding: .utf8) == "return")
   }
 
+  @Test func recipeReturnOpensLiveRecipeReviewThenClaimsItsFile() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let recipeID = UUID()
+    let envelope = ChatAccessStagedRecipeReturn(recipeID: recipeID, recipeTitle: "Soup", text: "YC-REVISION:\nToast the spices")
+    let text = String(decoding: try JSONEncoder().encode(envelope), as: UTF8.self)
+    let url = folder.inboxURL.appending(path: "20261110T120000Z-\(recipeID.uuidString).ycrecipereturn")
+    let coordinator = HandoffReviewCoordinator()
+    let recorder = InboxClaims()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_800_000_000)
+      $0.uuid = .incrementing
+      $0.handoffReviewCoordinator = coordinator
+      $0.chatAccessInboxFileClient = .init(read: { _ in text }, openAndClaim: { _, _ in "" },
+        claim: { _, url in await recorder.add(url) }, maintain: { _, _, _ in })
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert { Recipe(id: recipeID, title: "Soup", dateCreated: .now, dateModified: .now) }.execute(db)
+      }
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      await model.updateReturnRows(from: [.init(url: url, name: url.lastPathComponent, isCurrent: true)])
+      let row = try #require(model.recipeReturnRows.first)
+      #expect(row.title == "Changes · Soup")
+      await model.open(row)
+      guard case .recipeAdjustmentBrief = coordinator.review else { Issue.record("Expected the recipe revision review"); return }
+      #expect(model.recipeReturnRows.isEmpty)
+      #expect(await recorder.urls == [url])
+      #expect(try await database.read { db in try AIHandoff.fetchAll(db).count } == 1)
+    }
+  }
+
+  @Test func menuReviewCreatesAndClaimsOneMenuWithKeptItems() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let recipeID = UUID()
+    let envelope = ChatAccessStagedMenu(title: "Sunday Supper", dayCount: 2, items: [
+      .init(recipeID: recipeID, title: "Beans", dayOffset: 0, slot: .dinner, note: "Warm gently", scale: 2),
+      .init(recipeID: nil, title: "Green salad", dayOffset: 1, slot: .lunch, note: "Dress late", scale: nil),
+    ])
+    let text = String(decoding: try JSONEncoder().encode(envelope), as: UTF8.self)
+    let url = folder.inboxURL.appending(path: "20261110T120000Z-sunday-supper.ycmenu")
+    let recorder = InboxClaims()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_800_000_000)
+      $0.uuid = .incrementing
+      $0.chatAccessInboxFileClient = .init(read: { _ in text }, openAndClaim: { _, _ in "" },
+        claim: { _, url in await recorder.add(url) }, maintain: { _, _, _ in })
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert { Recipe(id: recipeID, title: "Beans", dateCreated: .now, dateModified: .now) }.execute(db)
+      }
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      await model.updateReturnRows(from: [.init(url: url, name: url.lastPathComponent, isCurrent: true)])
+      let row = try #require(model.menuRows.first)
+      #expect(row.title == "Menu · Sunday Supper")
+      await model.open(row)
+      let review = try #require(model.menuReview)
+      review.setKept(false, at: 1)
+      var selectedMenuID: UUID?
+      model.onMenuSelected = { selectedMenuID = $0 }
+      await model.createMenu(from: review)
+      #expect(model.menuReview == nil)
+      #expect(await recorder.urls == [url])
+      #expect(selectedMenuID != nil)
+      let rows = try await database.read { db in try MenuItem.fetchAll(db) }
+      #expect(rows.count == 1)
+      #expect(rows.first?.kind == .recipe)
+      #expect(rows.first?.recipeID == recipeID)
+      #expect(rows.first?.scale == 2)
+    }
+  }
+
+  @Test func archivedRecipeReturnStaysUnclaimedUntilDiscarded() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let recipeID = UUID(), recorder = InboxClaims()
+    let envelope = ChatAccessStagedRecipeReturn(recipeID: recipeID, recipeTitle: "Old Soup", text: "YC-REVISION:\nToast it")
+    let text = String(decoding: try JSONEncoder().encode(envelope), as: UTF8.self)
+    let url = folder.inboxURL.appending(path: "20261110T120000Z-\(recipeID.uuidString).ycrecipereturn")
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.chatAccessInboxFileClient = .init(read: { _ in text }, openAndClaim: { _, _ in "" },
+        claim: { _, url in await recorder.add(url) }, maintain: { _, _, _ in })
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert { Recipe(id: recipeID, title: "Old Soup", archived: true, dateCreated: .now, dateModified: .now) }.execute(db)
+      }
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      await model.updateReturnRows(from: [.init(url: url, name: url.lastPathComponent, isCurrent: true)])
+      let row = try #require(model.recipeReturnRows.first)
+      #expect(row.title == "Recipe not found on this device")
+      await model.open(row)
+      #expect(await recorder.urls.isEmpty)
+      #expect(model.recipeReturnRows.count == 1)
+      await model.discard(row)
+      #expect(await recorder.urls == [url])
+      #expect(model.recipeReturnRows.isEmpty)
+    }
+  }
+
   @Test(arguments: [AIHandoffTaskType.adjustRecipe, .recipe])
   func newRecipeReturnOpensCreateAndMarksImported(task: AIHandoffTaskType) async throws {
     let (folder, defaults, suiteName, temporary) = try fixture()

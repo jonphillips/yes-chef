@@ -5,6 +5,7 @@ struct ChatAccessInboxSection: View {
   let model: ChatAccessInboxModel
 
   var body: some View {
+    @Bindable var model = model
     if model.inboxCount > 0 || !model.returnRows.isEmpty || model.message != nil {
       Section {
         if let message = model.message {
@@ -50,6 +51,46 @@ struct ChatAccessInboxSection: View {
         ForEach(model.returnRows.filter { if case .openable = $0.destination { true } else { false } }) { row in
           returnRow(row)
         }
+        ForEach(model.recipeReturnRows) { row in
+          VStack(alignment: .leading, spacing: 8) {
+            Text(row.title).font(.headline)
+            Text(row.stagedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+            if row.downloadState == .downloading { Text("Downloading…").font(.caption).foregroundStyle(.secondary) }
+            if let error = model.rowErrors[row.id] {
+              Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange)
+            }
+            HStack {
+              if case .openable = row.destination {
+                Button("Open") { Task { await model.open(row) } }
+                  .disabled(row.downloadState != .current || model.workingIDs.contains(row.id))
+                  .buttonStyle(.bordered)
+              }
+              Button("Discard", role: .destructive) { Task { await model.discard(row) } }
+                .disabled(model.workingIDs.contains(row.id))
+                .buttonStyle(.bordered)
+            }
+          }
+          .accessibilityElement(children: .contain)
+        }
+        ForEach(model.menuRows) { row in
+          VStack(alignment: .leading, spacing: 8) {
+            Text(row.title).font(.headline)
+            Text(row.stagedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+            if row.downloadState == .downloading { Text("Downloading…").font(.caption).foregroundStyle(.secondary) }
+            if let error = model.rowErrors[row.id] {
+              Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange)
+            }
+            HStack {
+              Button("Open") { Task { await model.open(row) } }
+                .disabled(row.downloadState != .current || model.workingIDs.contains(row.id))
+                .buttonStyle(.bordered)
+              Button("Discard", role: .destructive) { Task { await model.discard(row) } }
+                .disabled(model.workingIDs.contains(row.id))
+                .buttonStyle(.bordered)
+            }
+          }
+          .accessibilityElement(children: .contain)
+        }
         if model.returnRows.contains(where: { if case .openable = $0.destination { false } else { true } }) {
           Text("Started on another device")
             .font(.headline)
@@ -60,7 +101,14 @@ struct ChatAccessInboxSection: View {
       } header: {
         Text("From Chat")
       } footer: {
-        Text("Open a staged recipe to review and save it, or discard it.")
+        Text("Open a staged recipe return or menu to review it, or discard it.")
+      }
+      .sheet(item: $model.menuReview) { review in
+        ChatMenuReviewSheet(
+          model: review,
+          isCreating: model.workingIDs.contains(review.row.id),
+          create: { await model.createMenu(from: review) }
+        )
       }
     }
   }

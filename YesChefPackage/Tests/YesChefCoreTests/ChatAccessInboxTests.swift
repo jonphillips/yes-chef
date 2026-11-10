@@ -30,6 +30,25 @@ struct ChatAccessInboxTests {
     #expect(rows.contains { if case .unreadable = $0.destination { true } else { false } })
   }
 
+  @Test func recipeReturnRowsKeepEveryFileAndTreatMissingOrArchivedRecipesAsDiscardOnly() throws {
+    let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
+    let liveID = UUID(), archivedID = UUID()
+    let live = Recipe(id: liveID, title: "Beans", dateCreated: .distantPast, dateModified: .distantPast)
+    let archived = Recipe(id: archivedID, title: "Old Soup", archived: true, dateCreated: .distantPast, dateModified: .distantPast)
+    let urls = [
+      root.appending(path: "20261110T120000Z-\(liveID.uuidString).ycrecipereturn"),
+      root.appending(path: "20261110T130000Z-\(liveID.uuidString).ycrecipereturn"),
+      root.appending(path: "20261110T140000Z-\(archivedID.uuidString).ycrecipereturn"),
+    ]
+    let snapshots = urls.map { ChatAccessInbox.MetadataSnapshot(url: $0, name: $0.lastPathComponent, isCurrent: true) }
+    let rows = ChatAccessInbox.recipeReturnRows(from: snapshots) { id in
+      [liveID: live, archivedID: archived][id]
+    }
+    #expect(rows.map(\.url) == urls)
+    #expect(rows.filter { if case .openable = $0.destination { true } else { false } }.count == 2)
+    #expect(rows.last?.title == "Recipe not found on this device")
+  }
+
   @Test func returnsStagedInSameSecondUseCollisionSequence() throws {
     let id = UUID()
     let handoff = AIHandoff(id: id, sourceType: .menu, sourceID: UUID(), taskType: .prepPlan,
@@ -102,6 +121,9 @@ struct ChatAccessInboxTests {
     let opening = String(text.prefix(512))
     #expect(opening.contains("stage_recipe"))
     #expect(opening.contains("stage_handoff_return"))
+    #expect(opening.contains("stage_recipe_return"))
+    #expect(opening.contains("stage_menu"))
+    #expect(text.contains(RecipeReturnLabels.deliverableLines))
     #expect(text.contains(AIHandoffReturnContract.projectInstructions))
     #expect(text.contains("If a tool call fails or times out, print the return block or the JSON-LD object for Jon to paste instead."))
     let libraryCheck = "Before suggesting a recipe, check the Yes Chef library with the read tools."

@@ -3,6 +3,7 @@ import Dependencies
 import Foundation
 import LLMHandoffKit
 import Observation
+import SQLiteData
 import UIKit
 import YesChefCore
 
@@ -18,6 +19,7 @@ final class ChatAccessInboxModel {
   @ObservationIgnored @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @ObservationIgnored @Dependency(\.handoffReviewCoordinator) private var handoffReviewCoordinator
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
+  @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored weak var toastCenter: AppToastCenter?
   @ObservationIgnored private let defaults: UserDefaults
   @ObservationIgnored private(set) var watcher: ChatInboxWatcher?
@@ -26,6 +28,7 @@ final class ChatAccessInboxModel {
   @ObservationIgnored private var claimedIDs: Set<String> = []
   @ObservationIgnored private var isPreparing = false
   @ObservationIgnored private var recipeNamesByID: [String: String] = [:]
+  @ObservationIgnored private var menuTitlesByID: [String: String] = [:]
   @ObservationIgnored private var nameReadIDs: Set<String> = []
   @ObservationIgnored private var nameReadsInProgress: Set<String> = []
   @ObservationIgnored private var metadataGeneration = 0
@@ -33,11 +36,19 @@ final class ChatAccessInboxModel {
   private(set) var folder: ChatAccessFolder?
   private(set) var rows: [ChatAccessInbox.Row] = []
   private(set) var returnRows: [ChatAccessInbox.ReturnRow] = []
+  private(set) var recipeReturnRows: [ChatAccessInbox.RecipeReturnRow] = []
+  private(set) var menuRows: [ChatAccessInbox.MenuRow] = []
+  var menuReview: ChatMenuReviewModel?
+  var onMenuSelected: ((Menu.ID) -> Void)?
   private(set) var rowErrors: [String: String] = [:]
   private(set) var workingIDs: Set<String> = []
   private(set) var message: String?
 
-  var inboxCount: Int { rows.count + returnRows.filter { if case .openable = $0.destination { true } else { false } }.count }
+  var inboxCount: Int {
+    rows.count + menuRows.count
+      + returnRows.filter { if case .openable = $0.destination { true } else { false } }.count
+      + recipeReturnRows.filter { if case .openable = $0.destination { true } else { false } }.count
+  }
 
   init(folder: ChatAccessFolder? = nil, defaults: UserDefaults = .standard) {
     self.folder = folder
@@ -160,6 +171,109 @@ final class ChatAccessInboxModel {
     }
   }
 
+  func open(_ row: ChatAccessInbox.RecipeReturnRow) async {
+    guard case .openable = row.destination, row.downloadState == .current,
+      let folder, !workingIDs.contains(row.id) else { return }
+    workingIDs.insert(row.id)
+    defer { workingIDs.remove(row.id) }
+    do {
+      let text = try await fileClient.read(row.url)
+      guard let data = text.data(using: .utf8) else { throw ChatInboxOpenError.invalidEncoding }
+      let envelope = try JSONDecoder().decode(ChatAccessStagedRecipeReturn.self, from: data)
+      let currentNow = now
+      let generator = uuid
+      let makeUUID: @Sendable () -> UUID = { generator() }
+      let result = try await database.write { db -> AIHandoffReviewResult in
+        let review = try ChatRecipeReturnImport.stageReview(envelope, in: db, now: currentNow, uuid: makeUUID)
+        guard case .recipeItems = review else { throw ChatInboxOpenError.unexpectedRecipeReturn }
+        return AIHandoffReviewResult(review: review, warning: nil)
+      }
+      await handoffReviewCoordinator.presentStaged(result, toastCenter: toastCenter)
+      try await fileClient.claim(folder, row.url)
+      forget([row.url])
+      recipeReturnRows.removeAll { $0.id == row.id }
+      rowErrors[row.id] = nil
+    } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url])
+      recipeReturnRows.removeAll { $0.id == row.id }
+      rowErrors[row.id] = nil
+    } catch { rowErrors[row.id] = error.localizedDescription }
+  }
+
+  func discard(_ row: ChatAccessInbox.RecipeReturnRow) async {
+    guard case .missing = row.destination, let folder, !workingIDs.contains(row.id) else { return }
+    workingIDs.insert(row.id)
+    defer { workingIDs.remove(row.id) }
+    do {
+      try await fileClient.claim(folder, row.url)
+      forget([row.url])
+      recipeReturnRows.removeAll { $0.id == row.id }
+      rowErrors[row.id] = nil
+    } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url])
+      recipeReturnRows.removeAll { $0.id == row.id }
+      rowErrors[row.id] = nil
+    } catch { rowErrors[row.id] = error.localizedDescription }
+  }
+
+  func open(_ row: ChatAccessInbox.MenuRow) async {
+    guard row.downloadState == .current, !workingIDs.contains(row.id) else { return }
+    workingIDs.insert(row.id)
+    defer { workingIDs.remove(row.id) }
+    do {
+      let text = try await fileClient.read(row.url)
+      guard let data = text.data(using: .utf8) else { throw ChatInboxOpenError.invalidEncoding }
+      let envelope = try JSONDecoder().decode(ChatAccessStagedMenu.self, from: data)
+      let items = try await database.read { db in try ChatMenuImport.resolve(envelope, in: db) }
+      menuReview = ChatMenuReviewModel(row: row, title: envelope.title, dayCount: envelope.dayCount, items: items)
+    } catch { rowErrors[row.id] = error.localizedDescription }
+  }
+
+  func discard(_ row: ChatAccessInbox.MenuRow) async {
+    guard let folder, !workingIDs.contains(row.id) else { return }
+    workingIDs.insert(row.id)
+    defer { workingIDs.remove(row.id) }
+    do {
+      try await fileClient.claim(folder, row.url)
+      forget([row.url])
+      menuRows.removeAll { $0.id == row.id }
+      rowErrors[row.id] = nil
+    } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([row.url])
+      menuRows.removeAll { $0.id == row.id }
+      rowErrors[row.id] = nil
+    } catch { rowErrors[row.id] = error.localizedDescription }
+  }
+
+  func createMenu(from review: ChatMenuReviewModel) async {
+    guard let folder, !review.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      review.items.contains(where: \.isKept), !workingIDs.contains(review.row.id) else { return }
+    workingIDs.insert(review.row.id)
+    defer { workingIDs.remove(review.row.id) }
+    do {
+      let title = review.title
+      let items = review.items
+      let dayCount = review.dayCount
+      let currentNow = now
+      let generator = uuid
+      let makeUUID: @Sendable () -> UUID = { generator() }
+      let menuID = try await database.write { db in
+        try ChatMenuImport.create(title: title, dayCount: dayCount, items: items, in: db, now: currentNow, uuid: makeUUID)
+      }
+      try await fileClient.claim(folder, review.row.url)
+      forget([review.row.url])
+      menuRows.removeAll { $0.id == review.row.id }
+      rowErrors[review.row.id] = nil
+      menuReview = nil
+      toastCenter?.postSuccess("Menu created.")
+      onMenuSelected?(menuID)
+    } catch let error as HandoffInboxError where error == .alreadyClaimed {
+      forget([review.row.url])
+      menuRows.removeAll { $0.id == review.row.id }
+      menuReview = nil
+    } catch { rowErrors[review.row.id] = error.localizedDescription }
+  }
+
   func copy(_ row: ChatAccessInbox.ReturnRow) async {
     guard row.downloadState == .current, !workingIDs.contains(row.id) else { return }
     workingIDs.insert(row.id)
@@ -212,7 +326,7 @@ final class ChatAccessInboxModel {
 
   func updateRows(from snapshots: [ChatAccessInbox.MetadataSnapshot]) {
     rows = ChatAccessInbox.rows(from: snapshots)
-    let visibleIDs = Set(snapshots.map { $0.url.path } + returnRows.map(\.id))
+    let visibleIDs = Set(snapshots.map { $0.url.path } + returnRows.map(\.id) + recipeReturnRows.map(\.id) + menuRows.map(\.id))
     rowErrors = rowErrors.filter { visibleIDs.contains($0.key) }
   }
 
@@ -228,13 +342,25 @@ final class ChatAccessInboxModel {
       guard generation == nil || generation == metadataGeneration else { return }
       let lookup = Dictionary(uniqueKeysWithValues: handoffs.map { ($0.id, $0) })
       returnRows = ChatAccessInbox.returnRows(from: snapshots) { lookup[$0] }
+      let recipeIDs = Set(snapshots.compactMap { snapshot -> UUID? in
+        guard snapshot.url.pathExtension == "ycrecipereturn", let staged = StagedHandoff(url: snapshot.url) else { return nil }
+        return UUID(uuidString: staged.slug)
+      })
+      let recipes = try await database.read { db in try recipeIDs.compactMap { try Recipe.find($0).fetchOne(db) } }
+      let recipeLookup = Dictionary(uniqueKeysWithValues: recipes.map { ($0.id, $0) })
+      recipeReturnRows = ChatAccessInbox.recipeReturnRows(from: snapshots) { recipeLookup[$0] }
+      menuRows = ChatAccessInbox.menuRows(from: snapshots.map {
+        ChatAccessInbox.MetadataSnapshot(url: $0.url, name: $0.name, isCurrent: $0.isCurrent,
+          recipeName: $0.recipeName, menuTitle: menuTitlesByID[$0.url.path])
+      })
+      updateRows(from: snapshots)
     } catch {
       message = error.localizedDescription
     }
   }
 
   private func loadNames(for snapshots: [ChatAccessInbox.MetadataSnapshot]) {
-    for snapshot in snapshots where snapshot.isCurrent && snapshot.url.pathExtension == "json" {
+    for snapshot in snapshots where snapshot.isCurrent && ["json", "ycmenu"].contains(snapshot.url.pathExtension) {
       let id = snapshot.url.path
       guard !nameReadIDs.contains(id), nameReadsInProgress.insert(id).inserted else { continue }
       Task { await loadName(for: snapshot.url, id: id) }
@@ -246,7 +372,9 @@ final class ChatAccessInboxModel {
     do {
       let text = try await fileClient.read(url)
       nameReadIDs.insert(id)
-      if let name = ChatAccessInbox.recipeName(from: text) {
+      if url.pathExtension == "ycmenu" {
+        if let name = ChatAccessInbox.menuTitle(from: text) { menuTitlesByID[id] = name }
+      } else if let name = ChatAccessInbox.recipeName(from: text) {
         recipeNamesByID[id] = name
       }
       rebuildRows()
@@ -274,5 +402,17 @@ final class ChatAccessInboxModel {
       }
     }
     watcher?.start()
+  }
+}
+
+private enum ChatInboxOpenError: LocalizedError {
+  case invalidEncoding
+  case unexpectedRecipeReturn
+
+  var errorDescription: String? {
+    switch self {
+    case .invalidEncoding: "The staged item is not valid UTF-8."
+    case .unexpectedRecipeReturn: "The recipe return produced an unsupported review."
+    }
   }
 }
