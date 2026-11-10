@@ -62,7 +62,7 @@ struct RecipeCategoryFilterPickerView: View {
                   availabilityByName: availabilityByName
                 )
               } label: {
-                Label(group.title, systemImage: "folder.fill")
+                Label(group.title, symbol: AppSymbol("folder.fill"))
               }
             }
           }
@@ -79,7 +79,9 @@ struct RecipeCategoryFilterPickerView: View {
         }
         .overlay {
           if categoryGroups.isEmpty && looseCategoryNodes.isEmpty {
-            ContentUnavailableView("No Categories", systemImage: "folder")
+            ContentUnavailableView {
+              Label("No Categories", symbol: .category)
+            }
           }
         }
         .navigationTitle("Categories")
@@ -89,7 +91,7 @@ struct RecipeCategoryFilterPickerView: View {
             let availability = availabilityByName[result.node.path] ?? .empty(categoryName: result.node.path)
             RecipeFilterSelectionRow(
               title: result.title,
-              systemImage: "folder",
+              symbol: .category,
               detail: availability.countText,
               isSelected: availability.isSelected,
               isEnabled: availability.isEnabled
@@ -100,7 +102,9 @@ struct RecipeCategoryFilterPickerView: View {
         }
         .overlay {
           if matchingNodes.isEmpty {
-            ContentUnavailableView("No Matching Categories", systemImage: "folder")
+            ContentUnavailableView {
+              Label("No Matching Categories", symbol: .category)
+            }
           }
         }
         .navigationTitle("Categories")
@@ -134,7 +138,7 @@ private struct RecipeCategoryFilterLevelView: View {
           let availability = availabilityByName[parentNode.path] ?? .empty(categoryName: parentNode.path)
           RecipeFilterSelectionRow(
             title: "All \(parentNode.title)",
-            systemImage: "folder.fill",
+            symbol: .category,
             detail: availability.countText,
             isSelected: availability.isSelected,
             isEnabled: availability.isEnabled
@@ -170,7 +174,7 @@ private struct RecipeCategoryFilterNodeRow: View {
     if node.children.isEmpty {
       RecipeFilterSelectionRow(
         title: node.title,
-        systemImage: "folder",
+        symbol: .category,
         detail: availability.countText,
         isSelected: availability.isSelected,
         isEnabled: availability.isEnabled

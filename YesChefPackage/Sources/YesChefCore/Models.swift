@@ -293,14 +293,6 @@ public enum MealPlanItemKind: String, CaseIterable, Codable, QueryBindable, Quer
     case .reservation: "Reservation"
     }
   }
-
-  public var systemImage: String {
-    switch self {
-    case .recipe: "book.closed"
-    case .note: "note.text"
-    case .reservation: "fork.knife.circle"
-    }
-  }
 }
 
 public enum MealPlanItemSlot: String, CaseIterable, Codable, QueryBindable, QueryDecodable, Sendable {
@@ -322,6 +314,7 @@ public enum MealPlanItemSlot: String, CaseIterable, Codable, QueryBindable, Quer
     switch self {
     case .breakfast: "sunrise"
     case .lunch: "takeoutbag.and.cup.and.straw"
+    // swiftlint:disable:next concept_glyph_literal -- Meal slots are not dish concepts (ADR-0065 D4).
     case .dinner: "fork.knife"
     case .snack: "carrot"
     }
@@ -579,16 +572,6 @@ public enum GroceryItemOrigin: String, CaseIterable, Codable, QueryBindable, Que
     case .menu: "Menu"
     case .calendarItem: "Meal Calendar"
     case .menuPlacement: "Placed Menu"
-    }
-  }
-
-  public var systemImage: String {
-    switch self {
-    case .custom: "plus.circle"
-    case .recipe: "book.closed"
-    case .menu: "menucard"
-    case .calendarItem: "calendar"
-    case .menuPlacement: "calendar.badge.checkmark"
     }
   }
 }

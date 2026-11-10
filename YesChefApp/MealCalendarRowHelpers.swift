@@ -49,7 +49,7 @@ struct MealPlanItemImage: View {
     if row.item.kind == .recipe {
       RecipeThumbnail(data: row.thumbnailData)
     } else {
-      Image(systemName: row.item.kind.systemImage)
+      Image(symbol: row.item.kind.symbol)
         .font(.title3)
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -74,7 +74,7 @@ struct RecipeThumbnail: View {
               .scaledToFill()
           }
       } else {
-        Image(systemName: "fork.knife")
+        Image(symbol: .dish)
           .font(.title3)
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, maxHeight: .infinity)

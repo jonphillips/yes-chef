@@ -224,7 +224,7 @@ struct RecipeEditorFields: View {
             Button(role: .destructive) {
               model.deleteIngredientSection(id: section.id)
             } label: {
-              Label("Delete Section", systemImage: "trash")
+              Label("Delete Section", symbol: .delete)
             }
           }
         } header: {
@@ -263,7 +263,7 @@ struct RecipeEditorFields: View {
             Button(role: .destructive) {
               model.deleteInstructionSection(id: section.id)
             } label: {
-              Label("Delete Section", systemImage: "trash")
+              Label("Delete Section", symbol: .delete)
             }
           }
         } header: {
@@ -477,7 +477,7 @@ private struct RecipeHeroPhotoPickerRow: View {
           Button(role: .destructive) {
             model.heroPhotoRemoved()
           } label: {
-            Label("Delete Photo", systemImage: "trash")
+            Label("Delete Photo", symbol: .delete)
           }
           .buttonStyle(.bordered)
         }
@@ -532,7 +532,7 @@ private struct RecipeSourceSummaryRow: View {
   var body: some View {
     StackedFormField(title: "Source") {
       HStack(alignment: .firstTextBaseline, spacing: 12) {
-        Image(systemName: "book")
+        Image(symbol: .source)
           .foregroundStyle(.secondary)
           .frame(width: 22)
         VStack(alignment: .leading, spacing: 3) {

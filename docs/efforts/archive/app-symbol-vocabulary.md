@@ -7,9 +7,9 @@ Jon asked 2026-11-10 whether the app has one icon abstraction. It doesn't. He ch
 glyphs the same day. One dispatch, one PR. No schema change. **Dispatch after #468 merges**, because it uses the
 custom symbol sets #468 adds.
 
-Decisions: [ADR-0065](../decisions/ADR-0065-one-glyph-per-concept.md) (the vocabulary table is D2).
-Related: [ADR-0064 D8](../decisions/ADR-0064-menu-detail-declutter.md) (the custom symbols) ·
-[standing guards](../standing-guards.md).
+Decisions: [ADR-0065](../../decisions/ADR-0065-one-glyph-per-concept.md) (the vocabulary table is D2).
+Related: [ADR-0064 D8](../../decisions/ADR-0064-menu-detail-declutter.md) (the custom symbols) ·
+[standing guards](../../standing-guards.md).
 
 ## Where things are (architect, 2026-11-10)
 
@@ -90,7 +90,7 @@ Related: [ADR-0064 D8](../decisions/ADR-0064-menu-detail-declutter.md) (the cust
 
 - No schema, sync or migration change. Core loses two computed properties.
 - Run focused tests, `scripts/check-drift.sh` (SwiftLint, package tests, app test build), and the generic device
-  build per [verification.md](../verification.md). Most of the change is view code. Run `YesChefTests` too, since
+  build per [verification.md](../../verification.md). Most of the change is view code. Run `YesChefTests` too, since
   enum properties that app model code reads change type.
 - Closeout per ADR-0005 D16. This dispatch archives the brief.
 - **Gate (Jon, iPad, then iPhone):**
@@ -103,4 +103,4 @@ Related: [ADR-0064 D8](../decisions/ADR-0064-menu-detail-declutter.md) (the cust
 
 ## Dispatch ledger
 
-- [ ] Dispatch 1 — S1 + S2, one PR. No schema.
+- [x] Dispatch 1 — S1 + S2, one PR. No schema.

@@ -23,7 +23,7 @@ struct RecipeStringFilterNavigationRow<Destination: View>: View {
   let title: LocalizedStringKey
   let emptyTitle: LocalizedStringKey
   let summary: String
-  let systemImage: String
+  let symbol: AppSymbol
   let isDefaultSelection: Bool
   let options: [String]
   let destination: Destination
@@ -32,7 +32,7 @@ struct RecipeStringFilterNavigationRow<Destination: View>: View {
     title: LocalizedStringKey,
     emptyTitle: LocalizedStringKey,
     summary: String,
-    systemImage: String,
+    symbol: AppSymbol,
     isDefaultSelection: Bool,
     options: [String],
     @ViewBuilder destination: () -> Destination
@@ -40,7 +40,7 @@ struct RecipeStringFilterNavigationRow<Destination: View>: View {
     self.title = title
     self.emptyTitle = emptyTitle
     self.summary = summary
-    self.systemImage = systemImage
+    self.symbol = symbol
     self.isDefaultSelection = isDefaultSelection
     self.options = options
     self.destination = destination()
@@ -48,7 +48,7 @@ struct RecipeStringFilterNavigationRow<Destination: View>: View {
 
   var body: some View {
     if options.isEmpty {
-      Label(emptyTitle, systemImage: systemImage)
+      Label(emptyTitle, symbol: symbol)
         .foregroundStyle(.secondary)
     } else {
       NavigationLink {
@@ -60,7 +60,7 @@ struct RecipeStringFilterNavigationRow<Destination: View>: View {
               .foregroundStyle(isDefaultSelection ? .secondary : .primary)
               .lineLimit(3)
           } icon: {
-            Image(systemName: systemImage)
+            Image(symbol: symbol)
               .foregroundStyle(.secondary)
           }
         }
@@ -76,7 +76,7 @@ struct RecipeStringFilterPickerView: View {
   let remainingOptions: [String]
   let countsByOption: [String: Int]
   let selectedValues: Set<String>
-  let systemImage: String
+  let symbol: AppSymbol
   let toggle: (String) -> Void
   @State private var searchText = ""
 
@@ -98,11 +98,11 @@ struct RecipeStringFilterPickerView: View {
           options: filteredOptions,
           countsByOption: countsByOption,
           selectedValues: selectedValues,
-          systemImage: systemImage,
+          symbol: symbol,
           toggle: toggle
         )
       } else if options.isEmpty {
-        ContentUnavailableView("No \(title)", systemImage: systemImage)
+        ContentUnavailableView { Label("No \(title)", symbol: symbol) }
       } else {
         if !popularOptions.isEmpty {
           RecipeStringFilterPickerSection(
@@ -110,7 +110,7 @@ struct RecipeStringFilterPickerView: View {
             options: popularOptions,
             countsByOption: countsByOption,
             selectedValues: selectedValues,
-            systemImage: systemImage,
+            symbol: symbol,
             toggle: toggle
           )
         }
@@ -120,7 +120,7 @@ struct RecipeStringFilterPickerView: View {
             options: remainingOptions,
             countsByOption: countsByOption,
             selectedValues: selectedValues,
-            systemImage: systemImage,
+            symbol: symbol,
             toggle: toggle
           )
         }
@@ -153,7 +153,7 @@ struct RecipeOptionalStringPicker: View {
 
 struct RecipeFilterSelectionRow: View {
   let title: String
-  let systemImage: String
+  let symbol: AppSymbol
   let detail: String?
   let isSelected: Bool
   let isEnabled: Bool
@@ -161,14 +161,14 @@ struct RecipeFilterSelectionRow: View {
 
   init(
     title: String,
-    systemImage: String,
+    symbol: AppSymbol,
     detail: String? = nil,
     isSelected: Bool,
     isEnabled: Bool = true,
     action: @escaping () -> Void
   ) {
     self.title = title
-    self.systemImage = systemImage
+    self.symbol = symbol
     self.detail = detail
     self.isSelected = isSelected
     self.isEnabled = isEnabled
@@ -178,7 +178,7 @@ struct RecipeFilterSelectionRow: View {
   var body: some View {
     Button(action: action) {
       HStack(spacing: 12) {
-        Image(systemName: systemImage)
+        Image(symbol: symbol)
           .foregroundStyle(.secondary)
           .frame(width: 22)
         Text(title)
@@ -207,19 +207,19 @@ private struct RecipeStringFilterSearchSection: View {
   let options: [String]
   let countsByOption: [String: Int]
   let selectedValues: Set<String>
-  let systemImage: String
+  let symbol: AppSymbol
   let toggle: (String) -> Void
 
   var body: some View {
     if options.isEmpty {
-      ContentUnavailableView("No Matching \(title)", systemImage: systemImage)
+      ContentUnavailableView { Label("No Matching \(title)", symbol: symbol) }
     } else {
       RecipeStringFilterPickerSection(
         title: "Matches",
         options: options,
         countsByOption: countsByOption,
         selectedValues: selectedValues,
-        systemImage: systemImage,
+        symbol: symbol,
         toggle: toggle
       )
     }
@@ -231,7 +231,7 @@ private struct RecipeStringFilterPickerSection: View {
   let options: [String]
   let countsByOption: [String: Int]
   let selectedValues: Set<String>
-  let systemImage: String
+  let symbol: AppSymbol
   let toggle: (String) -> Void
 
   var body: some View {
@@ -239,7 +239,7 @@ private struct RecipeStringFilterPickerSection: View {
       ForEach(options, id: \.self) { option in
         RecipeFilterSelectionRow(
           title: option,
-          systemImage: systemImage,
+          symbol: symbol,
           detail: countsByOption[option].map { String($0) },
           isSelected: selectedValues.contains(option)
         ) {

@@ -74,17 +74,17 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
   }
 
-  var systemImage: String {
+  var symbol: AppSymbol {
     switch self {
-    case .recipes: "book.closed"
-    case .createRecipe: "square.and.pencil"
-    case .workbenches: "hammer"
-    case .powerBrowser: "square.grid.2x2"
-    case .browser: "safari"
-    case .mealCalendar: "calendar"
-    case .groceries: "cart"
-    case .menus: "menucard"
-    case .settings: "gearshape"
+    case .recipes: .recipe
+    case .createRecipe: .addRecipes
+    case .workbenches: .workbench
+    case .powerBrowser: AppSymbol("square.grid.2x2")
+    case .browser: AppSymbol("safari")
+    case .mealCalendar: .calendar
+    case .groceries: .groceries
+    case .menus: .menu
+    case .settings: AppSymbol("gearshape")
     }
   }
 }
@@ -116,21 +116,21 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     }
   }
 
-  var systemImage: String {
+  var symbol: AppSymbol {
     switch self {
-    case .ai: "sparkles"
-    case .categories: "folder"
-    case .pantry: "list.bullet"
-    case .archivedRecipes: "archivebox"
-    case .seedCoverage: "checklist"
-    case .facetCoverage: "tag"
+    case .ai: AppSymbol("sparkles")
+    case .categories: .category
+    case .pantry: AppSymbol("list.bullet")
+    case .archivedRecipes: AppSymbol("archivebox")
+    case .seedCoverage: AppSymbol("checklist")
+    case .facetCoverage: .tag
 #if DEBUG
-    case .modelCallInventory: "sparkles"
+    case .modelCallInventory: AppSymbol("sparkles")
 #endif
     }
   }
 
   @ViewBuilder var label: some View {
-    Label(title, systemImage: systemImage)
+    Label(title, symbol: symbol)
   }
 }

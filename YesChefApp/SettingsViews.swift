@@ -519,7 +519,9 @@ struct SettingsDetailPane: View {
       }
 #endif
     case nil:
-      ContentUnavailableView("Settings", systemImage: AppSection.settings.systemImage)
+      ContentUnavailableView {
+        Label("Settings", symbol: AppSection.settings.symbol)
+      }
     }
   }
 }

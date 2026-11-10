@@ -146,7 +146,7 @@ struct RecipeLensEditorView: View {
               Button("Edit query") { model.editShelfQueryButtonTapped(shelf); dismiss() }
                 .buttonStyle(.borderless)
               Button(role: .destructive) { model.deleteShelfButtonTapped(shelf) } label: {
-                Image(systemName: "trash")
+                Image(symbol: .delete)
               }
               .buttonStyle(.borderless)
             }

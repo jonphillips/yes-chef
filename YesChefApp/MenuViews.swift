@@ -17,7 +17,7 @@ struct MenuListView: View {
           Button {
             model.deleteMenuButtonTapped(row)
           } label: {
-            Label("Delete", systemImage: "trash")
+            Label("Delete", symbol: .delete)
           }
           .tint(.red)
         }
@@ -44,8 +44,8 @@ private struct MenuRowView: View {
       Text(row.menu.title)
         .font(.headline)
       HStack(spacing: 10) {
-        Label(dayCountTitle, systemImage: "calendar")
-        Label(itemCountTitle, systemImage: "fork.knife")
+        Label(dayCountTitle, symbol: .calendar)
+        Label(itemCountTitle, symbol: .dish)
         if row.placementCount > 0 {
           Label("\(row.placementCount)", systemImage: "calendar.badge.checkmark")
         }
@@ -86,7 +86,9 @@ struct MenuDetailColumn: View {
       )
         .id(menuID)
     } else {
-      ContentUnavailableView("Select a Menu", systemImage: "menucard")
+      ContentUnavailableView {
+        Label("Select a Menu", symbol: .menu)
+      }
     }
   }
 }
@@ -136,7 +138,9 @@ struct MenuDetailView: View {
         )
         .navigationTitle(detail.menu.title)
       } else {
-        ContentUnavailableView("Menu Not Found", systemImage: "menucard")
+      ContentUnavailableView {
+        Label("Menu Not Found", symbol: .menu)
+      }
       }
     }
     .overlay(alignment: .trailing) {
@@ -180,12 +184,12 @@ struct MenuDetailView: View {
           Button {
             detailModel.recipeBrowserButtonTapped()
           } label: {
-            Label("Add Recipes", image: "custom.richtext.page.badge.plus")
+            Label("Add Recipes", symbol: .addRecipes)
           }
           Button {
             if let detail = detailModel.detail { model.editMenuButtonTapped(menu: detail.menu, detail: detail) }
           } label: {
-            Label("Edit", systemImage: "square.and.pencil")
+            Label("Edit", symbol: .edit)
           }
           HandoffMenu(
             paste: {
@@ -708,7 +712,9 @@ struct MenuItemEditorView: View {
             .textInputAutocapitalization(.never)
 
           if model.availableRecipeRows.isEmpty {
-            ContentUnavailableView("No Recipes", systemImage: "book.closed")
+            ContentUnavailableView {
+              Label("No Recipes", symbol: .recipe)
+            }
           } else if filteredRecipeRows.isEmpty {
             ContentUnavailableView.search(text: recipeSearchText)
           } else {
@@ -810,7 +816,7 @@ private struct MenuRecipeSelectionRow: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      Image(systemName: "book.closed")
+      Image(symbol: .recipe)
         .font(.title3)
         .foregroundStyle(.secondary)
         .frame(width: 32, height: 32)
@@ -868,12 +874,12 @@ struct MenuEditView: View {
           DatePicker("Start Date", selection: $placement.startDate, displayedComponents: .date)
             .swipeActions(edge: .trailing) {
               Button(role: .destructive) { remove(placement) } label: {
-                Label("Remove from Calendar", systemImage: "trash")
+                Label("Remove from Calendar", symbol: .delete)
               }
             }
             .contextMenu {
               Button(role: .destructive) { remove(placement) } label: {
-                Label("Remove from Calendar", systemImage: "trash")
+                Label("Remove from Calendar", symbol: .delete)
               }
             }
         }
@@ -886,7 +892,7 @@ struct MenuEditView: View {
             dismiss()
             model.bringInButtonTapped(menuID: draft.menuID, menuTitle: draft.title, offer: bringInOffer)
           } label: {
-            Label("Bring In Calendar Items…", image: "custom.menucard.arrow.in")
+            Label("Bring In Calendar Items…", symbol: .bringIntoMenu)
           }
         }
       }

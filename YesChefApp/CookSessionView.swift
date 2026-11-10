@@ -191,7 +191,7 @@ private struct CookSessionChip: View {
         Text(item.title)
           .lineLimit(1)
       } icon: {
-        Image(systemName: isCompleted ? "checkmark.circle.fill" : "fork.knife")
+        Image(symbol: isCompleted ? AppSymbol("checkmark.circle.fill") : .recipe)
       }
       .font(.subheadline.weight(.semibold))
       .padding(.horizontal, 12)

@@ -35,14 +35,14 @@ enum RecipeFilterFacetKind: Hashable, Identifiable, Sendable {
     }
   }
 
-  var systemImage: String {
+  var symbol: AppSymbol {
     switch self {
-    case .library: "books.vertical"
-    case .favorites: "star.fill"
-    case .photos: "photo"
-    case .categories: "folder"
-    case .sources: "book"
-    case .authors: "person.text.rectangle"
+    case .library: .libraryShelf
+    case .favorites: AppSymbol("star.fill")
+    case .photos: AppSymbol("photo")
+    case .categories: .category
+    case .sources: .source
+    case .authors: AppSymbol("person.text.rectangle")
     }
   }
 }
@@ -121,7 +121,7 @@ private struct RecipeActiveFilterFacetChip: View {
   var body: some View {
     Button(action: clearAction) {
       HStack(spacing: 7) {
-        Image(systemName: facet.kind.systemImage)
+        Image(symbol: facet.kind.symbol)
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
           .frame(width: 18)

@@ -405,9 +405,9 @@ private struct RecipeCaptureReviewSections: View {
                   model.isSuggestedLabelAccepted(suggestion)
                     ? "Added category group: \(suggestion.categoryName)"
                     : "Review new category group: \(suggestion.categoryName)",
-                  systemImage: model.isSuggestedLabelAccepted(suggestion)
-                    ? "checkmark.circle.fill"
-                    : "folder.badge.plus"
+                  symbol: model.isSuggestedLabelAccepted(suggestion)
+                    ? AppSymbol("checkmark.circle.fill")
+                    : .addCategory
                 )
               }
               .tint(model.isSuggestedLabelAccepted(suggestion) ? .green : .accentColor)

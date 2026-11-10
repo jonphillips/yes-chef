@@ -100,7 +100,7 @@ private extension View {
       Button {
         model.deleteWorkbenchButtonTapped(row)
       } label: {
-        Label("Delete", systemImage: "trash")
+        Label("Delete", symbol: .delete)
       }
       .tint(.red)
     }
@@ -145,7 +145,9 @@ struct WorkbenchDetailColumn: View {
       )
         .id(workbenchID)
     } else {
-      ContentUnavailableView("Select a Workbench", systemImage: "hammer")
+      ContentUnavailableView {
+        Label("Select a Workbench", symbol: .workbench)
+      }
     }
   }
 }
@@ -351,7 +353,9 @@ struct WorkbenchDetailView: View {
       )
       .navigationTitle(detail.workbench.title)
     } else {
-      ContentUnavailableView("Workbench Not Found", systemImage: "hammer")
+      ContentUnavailableView {
+        Label("Workbench Not Found", symbol: .workbench)
+      }
     }
   }
 
@@ -559,7 +563,7 @@ private struct WorkbenchReader: View {
             Button {
               model.moveAllCandidatesToReferenceButtonTapped()
             } label: {
-              Label("Move to Reference", systemImage: "books.vertical")
+              Label("Move to Reference", symbol: .libraryShelf)
             }
           }
           Button {
@@ -752,7 +756,7 @@ private struct WorkingRecipeRow: View {
             .lineLimit(3)
         }
         if recipe.libraryPlacement == .reference {
-          Label("Reference", systemImage: "books.vertical")
+          Label("Reference", symbol: .libraryShelf)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -787,7 +791,7 @@ private struct WorkingRecipeRow: View {
         Button(role: .destructive) {
           remove()
         } label: {
-          Label("Remove", systemImage: "trash")
+          Label("Remove", symbol: .delete)
             .labelStyle(.iconOnly)
         }
         .buttonStyle(.bordered)
@@ -909,7 +913,7 @@ private struct WorkbenchCandidateRow: View {
           VStack(alignment: .leading, spacing: 5) {
             Text(row.displayTitle)
               .font(.headline)
-            Label(sourceDisplayName, systemImage: "book")
+            Label(sourceDisplayName, symbol: .source)
               .font(.caption)
               .foregroundStyle(.secondary)
           }

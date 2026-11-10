@@ -350,7 +350,7 @@ private struct MenuDishRowView: View {
         Button {
           model.editItemButtonTapped(menu: menu, row: row)
         } label: {
-          Label("Edit", systemImage: "pencil")
+          Label("Edit", symbol: .editRow)
         }
 
         Menu {
@@ -358,7 +358,7 @@ private struct MenuDishRowView: View {
             Button {
               _ = model.moveMenuItem(itemID: row.id, toDayOffset: dayOffset)
             } label: {
-              Label("Day \(dayOffset + 1)", systemImage: "calendar")
+              Label("Day \(dayOffset + 1)", symbol: .calendar)
             }
             .disabled(dayOffset == row.item.dayOffset)
           }
@@ -370,7 +370,7 @@ private struct MenuDishRowView: View {
           Button {
             detailModel.makeRecipeFromNoteButtonTapped(row.item)
           } label: {
-            Label("Make Recipe", image: "custom.richtext.page.arrow.in")
+            Label("Make Recipe", symbol: .makeRecipe)
           }
         }
 
@@ -378,21 +378,21 @@ private struct MenuDishRowView: View {
           Button {
             detailModel.targetItemTapped(row.id)
           } label: {
-            Label(isDepositTarget ? "Clear Chat Target" : "Set as Chat Target", systemImage: "target")
+            Label(isDepositTarget ? "Clear Chat Target" : "Set as Chat Target", symbol: .chatTarget)
           }
         }
 
         Button(role: .destructive) {
           model.deleteMenuItemButtonTapped(row)
         } label: {
-          Label("Delete", systemImage: "trash")
+          Label("Delete", symbol: .delete)
         }
       }
       .swipeActions {
         Button(role: .destructive) {
           model.deleteMenuItemButtonTapped(row)
         } label: {
-          Label("Delete", systemImage: "trash")
+          Label("Delete", symbol: .delete)
         }
 
         Menu {
@@ -400,7 +400,7 @@ private struct MenuDishRowView: View {
             Button {
               _ = model.moveMenuItem(itemID: row.id, toDayOffset: dayOffset)
             } label: {
-              Label("Day \(dayOffset + 1)", systemImage: "calendar")
+              Label("Day \(dayOffset + 1)", symbol: .calendar)
             }
             .disabled(dayOffset == row.item.dayOffset)
           }
@@ -413,13 +413,13 @@ private struct MenuDishRowView: View {
           Button {
             detailModel.makeRecipeFromNoteButtonTapped(row.item)
           } label: {
-            Label("Make Recipe", image: "custom.richtext.page.arrow.in")
+            Label("Make Recipe", symbol: .makeRecipe)
           }
         } else {
           Button {
             model.editItemButtonTapped(menu: menu, row: row)
           } label: {
-            Label("Edit", systemImage: "pencil")
+            Label("Edit", symbol: .editRow)
           }
         }
       }
@@ -467,7 +467,7 @@ private struct MenuDishRowView: View {
       Spacer()
 
       if isAskActive && isDepositTarget {
-        Image(systemName: "target")
+        Image(symbol: .chatTarget)
           .foregroundStyle(.tint)
           .accessibilityLabel("Chat target")
       }
@@ -495,7 +495,7 @@ private struct MenuDishRowView: View {
         .frame(width: 32, height: 32)
         .accessibilityHidden(true)
     } else {
-      Image(systemName: row.item.kind.systemImage)
+      Image(symbol: row.item.kind.symbol)
         .font(.title3)
         .foregroundStyle(.secondary)
         .frame(width: 32, height: 32)

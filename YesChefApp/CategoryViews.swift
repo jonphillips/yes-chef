@@ -89,12 +89,12 @@ private struct CategoryManagementListView: View {
     .overlay {
       if model.facets.isEmpty && model.looseCategories.isEmpty {
         ContentUnavailableView {
-          Label("No Categories", systemImage: "folder")
+          Label("No Categories", symbol: .category)
         } actions: {
           Button {
             model.addCategoryGroupButtonTapped()
           } label: {
-            Label("New Category Group", systemImage: "folder.badge.plus")
+            Label("New Category Group", symbol: .addCategory)
           }
         }
       }
@@ -106,12 +106,12 @@ private struct CategoryManagementListView: View {
           Button {
             model.addCategoryGroupButtonTapped()
           } label: {
-            Label("New Category Group", systemImage: "folder.badge.plus")
+            Label("New Category Group", symbol: .addCategory)
           }
           Button {
             model.addLooseCategoryButtonTapped()
           } label: {
-            Label("New Category", systemImage: "tag")
+            Label("New Category", symbol: .tag)
           }
         } label: {
           Label("Add Category", systemImage: "plus")
@@ -151,7 +151,7 @@ private struct CategoryGroupRow: View {
       Button {
         model.editCategoryGroupButtonTapped(facetID: facet.id)
       } label: {
-        Label("Edit", systemImage: "pencil")
+        Label("Edit", symbol: .editRow)
       }
       Button {
         model.toggleCategoryGroupVisibilityButtonTapped(facetID: facet.id)
@@ -162,7 +162,7 @@ private struct CategoryGroupRow: View {
         Button(role: .destructive) {
           model.deleteCategoryGroupButtonTapped(facetID: facet.id)
         } label: {
-          Label("Delete", systemImage: "trash")
+          Label("Delete", symbol: .delete)
         }
       }
     }
@@ -191,7 +191,7 @@ private struct CategoryGroupBrowserView: View {
     .overlay {
       if categories.isEmpty {
         ContentUnavailableView {
-          Label("No Categories", systemImage: "folder")
+          Label("No Categories", symbol: .category)
         } actions: {
           if parentCategoryID == nil {
             Button {
@@ -244,7 +244,7 @@ private struct CategoryRow: View {
       Button {
         model.editCategoryButtonTapped(categoryID: category.id)
       } label: {
-        Label("Edit", systemImage: "pencil")
+        Label("Edit", symbol: .editRow)
       }
       Button {
         model.moveRecipesButtonTapped(categoryID: category.id)
@@ -260,7 +260,7 @@ private struct CategoryRow: View {
         Button(role: .destructive) {
           model.deleteCategoryButtonTapped(categoryID: category.id)
         } label: {
-          Label("Delete", systemImage: "trash")
+          Label("Delete", symbol: .delete)
         }
       }
     }
@@ -268,7 +268,7 @@ private struct CategoryRow: View {
 
   private var label: some View {
     HStack(spacing: 12) {
-      Image(systemName: model.childCount(for: category.id) > 0 ? "folder.fill" : "tag")
+      Image(symbol: model.childCount(for: category.id) > 0 ? AppSymbol("folder.fill") : .tag)
         .foregroundStyle(.secondary)
         .frame(width: 22)
       Text(category.name)
@@ -337,7 +337,7 @@ private struct CategoryEditorSheet: View {
             model.deleteCategoryButtonTapped(categoryID: categoryID)
             dismiss()
           } label: {
-            Label("Delete Category", systemImage: "trash")
+            Label("Delete Category", symbol: .delete)
           }
         }
       }
@@ -464,7 +464,7 @@ private struct CategoryGroupEditorSheet: View {
             model.deleteCategoryGroupButtonTapped(facetID: facetID)
             dismiss()
           } label: {
-            Label("Delete Category Group", systemImage: "trash")
+            Label("Delete Category Group", symbol: .delete)
           }
         }
       }
@@ -589,7 +589,9 @@ private struct RecipeCategorySelectionView: View {
     }
     .overlay {
       if model.categorySections.allSatisfy({ $0.rows.isEmpty }) {
-        ContentUnavailableView("No Categories", systemImage: "folder")
+        ContentUnavailableView {
+          Label("No Categories", symbol: .category)
+        }
       }
     }
     .navigationTitle("Categories")
@@ -605,7 +607,7 @@ private struct RecipeCategorySelectionRow: View {
   var body: some View {
     Button(action: action) {
       HStack(spacing: 12) {
-        Image(systemName: row.hasChildren ? "folder.fill" : "folder")
+        Image(symbol: row.hasChildren ? AppSymbol("folder.fill") : .category)
           .foregroundStyle(.secondary)
           .frame(width: 22)
         Text(row.category.name)

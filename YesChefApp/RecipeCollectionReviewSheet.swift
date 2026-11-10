@@ -305,7 +305,7 @@ private struct CollectionReviewLaunchRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       HStack {
         Button(role: .cancel, action: discard) {
-          Label("Discard", systemImage: "trash")
+          Label("Discard", symbol: .delete)
         }
         .buttonStyle(.bordered)
         .disabled(isCommitting || isBulkCommitting)

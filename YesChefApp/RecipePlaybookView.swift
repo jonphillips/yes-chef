@@ -305,7 +305,7 @@ struct RecipePlaybookView: View {
 
   private func sectionEditButton(for section: PlaybookSectionKind, isFilled: Bool) -> some View {
     Button { editingSection = section } label: {
-      Image(systemName: "square.and.pencil")
+      Image(symbol: .edit)
     }
       .accessibilityLabel("\(isFilled ? "Edit" : "Write") \(section.title)")
   }
@@ -381,7 +381,7 @@ private struct RecipeServeWithStrip: View {
         Spacer()
         if !items.isEmpty {
           Button { isManaging = true } label: {
-            Image(systemName: "square.and.pencil")
+            Image(symbol: .edit)
           }
           .accessibilityLabel("Edit Serve With")
         }

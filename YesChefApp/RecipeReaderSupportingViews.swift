@@ -6,7 +6,7 @@ struct SourceMetadataView: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Image(systemName: "book")
+      Image(symbol: .source)
         .foregroundStyle(.secondary)
       if let urlString = source.url, let url = URL(string: urlString) {
         Link(source.displayName, destination: url)
@@ -124,7 +124,7 @@ struct WorkbenchCandidateLinksView: View {
 
   private func linkLabel(_ link: WorkbenchCandidateLink) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Image(systemName: link.recipeID == nil ? "book.closed" : "arrow.up.right.square")
+      Image(symbol: link.recipeID == nil ? .source : AppSymbol("arrow.up.right.square"))
         .foregroundStyle(.secondary)
       VStack(alignment: .leading, spacing: 2) {
         Text(link.title)
@@ -243,7 +243,7 @@ struct ScalePanel: View {
 
 struct WrappingLabels: View {
   let labels: [String]
-  let systemImage: String
+  let symbol: AppSymbol
 
   var body: some View {
     FlowLayout(spacing: 8) {
@@ -256,7 +256,7 @@ struct WrappingLabels: View {
   @ViewBuilder
   private var chips: some View {
     ForEach(labels, id: \.self) { label in
-      Label(label, systemImage: systemImage)
+      Label(label, symbol: symbol)
         .recipeChip()
     }
   }

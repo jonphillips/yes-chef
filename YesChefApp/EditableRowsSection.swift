@@ -261,7 +261,7 @@ private struct EditableRow<Item: Identifiable, Content: View, Badge: View>: View
       Button(role: .destructive) {
         deleteItem(item)
       } label: {
-        Label("Delete", systemImage: "trash")
+        Label("Delete", symbol: .delete)
       }
     }
   }
