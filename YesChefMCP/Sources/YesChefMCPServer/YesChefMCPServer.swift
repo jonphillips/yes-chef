@@ -241,6 +241,7 @@ public enum YesChefMCPServer {
     let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !cleanTitle.isEmpty else { throw StageInputError("The menu title cannot be empty.") }
     guard (1...40).contains(rawItems.count) else { throw StageInputError("Items must contain 1 to 40 entries.") }
+    guard args["days"] == nil || args["days"]?.integerValue != nil else { throw StageInputError("Days must be a whole number from 1 to 14.") }
     let days = args["days"]?.integerValue ?? 1
     guard (1...14).contains(days) else { throw StageInputError("Days must be between 1 and 14.") }
     var problems: [String] = []
@@ -257,7 +258,8 @@ public enum YesChefMCPServer {
       let scale = row["scale"]?.doubleValue
       let ref = row["ref"]?.stringValue
       let rowTitle = row["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
-      if !(0..<days).contains(day) { problems.append("item \(index + 1): day must be from 0 to \(days - 1)") }
+      if row["day"] != nil && row["day"]?.integerValue == nil { problems.append("item \(index + 1): day must be a whole number") }
+      else if !(0..<days).contains(day) { problems.append("item \(index + 1): day must be from 0 to \(days - 1)") }
       if slot == nil { problems.append("item \(index + 1): slot must be breakfast, lunch, dinner, or snack") }
       if let note, note.count > 500 { problems.append("item \(index + 1): note must be at most 500 characters") }
       if let scale, scale <= 0 { problems.append("item \(index + 1): scale must be greater than 0") }

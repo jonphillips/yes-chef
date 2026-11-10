@@ -402,6 +402,8 @@ struct YesChefMCPTests {
       ["title": .string("Dinner"), "days": .integer(0), "items": .array([.object(["title": .string("Salad")])])],
       ["title": .string("Dinner"), "days": .integer(15), "items": .array([.object(["title": .string("Salad")])])],
       ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "day": .integer(1)])])],
+      ["title": .string("Dinner"), "days": .string("2"), "items": .array([.object(["title": .string("Salad")])])],
+      ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "day": .string("0")])])],
       ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "slot": .string("brunch")])])],
       ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "note": .string(String(repeating: "x", count: 501))])])],
       ["title": .string("Dinner"), "items": .array([.object(["title": .string("Salad"), "scale": .number(2)])])],

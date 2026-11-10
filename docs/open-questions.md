@@ -24,6 +24,12 @@ and everything downstream move forward without waiting on it.
 - **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
   Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
 
+**A staged menu opened on both devices at once can be created twice (found 2026-11-10, reviewing #473).**
+Create Menu writes the menu and then claims the `.ycmenu` file, as the brief specified. Claiming first would lose the
+staged menu if the write then failed. If the iPhone and iPad both open the review before either claims, both can
+create the menu; the second device's `alreadyClaimed` is swallowed. It needs one person reviewing on two devices in
+the same minute. Revisit if a duplicate menu ever shows up: claim first and restore the file on a failed write.
+
 **Hand-edited Serve With suggestions can vanish on regeneration (found 2026-11-04, drafting ADR-0062).**
 `RecipeServeWithRepository.update` leaves `provenance` at `.model`, so an edited suggestion no longer matches and
 `replaceModelSuggestions` deletes it. ADR-0048 meant regeneration to keep the cook's work. ADR-0062 protects linked rows
