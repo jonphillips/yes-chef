@@ -51,7 +51,11 @@ struct SchemaColumnTests {
           id: stepID, menuID: menuID, sortOrder: 0, session: "Morning", task: "Make dough"
         )
       }.execute(db)
+      try db.execute(sql: #"ALTER TABLE "prepPlanSteps" DROP COLUMN "makeAheadWindow""#)
       try db.execute(sql: #"ALTER TABLE "prepPlanSteps" DROP COLUMN "workDayOffset""#)
+      try db.execute(
+        sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Add prep plan make-ahead window'"#
+      )
       try db.execute(
         sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Add prep plan work day offset'"#
       )
@@ -63,6 +67,7 @@ struct SchemaColumnTests {
       let step = try #require(try PrepPlanStepRecord.find(stepID).fetchOne(db))
       #expect(step.task == "Make dough")
       #expect(step.workDayOffset == nil)
+      #expect(step.makeAheadWindow == nil)
     }
     try migratedDatabase.close()
   }

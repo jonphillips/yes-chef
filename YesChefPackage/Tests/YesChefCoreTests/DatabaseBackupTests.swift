@@ -54,9 +54,12 @@ struct DatabaseBackupTests {
     let database = try pathBackedDatabase(at: sourceURL)
     let recipeID = SampleUUIDSequence.uuid(71)
     let photoID = SampleUUIDSequence.uuid(72)
+    let menuID = SampleUUIDSequence.uuid(74)
+    let stepID = SampleUUIDSequence.uuid(75)
     let imageBytes = Data([0x01, 0x02, 0x03, 0xFE])
 
     try await database.write { db in
+      let now = Date(timeIntervalSinceReferenceDate: 811_000_000)
       try Recipe.insert {
         Recipe(
           id: recipeID,
@@ -66,6 +69,13 @@ struct DatabaseBackupTests {
         )
       }
       .execute(db)
+      try Menu.insert { Menu(id: menuID, title: "Prep Backup", dayCount: 1, dateCreated: now, dateModified: now) }.execute(db)
+      try PrepPlanStepRecord.insert {
+        PrepPlanStepRecord(
+          id: stepID, menuID: menuID, sortOrder: 0, session: "Friday",
+          task: "Make sauce", makeAheadWindow: "Up to 3 days ahead"
+        )
+      }.execute(db)
       try RecipePhoto.insert {
         RecipePhoto(
           id: photoID,
@@ -93,8 +103,10 @@ struct DatabaseBackupTests {
     let restoredPhoto = try await restoredDatabase.read { db in
       try RecipePhoto.find(photoID).fetchOne(db)
     }
+    let restoredStep = try await restoredDatabase.read { db in try PrepPlanStepRecord.find(stepID).fetchOne(db) }
     #expect(restoredPhoto?.displayData == imageBytes)
     #expect(restoredPhoto?.thumbnailData == Data([0xAA, 0xBB]))
+    #expect(restoredStep?.makeAheadWindow == "Up to 3 days ahead")
     try restoredDatabase.close()
     try database.close()
   }

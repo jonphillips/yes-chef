@@ -63,6 +63,7 @@ extension RecipeCoreTests {
               id: index == 0 ? containedStepID : SampleUUIDSequence.uuid(61_020 + index),
               menuID: containedID, sortOrder: index, session: session, task: task,
               serves: index == 0 ? "Gravy" : nil,
+              makeAheadWindow: index == 0 ? "Up to 3 days ahead" : nil,
               sourceDish: index == 0 ? containedItemID : nil
             )
           }.execute(db)
@@ -153,6 +154,7 @@ extension RecipeCoreTests {
         #expect(copiedStep.sourceDish == copied.id)
         #expect(copiedStep.session == "The day before")
         #expect(copiedStep.serves == "Gravy")
+        #expect(copiedStep.makeAheadWindow == "Up to 3 days ahead")
         #expect(copiedStep.workDayOffset == 0)
         let copiedSteps = try PrepPlanStepRepository.steps(for: targetID, in: db)
         #expect(copiedSteps.first { $0.task == "Roast turkey" }?.workDayOffset == 1)

@@ -298,6 +298,9 @@ struct YesChefMCPTests {
     #expect(menuDay.contains("whole day") || menuDay.contains("every dish for that day"))
     #expect(menuDay.contains("anything not sent is removed"))
     #expect(menuDay.contains("stage_recipe_return"))
+    #expect(tool("stage_prep_plan")["description"]?.stringValue?.contains(MenuPrepPlanClient.makeAheadAndLeftoversGuidance) == true)
+    let prepStepProperties = tool("stage_prep_plan")["inputSchema"]?.objectValue?["properties"]?.objectValue?["dishes"]?.objectValue?["items"]?.objectValue?["properties"]?.objectValue?["steps"]?.objectValue?["items"]?.objectValue?["properties"]?.objectValue ?? [:]
+    #expect(prepStepProperties["makeAheadWindow"]?.objectValue?["type"] == .string("string"))
     let menuDayItemProperties = tool("stage_menu_day")["inputSchema"]?.objectValue?["properties"]?.objectValue?["items"]?.objectValue?["items"]?.objectValue?["properties"]?.objectValue ?? [:]
     #expect(menuDayItemProperties["day"] == nil)
 
@@ -356,7 +359,7 @@ struct YesChefMCPTests {
       .init(kind: .recipe, title: "Souvlaki", recipeID: recipe.id, dayOffset: 2, slot: .dinner, note: nil, scale: 1),
       .init(kind: .note, title: "Pie", recipeID: nil, dayOffset: 1, slot: .snack, note: nil, scale: 1),
       .init(kind: .note, title: "Salad", recipeID: nil, dayOffset: 0, slot: .dinner, note: nil, scale: 1),
-    ], prepPlan: [.init(workDayOffset: 1, session: "Monday evening", task: "Salt the chicken", serves: "Souvlaki", dishIndex: 0)])
+    ], prepPlan: [.init(workDayOffset: 1, session: "Monday evening", task: "Salt the chicken", serves: "Souvlaki", dishIndex: 0, makeAheadWindow: "Up to 3 days ahead")])
     let otherMenu = ChatAccessExport.MenuRecord(id: UUID(), title: "Other menu", notes: nil, dayCount: 1, modified: now, items: [],
       prepPlan: [.init(workDayOffset: nil, session: "Later", task: "Other menu only", serves: nil, dishIndex: nil)])
     let legacyMenu = ChatAccessExport.MenuRecord(id: UUID(), title: "Older export", notes: nil, dayCount: 1, modified: now, items: [])
@@ -371,13 +374,14 @@ struct YesChefMCPTests {
     let detail = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(menuRef)])))
     let detailJSON = try object(toolText(detail))
     #expect(detailJSON["menu"]?.objectValue?["prepPlan"]?.arrayValue?.first?.objectValue?["dish"]?.stringValue == "Souvlaki, day 2")
+    #expect(detailJSON["menu"]?.objectValue?["prepPlan"]?.arrayValue?.first?.objectValue?["makeAheadWindow"]?.stringValue == "Up to 3 days ahead")
     let legacyDetail = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(try lookupMenuRef("Older export"))])))
     let legacyDetailJSON = try object(toolText(legacyDetail))
     #expect(legacyDetailJSON["menu"]?.objectValue?["prepPlan"] == nil)
     let recipeSearch = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("Souvlaki")])))
     let recipeRef = try #require(object(toolText(recipeSearch))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
     let staged = try #require(await server.handle(line: genericToolCall("stage_prep_plan", args: [
-      "menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .integer(1), "session": .string("Monday evening"), "task": .string("Salt the chicken")])])])]),
+      "menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .integer(1), "session": .string("Monday evening"), "task": .string("Salt the chicken"), "makeAheadWindow": .string("Up to 3 days ahead")])])])]),
     ])))
     let resultText = try toolText(staged)
     #expect(!containsUUID(resultText))
@@ -386,6 +390,7 @@ struct YesChefMCPTests {
     let file = try #require(HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").list().first)
     let envelope = try JSONDecoder().decode(ChatAccessStagedPrepPlan.self, from: Data(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").read(file).utf8))
     #expect(envelope.planAtStage?.first?.task == "Salt the chicken")
+    #expect(envelope.dishes.first?.steps.first?.makeAheadWindow == "Up to 3 days ahead")
     #expect(envelope.planAtStage?.contains { $0.task == "Other menu only" } == false)
 
     let step = MCPValue.object(["workDay": .integer(1), "session": .string("Monday evening"), "task": .string("Salt the chicken")])
@@ -405,6 +410,7 @@ struct YesChefMCPTests {
       ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "title": .string("Souvlaki"), "steps": .array([])])])],
       ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .integer(7), "session": .string("Later"), "task": .string("Salt")])])])])],
       ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .number(1.5), "session": .string("Later"), "task": .string("Salt")])])])])],
+      ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["session": .string("Later"), "task": .string("Salt"), "makeAheadWindow": .number(3)])])])])],
       ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["session": .string("Later"), "task": .string("  ")])])])])],
     ]
     for args in invalidCalls {

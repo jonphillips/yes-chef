@@ -14,6 +14,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
   public var session: String
   public var task: String
   public var serves: String?
+  public var makeAheadWindow: String?
   public var sourceDish: MenuItem.ID?
   public var workDayOffset: Int?
 
@@ -24,6 +25,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     session: String,
     task: String,
     serves: String? = nil,
+    makeAheadWindow: String? = nil,
     sourceDish: MenuItem.ID? = nil,
     workDayOffset: Int? = nil
   ) {
@@ -33,6 +35,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     self.session = session
     self.task = task
     self.serves = serves
+    self.makeAheadWindow = makeAheadWindow?.cleanedPrepPlanText
     self.sourceDish = sourceDish
     self.workDayOffset = workDayOffset
   }
@@ -83,6 +86,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
   public var session: String
   public var task: String
   public var serves: String?
+  public var makeAheadWindow: String?
   public var sourceDish: MenuItem.ID?
   public var workDayOffset: Int?
 
@@ -90,12 +94,14 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     session: String,
     task: String,
     serves: String? = nil,
+    makeAheadWindow: String? = nil,
     sourceDish: MenuItem.ID? = nil,
     workDayOffset: Int? = nil
   ) {
     self.session = session
     self.task = task
     self.serves = serves
+    self.makeAheadWindow = makeAheadWindow?.cleanedPrepPlanText
     self.sourceDish = sourceDish
     self.workDayOffset = workDayOffset
   }
@@ -105,6 +111,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
       session: record.session,
       task: record.task,
       serves: record.serves,
+      makeAheadWindow: record.makeAheadWindow,
       sourceDish: record.sourceDish,
       workDayOffset: record.workDayOffset
     )
@@ -115,6 +122,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     case when
     case task
     case serves
+    case makeAheadWindow
     case sourceDish
     case workDay
   }
@@ -125,6 +133,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
       ?? container.decode(String.self, forKey: .when)
     task = try container.decode(String.self, forKey: .task)
     serves = try container.decodeIfPresent(String.self, forKey: .serves)
+    makeAheadWindow = try container.decodeIfPresent(String.self, forKey: .makeAheadWindow)?.cleanedPrepPlanText
     sourceDish = try container.decodeIfPresent(MenuItem.ID.self, forKey: .sourceDish)
     workDayOffset = try container.decodeIfPresent(Int.self, forKey: .workDay).map { $0 - 1 }
   }
@@ -134,6 +143,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     try container.encode(session, forKey: .session)
     try container.encode(task, forKey: .task)
     try container.encodeIfPresent(serves, forKey: .serves)
+    try container.encodeIfPresent(makeAheadWindow, forKey: .makeAheadWindow)
     try container.encodeIfPresent(sourceDish, forKey: .sourceDish)
     try container.encodeIfPresent(workDayOffset.map { $0 + 1 }, forKey: .workDay)
   }
@@ -176,6 +186,9 @@ public struct MenuPrepPlan: Equatable, Sendable {
         previousGroup = group
       }
       lines.append("- \(step.renderedEditableReviewLine)")
+      if let makeAheadWindow = step.makeAheadWindow {
+        lines.append("  Keeps: \(makeAheadWindow)")
+      }
     }
     return lines.joined(separator: "\n")
   }
@@ -190,10 +203,14 @@ public struct MenuPrepPlan: Equatable, Sendable {
     var revisedSteps: [PrepPlanStep] = []
     var unparsedLines: [String] = []
     var outOfRangeDayCount = 0
+    var previousLineWasBullet = false
 
     for rawLine in text.components(separatedBy: .newlines) {
       let line = rawLine.cleanedEditablePrepPlanLine
-      guard !line.isEmpty else { continue }
+      guard !line.isEmpty else {
+        previousLineWasBullet = false
+        continue
+      }
 
       if rawLine.isEditablePrepPlanSessionHeader, let parsedHeader = line.editablePrepPlanHeader(dayCount: dayCount) {
         session = parsedHeader.session
@@ -201,19 +218,31 @@ public struct MenuPrepPlan: Equatable, Sendable {
         if dayCount > 1, workDayOffset == nil, line.hasOutOfRangeWorkDayHeader(dayCount: dayCount) {
           outOfRangeDayCount += 1
         }
+        previousLineWasBullet = false
         continue
       }
 
       guard let session else {
         unparsedLines.append(rawLine)
+        previousLineWasBullet = false
         continue
       }
       guard rawLine.isEditablePrepPlanBullet else {
+        if previousLineWasBullet,
+          line.hasPrefix("Keeps:"),
+          let window = String(line.dropFirst("Keeps:".count)).cleanedPrepPlanText,
+          !revisedSteps.isEmpty {
+          revisedSteps[revisedSteps.count - 1].makeAheadWindow = window
+          previousLineWasBullet = false
+          continue
+        }
         unparsedLines.append(rawLine)
+        previousLineWasBullet = false
         continue
       }
       guard let parsedLine = PrepPlanStep.editableReviewLine(line) else {
         unparsedLines.append(rawLine)
+        previousLineWasBullet = false
         continue
       }
       revisedSteps.append(
@@ -221,9 +250,11 @@ public struct MenuPrepPlan: Equatable, Sendable {
           session: session,
           task: parsedLine.task,
           serves: parsedLine.serves,
+          makeAheadWindow: nil,
           workDayOffset: workDayOffset
         )
       )
+      previousLineWasBullet = true
     }
 
     return EditableReviewParseResult(
@@ -292,6 +323,8 @@ public enum MenuPrepPlanCoding {
 }
 
 public struct MenuPrepPlanClient: Sendable {
+  public static let makeAheadAndLeftoversGuidance = "When a dish keeps for days, schedule it so about 3 days of keeping remain after the meal it feeds: a sauce that keeps a week is made no more than 4 days before. Follow windows in hours, or of a few days or less, as written. The make-ahead preferences can change the 3 days."
+
   public var extract: @Sendable (
     _ selection: String,
     _ messages: [RecipeChatMessage],
@@ -351,7 +384,7 @@ extension MenuPrepPlanClient: DependencyKey {
   static let instructions = """
     You weave a staged prep plan for one multi-day menu from the current menu context and conversation.
     Return ONLY strict JSON:
-    {"steps":[{"workDay":1,"session":"time within that day","task":"concrete kitchen task","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
+    {"steps":[{"workDay":1,"session":"time within that day","task":"concrete kitchen task","makeAheadWindow":"the recipe's own limit in a few words, e.g. Up to 3 days ahead, or null","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
     Include workDay as a 1-based day number for scheduled work, or null for Flexible work. Day 0 and negative numbers mean
     days before Day 1; no more than 7 days before Day 1. Keep session as the time within that day. For one-day menus,
     omit workDay and keep using session bands.
@@ -364,6 +397,8 @@ extension MenuPrepPlanClient: DependencyKey {
     and conversation. Prefer the authored Make-Ahead notes when they are available.
     Group related work under free-form session labels such as "Anytime, get ahead" or "Wednesday evening". Set serves
     to the meal or day each step feeds when useful.
+    For makeAheadWindow, use the dish's Make-Ahead note first, else the recipe; use null when neither grounds a window.
+    \(makeAheadAndLeftoversGuidance)
     Use sourceDish only when the step clearly comes from one menu item ID in the context; use null when a step spans
     dishes or the source is unclear. Return {"steps":[]} only when there is genuinely no prep plan to save.
     """
@@ -415,6 +450,7 @@ extension MenuPrepPlanClient: DependencyKey {
           session: session,
           task: task,
           serves: (element["serves"] as? String)?.cleanedPrepPlanText,
+          makeAheadWindow: (element["makeAheadWindow"] as? String)?.cleanedPrepPlanText,
           sourceDish: (element["sourceDish"] as? String)
             .flatMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespacesAndNewlines)) },
           workDayOffset: dayCount > 1 && !isOutOfRange ? workDay.map { $0 - 1 } : nil
@@ -483,6 +519,7 @@ public enum PrepPlanStepRepository {
         session: draft.session,
         task: draft.task,
         serves: draft.serves,
+        makeAheadWindow: draft.makeAheadWindow,
         sourceDish: draft.sourceDish,
         workDayOffset: draft.workDayOffset
       )
@@ -496,6 +533,7 @@ public enum PrepPlanStepRepository {
     session: String,
     task: String,
     serves: String?,
+    makeAheadWindow: String? = nil,
     sourceDish: MenuItem.ID?,
     workDayOffset: Int?,
     in db: Database,
@@ -506,6 +544,7 @@ public enum PrepPlanStepRepository {
       $0.session = #bind(session)
       $0.task = #bind(task)
       $0.serves = #bind(serves?.cleanedPrepPlanText)
+      $0.makeAheadWindow = #bind(makeAheadWindow?.cleanedPrepPlanText)
       $0.sourceDish = #bind(sourceDish)
       $0.workDayOffset = #bind(workDayOffset)
     }
@@ -574,6 +613,7 @@ public enum PrepPlanStepRepository {
           session: draft.session,
           task: draft.task,
           serves: draft.serves,
+          makeAheadWindow: draft.makeAheadWindow,
           sourceDish: draft.sourceDish,
           workDayOffset: draft.workDayOffset
         )
@@ -617,6 +657,7 @@ public enum PrepPlanStepRepository {
     let session: String
     let task: String
     let serves: String?
+    let makeAheadWindow: String?
     let sourceDish: MenuItem.ID?
     let workDayOffset: Int?
 
@@ -625,6 +666,7 @@ public enum PrepPlanStepRepository {
         session: step.session,
         task: step.task,
         serves: step.serves,
+        makeAheadWindow: step.makeAheadWindow,
         sourceDish: step.sourceDish,
         workDayOffset: step.workDayOffset
       )
@@ -635,15 +677,17 @@ public enum PrepPlanStepRepository {
         session: step.session,
         task: step.task,
         serves: step.serves,
+        makeAheadWindow: step.makeAheadWindow,
         sourceDish: step.sourceDish,
         workDayOffset: step.workDayOffset
       )
     }
 
-    private init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?, workDayOffset: Int?) {
+    private init(session: String, task: String, serves: String?, makeAheadWindow: String?, sourceDish: MenuItem.ID?, workDayOffset: Int?) {
       self.session = session
       self.task = task
       self.serves = serves
+      self.makeAheadWindow = makeAheadWindow
       self.sourceDish = sourceDish
       self.workDayOffset = workDayOffset
     }

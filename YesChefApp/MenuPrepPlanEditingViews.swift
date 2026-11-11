@@ -16,6 +16,11 @@ struct MenuPrepPlanStepView: View {
         .foregroundStyle(.secondary)
 
       VStack(alignment: .leading, spacing: 4) {
+        if let makeAheadWindow = step.makeAheadWindow {
+          Label(makeAheadWindow, systemImage: "clock")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
         Text(step.task)
         if let dishChipLabel { servesLabel(dishChipLabel) }
       }
@@ -78,6 +83,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
   var sessionBand: PrepPlanSessionBand
   var customSession: String
   var task: String
+  var makeAheadWindow: String
   var serves: String
   var sourceDish: MenuItem.ID?
   var workDayOffset: Int?
@@ -88,6 +94,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
     sessionBand = .flexible
     customSession = ""
     task = ""
+    makeAheadWindow = ""
     serves = ""
     sourceDish = nil
     workDayOffset = nil
@@ -98,6 +105,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
     sessionBand = PrepPlanSessionBand.allCases.first(where: { $0.title == step.session }) ?? .other
     customSession = step.session
     task = step.task
+    makeAheadWindow = step.makeAheadWindow ?? ""
     serves = step.serves ?? ""
     sourceDish = step.sourceDish
     workDayOffset = step.workDayOffset
@@ -108,6 +116,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
       session: sessionBand == .other ? customSession : sessionBand.title,
       task: task,
       serves: serves.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : serves,
+      makeAheadWindow: makeAheadWindow.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : makeAheadWindow,
       sourceDish: sourceDish,
       workDayOffset: workDayOffset
     )
@@ -165,6 +174,7 @@ struct PrepPlanStepEditorSheet: View {
         }
         if draft.sessionBand == .other { VStack(alignment: .leading) { Text("Other session"); TextField("e.g. Wednesday evening", text: $draft.customSession) } }
         VStack(alignment: .leading) { Text("Task"); TextField("e.g. Salt the chicken", text: $draft.task, axis: .vertical).lineLimit(2...4) }
+        VStack(alignment: .leading) { Text("Make-ahead window"); TextField("e.g. Up to 3 days ahead", text: $draft.makeAheadWindow) }
         VStack(alignment: .leading) { Text("Serves"); TextField("Optional meal or day", text: $draft.serves) }
         VStack(alignment: .leading, spacing: 4) {
           Picker("Dish", selection: $draft.sourceDish) {

@@ -38,10 +38,12 @@ struct MenuPrepPlanModelTests {
         step: try #require(database.read { db in try PrepPlanStepRecord.find(stepID).fetchOne(db) })
       )
       editorDraft.workDayOffset = 1
+      editorDraft.makeAheadWindow = "Up to 3 days ahead"
       model.updatePrepPlanStep(editorDraft.step, id: stepID)
 
       let savedStep = try #require(database.read { db in try PrepPlanStepRecord.find(stepID).fetchOne(db) })
       #expect(savedStep.workDayOffset == 1)
+      #expect(savedStep.makeAheadWindow == "Up to 3 days ahead")
       #expect(model.isShowingError == false)
     }
   }

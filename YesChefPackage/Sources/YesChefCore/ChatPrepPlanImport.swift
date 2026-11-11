@@ -1,16 +1,22 @@
 import Foundation
 import SQLiteData
 
+private extension String {
+  var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
 public struct ChatAccessStagedPrepPlan: Codable, Equatable, Sendable {
   public struct Dish: Codable, Equatable, Sendable {
     public struct Step: Codable, Equatable, Sendable {
       public var workDayOffset: Int?
       public var session: String
       public var task: String
-      public init(workDayOffset: Int? = nil, session: String, task: String) {
+      public var makeAheadWindow: String?
+      public init(workDayOffset: Int? = nil, session: String, task: String, makeAheadWindow: String? = nil) {
         self.workDayOffset = workDayOffset
         self.session = session
         self.task = task
+        self.makeAheadWindow = makeAheadWindow?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
       }
     }
     public var dayOffset: Int
@@ -135,7 +141,7 @@ public enum ChatPrepPlanImport {
           }
         case let .new(_, step):
           if keeping.contains(entryIndex) {
-            insertions.append((entryIndex, PrepPlanStepRecord(id: uuid(), menuID: menu.id, sortOrder: 0, session: step.session.trimmingCharacters(in: .whitespacesAndNewlines), task: step.task.trimmingCharacters(in: .whitespacesAndNewlines), serves: dish.title, sourceDish: dish.id, workDayOffset: step.workDayOffset)))
+            insertions.append((entryIndex, PrepPlanStepRecord(id: uuid(), menuID: menu.id, sortOrder: 0, session: step.session.trimmingCharacters(in: .whitespacesAndNewlines), task: step.task.trimmingCharacters(in: .whitespacesAndNewlines), serves: dish.title, makeAheadWindow: step.makeAheadWindow, sourceDish: dish.id, workDayOffset: step.workDayOffset)))
           }
         case .removed: break
         }
@@ -162,12 +168,12 @@ public enum ChatPrepPlanImport {
   }
 
   private static func same(_ row: PrepPlanStepRecord, _ step: ChatAccessStagedPrepPlan.Dish.Step) -> Bool {
-    row.workDayOffset == step.workDayOffset && row.session.trimmingCharacters(in: .whitespacesAndNewlines) == step.session.trimmingCharacters(in: .whitespacesAndNewlines) && row.task.trimmingCharacters(in: .whitespacesAndNewlines) == step.task.trimmingCharacters(in: .whitespacesAndNewlines)
+    row.workDayOffset == step.workDayOffset && row.session.trimmingCharacters(in: .whitespacesAndNewlines) == step.session.trimmingCharacters(in: .whitespacesAndNewlines) && row.task.trimmingCharacters(in: .whitespacesAndNewlines) == step.task.trimmingCharacters(in: .whitespacesAndNewlines) && row.makeAheadWindow == step.makeAheadWindow
   }
   private static func multiset(_ rows: [ChatAccessExport.PrepStepRecord]) -> [String: Int] {
-    Dictionary(rows.map { ("\($0.workDayOffset ?? 0)|\($0.session)|\($0.task)|\($0.serves ?? "")", 1) }, uniquingKeysWith: +)
+    Dictionary(rows.map { ("\($0.workDayOffset ?? 0)|\($0.session)|\($0.task)|\($0.serves ?? "")|\($0.makeAheadWindow ?? "")", 1) }, uniquingKeysWith: +)
   }
   private static func trySteps(_ rows: [PrepPlanStepRecord]) -> [ChatAccessExport.PrepStepRecord] {
-    rows.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil) }
+    rows.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil, makeAheadWindow: $0.makeAheadWindow) }
   }
 }
