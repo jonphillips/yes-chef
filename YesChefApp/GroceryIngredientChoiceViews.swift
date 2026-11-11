@@ -10,21 +10,59 @@ struct GroceryIngredientChoiceSection: View {
   @Binding var selectedIngredientLineIDs: Set<IngredientLine.ID>
   var showsRecipeTitle: Bool
   var scale: Double
+  var tripByCanonicalName: [String: GroceryTrip]? = nil
+  var switchTrip: ((String) -> Void)? = nil
+
+  init(
+    title: String,
+    choices: [GroceryIngredientChoice],
+    selectedIngredientLineIDs: Binding<Set<IngredientLine.ID>>,
+    showsRecipeTitle: Bool,
+    scale: Double,
+    tripByCanonicalName: [String: GroceryTrip]? = nil,
+    switchTrip: ((String) -> Void)? = nil
+  ) {
+    self.title = title
+    self.choices = choices
+    self._selectedIngredientLineIDs = selectedIngredientLineIDs
+    self.showsRecipeTitle = showsRecipeTitle
+    self.scale = scale
+    self.tripByCanonicalName = tripByCanonicalName
+    self.switchTrip = switchTrip
+  }
 
   var body: some View {
     Section(title) {
       ForEach(choices) { choice in
-        Button {
-          toggle(choice.line.id)
-        } label: {
-          GroceryIngredientChoiceRow(
-            choice: choice,
-            isSelected: selectedIngredientLineIDs.contains(choice.line.id),
-            showsRecipeTitle: showsRecipeTitle,
-            scale: scale
-          )
+        HStack {
+          Button {
+            toggle(choice.line.id)
+          } label: {
+            GroceryIngredientChoiceRow(
+              choice: choice,
+              isSelected: selectedIngredientLineIDs.contains(choice.line.id),
+              showsRecipeTitle: showsRecipeTitle,
+              scale: scale
+            )
+          }
+          .buttonStyle(.plain)
+          Spacer(minLength: 8)
+          if let name = choice.line.canonicalIngredientName,
+             let trip = tripByCanonicalName?[name],
+             let switchTrip {
+            Button {
+              switchTrip(name)
+            } label: {
+              Text(trip.title)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.quaternary, in: Capsule())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Move \(name) to \(trip.other.title)")
+          }
         }
-        .buttonStyle(.plain)
       }
     }
   }

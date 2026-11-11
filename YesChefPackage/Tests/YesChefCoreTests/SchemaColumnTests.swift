@@ -282,6 +282,7 @@ private let persistedTableModels = [
   persistedTableModel(Category.self),
   persistedTableModel(Facet.self),
   persistedTableModel(GroceryAreaAssignment.self),
+  persistedTableModel(GroceryTripAssignment.self),
   persistedTableModel(PrepPlanStepRecord.self),
   persistedTableModel(ChatThreadRecord.self),
   persistedTableModel(RecipeDeliberationLogEntry.self),

@@ -53,6 +53,29 @@ public struct AppHelpPage: Equatable, Sendable {
       ])
     ]
   )
+
+  public static let groceries = AppHelpPage(
+    title: "How Groceries Work",
+    sections: [
+      Section(heading: "Adding ingredients", bullets: [
+        "**Add Ingredients** adds a calendar day or a menu to this list. You pick which lines to add first.",
+        "Lines matching a pantry item set to **Always have it** start unchecked under **Skipped Pantry Staples**. Check one to buy it anyway.",
+        "Turn on **Split into two trips** to send each line to an **Advance** list or a **Fresh** list. Tap a line's **Advance** or **Fresh** tag to switch it. The app remembers your switch next time."
+      ]),
+      Section(heading: "Merging", bullets: [
+        "The same ingredient from different recipes becomes one item with the amounts added up, when the units can be added (cups with cups, grams with grams). Otherwise it stays a separate item.",
+        "Long-press an item to see where it came from, or remove one recipe's share."
+      ]),
+      Section(heading: "Pantry", bullets: [
+        "Pantry items say what you usually have. Set each one in **Pantry**: **Always have it** hides it from the list, **Remind me** hides small amounts and shows big ones under **You may need more**, **Always confirm** always shows it.",
+        "Hidden items sit under **Assumed in pantry**. **Add Back** puts one on the list for now.",
+        "Swipe an item right and tap **Add to Pantry** to stop buying it."
+      ]),
+      Section(heading: "Store areas", bullets: [
+        "Items are grouped by store area. Change one with **Edit Item › Aisle**. The app remembers your change for that ingredient from then on."
+      ])
+    ]
+  )
 }
 
 public extension RecipeChatContext {

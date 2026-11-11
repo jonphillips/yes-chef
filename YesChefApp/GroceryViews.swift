@@ -250,6 +250,13 @@ private struct GroceryListActionsMenu: View {
           }
         }
       }
+
+      Divider()
+      Button {
+        model.helpButtonTapped()
+      } label: {
+        Label("How Groceries Work", symbol: .help)
+      }
     } label: {
       Label("List Actions", systemImage: "ellipsis.circle")
     }
@@ -868,6 +875,10 @@ struct GroceryItemEditorView: View {
 struct GroceryIngredientSelectionView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var selectedIngredientLineIDs: Set<IngredientLine.ID>
+  @State private var isSplitIntoTrips = false
+  @State private var tripByCanonicalName: [String: GroceryTrip] = [:]
+  @State private var switchedCanonicalNames: Set<String> = []
+  @State private var didLoadTrips = false
 
   let model: GroceryLibraryModel
   let context: GroceryIngredientSelectionContext
@@ -897,7 +908,7 @@ struct GroceryIngredientSelectionView: View {
   }
 
   private var isAddDisabled: Bool {
-    selectedIngredientLineIDs.isEmpty
+    selectedIngredientLineIDs.isEmpty || (isSplitIntoTrips && !didLoadTrips)
   }
 
   var body: some View {
@@ -909,31 +920,22 @@ struct GroceryIngredientSelectionView: View {
           Label("No Shoppable Ingredients", symbol: .groceries)
         }
       } else {
-        List {
-          if !regularChoices.isEmpty {
-            GroceryIngredientChoiceSection(
-              title: "Ingredients",
-              choices: regularChoices,
-              selectedIngredientLineIDs: $selectedIngredientLineIDs,
-              showsRecipeTitle: showsRecipeTitle,
-              scale: context.displayScale
-            )
-          }
-
-          if !pantryStapleChoices.isEmpty {
-            GroceryIngredientChoiceSection(
-              title: "Skipped Pantry Staples",
-              choices: pantryStapleChoices,
-              selectedIngredientLineIDs: $selectedIngredientLineIDs,
-              showsRecipeTitle: showsRecipeTitle,
-              scale: context.displayScale
-            )
-          }
-        }
+        ingredientList
       }
     }
     .navigationTitle(context.title)
     .navigationBarTitleDisplayMode(.inline)
+    .task(id: isSplitIntoTrips) {
+      guard isSplitIntoTrips, !didLoadTrips else { return }
+      do {
+        tripByCanonicalName = try await model.groceryTrips(for: choices)
+        didLoadTrips = true
+      } catch {
+        model.errorMessage = String(describing: error)
+        model.isShowingError = true
+        isSplitIntoTrips = false
+      }
+    }
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
         Button("Cancel") {
@@ -945,7 +947,10 @@ struct GroceryIngredientSelectionView: View {
           if model.confirmIngredientSelectionButtonTapped(
             context: context,
             selectedIngredientLineIDs: selectedIngredientLineIDs,
-            mealRows: mealRows
+            mealRows: mealRows,
+            choices: choices,
+            tripByCanonicalName: isSplitIntoTrips ? tripByCanonicalName : nil,
+            switchedCanonicalNames: switchedCanonicalNames
           ) {
             dismiss()
           }
@@ -966,12 +971,71 @@ struct GroceryIngredientSelectionView: View {
     Set(choices.map(\.recipe.id)).count > 1
   }
 
+  private var ingredientList: some View {
+    List {
+      if canSplitIntoTrips {
+        Section { Toggle("Split into two trips", isOn: $isSplitIntoTrips) }
+      }
+      if isSplitIntoTrips {
+        tripSection(.advance)
+        tripSection(.fresh)
+      } else if !regularChoices.isEmpty {
+        choiceSection(title: "Ingredients", choices: regularChoices)
+      }
+      if !pantryStapleChoices.isEmpty {
+        choiceSection(title: "Skipped Pantry Staples", choices: pantryStapleChoices, showsTripTags: isSplitIntoTrips)
+      }
+    }
+  }
+
+  private func tripSection(_ trip: GroceryTrip) -> some View {
+    choiceSection(title: trip.title, choices: tripChoices(for: trip), showsTripTags: true)
+  }
+
+  private func choiceSection(
+    title: String,
+    choices: [GroceryIngredientChoice],
+    showsTripTags: Bool = false
+  ) -> some View {
+    let tripAssignments: [String: GroceryTrip]? = showsTripTags ? tripByCanonicalName : nil
+    let tripSwitcher: ((String) -> Void)? = showsTripTags ? { name in switchTrip(name) } : nil
+    return GroceryIngredientChoiceSection(
+      title: title,
+      choices: choices,
+      selectedIngredientLineIDs: $selectedIngredientLineIDs,
+      showsRecipeTitle: showsRecipeTitle,
+      scale: context.displayScale,
+      tripByCanonicalName: tripAssignments,
+      switchTrip: tripSwitcher
+    )
+  }
+
   private var regularChoices: [GroceryIngredientChoice] {
     choices.filter { !$0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
   }
 
   private var pantryStapleChoices: [GroceryIngredientChoice] {
     choices.filter { $0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
+  }
+
+  private var canSplitIntoTrips: Bool {
+    switch context.source {
+    case .menu, .mealPlanRows: true
+    case .recipe: false
+    }
+  }
+
+  private func tripChoices(for trip: GroceryTrip) -> [GroceryIngredientChoice] {
+    regularChoices.filter { choice in
+      guard let name = choice.line.canonicalIngredientName else { return trip == .fresh }
+      return tripByCanonicalName[name] == trip
+    }
+  }
+
+  private func switchTrip(_ canonicalName: String) {
+    guard let trip = tripByCanonicalName[canonicalName] else { return }
+    tripByCanonicalName[canonicalName] = trip.other
+    switchedCanonicalNames.insert(canonicalName)
   }
 
   private var selectionToggleTitle: String {

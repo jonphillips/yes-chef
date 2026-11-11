@@ -6,7 +6,7 @@
 > small synced table. Separately, the add sheet now skips only pantry items set to **Always have it**, and the
 > Groceries screen gets a **How Groceries Work** page.
 
-Status: **Accepted** — 2026-11-11. Effort: [`efforts/grocery-two-trips.md`](../efforts/grocery-two-trips.md).
+Status: **Accepted** — 2026-11-11. Effort: [`efforts/archive/grocery-two-trips.md`](../efforts/archive/grocery-two-trips.md).
 Origin: Jon, 2026-11-11: *"Stores get crowded at Thanksgiving, so I like to do two waves of shopping. The first is a
 week before for staples, canned/jarred goods, and long keeping produce like onions/garlic."* He also said he
 *"barely understand[s] how the corrective nature of grocery list items/pantry/etc. work."* The same day he decided

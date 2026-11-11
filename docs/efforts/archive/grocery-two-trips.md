@@ -7,10 +7,10 @@ Origin: Jon, 2026-11-11, planning his two Thanksgiving shopping trips. One dispa
 authorized by ADR-0068 D3.** **Deadline:** Jon's advance trip is around **Thu Nov 19**, so the device gate has to
 pass before then.
 
-Decisions: [ADR-0068](../decisions/ADR-0068-two-trip-grocery-split.md) (D1–D6). Read it first. Patterns to copy:
-[ADR-0052](../decisions/ADR-0052-grocery-learned-area-table.md)'s learned table (`GroceryAreaAssignment`), and
-[ADR-0066](../decisions/ADR-0066-in-app-help-pages.md) with the archived
-[`menu-help-and-add-menu`](archive/menu-help-and-add-menu.md) brief for the help page.
+Decisions: [ADR-0068](../../decisions/ADR-0068-two-trip-grocery-split.md) (D1–D6). Read it first. Patterns to copy:
+[ADR-0052](../../decisions/ADR-0052-grocery-learned-area-table.md)'s learned table (`GroceryAreaAssignment`), and
+[ADR-0066](../../decisions/ADR-0066-in-app-help-pages.md) with the archived
+[`menu-help-and-add-menu`](menu-help-and-add-menu.md) brief for the help page.
 
 ## Where things are (architect, 2026-11-11, `origin/main` 69f73fe)
 
@@ -157,7 +157,7 @@ This touches `YesChefApp/` model code, so the target runs (guardrail #9).
 - Only **Always have it** pantry items start skipped.
 - **⋯ › How Groceries Work** shows the page, and the page matches the app as built. Any label fixes are listed in the
   PR body (ADR-0066 D5).
-- Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above. Verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
 - **Gate, before any TestFlight upload:** the `groceryTripAssignments` record type and its fields are in Production.
   The architect imports them to Development with `cktool`, and Jon deploys in the Console.

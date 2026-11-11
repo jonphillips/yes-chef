@@ -27,6 +27,7 @@ final class GroceryLibraryModel {
     case deleteList(CoreGroceryList.ID)
     case editItem(GroceryItemEditorDraft)
     case editList(GroceryListEditorDraft)
+    case help
     case editPantryItem(PantryItem.ID)
     case selectIngredients(GroceryIngredientSelectionPresentation)
   }
@@ -83,7 +84,18 @@ final class GroceryLibraryModel {
   }
 
   var pantryStapleNames: [String] {
-    pantryItems.map(\.title)
+    GroceryPantryAssumptions.skippedStapleTitles(from: pantryItems)
+  }
+
+  func helpButtonTapped() {
+    destination = .help
+  }
+
+  func groceryTrips(for choices: [GroceryIngredientChoice]) async throws -> [String: GroceryTrip] {
+    let names = choices.compactMap { $0.line.canonicalIngredientName }
+    return try await database.read { db in
+      try GroceryTripRepository.trips(forCanonicalNames: names, in: db)
+    }
   }
 
   var selectedDisplaySections: GroceryDisplaySections {
@@ -432,7 +444,10 @@ final class GroceryLibraryModel {
   func confirmIngredientSelectionButtonTapped(
     context: GroceryIngredientSelectionContext,
     selectedIngredientLineIDs: Set<IngredientLine.ID>,
-    mealRows: [MealPlanItemRowData]
+    mealRows: [MealPlanItemRowData],
+    choices: [GroceryIngredientChoice],
+    tripByCanonicalName: [String: GroceryTrip]? = nil,
+    switchedCanonicalNames: Set<String> = []
   ) -> Bool {
     guard !selectedIngredientLineIDs.isEmpty else {
       errorMessage = "Select at least one ingredient."
@@ -442,79 +457,76 @@ final class GroceryLibraryModel {
 
     do {
       let selectedListID = selectedListID
-      let listID = try database.write { db in
+      let result = try database.write { db -> (CoreGroceryList.ID, Int, Int)? in
+        if let tripByCanonicalName {
+          var lineIDsByTrip: [GroceryTrip: Set<IngredientLine.ID>] = [:]
+          for choice in choices {
+            guard selectedIngredientLineIDs.contains(choice.line.id) else { continue }
+            let name = choice.line.canonicalIngredientName
+            let trip = name.flatMap { tripByCanonicalName[$0] } ?? .fresh
+            lineIDsByTrip[trip, default: []].insert(choice.line.id)
+          }
+          var advanceListID: CoreGroceryList.ID?
+          var freshListID: CoreGroceryList.ID?
+          let advanceIDs = lineIDsByTrip[.advance] ?? []
+          let freshIDs = lineIDsByTrip[.fresh] ?? []
+          if !advanceIDs.isEmpty {
+            let listID = try GroceryRepository.tripListID(
+              title: "\(context.title) — Advance", in: db, now: now, uuid: { uuid() }
+            )
+            advanceListID = listID
+            try addSelectedIngredients(
+              context: context, selectedIDs: advanceIDs, mealRows: mealRows,
+              groceryListID: listID, in: db
+            )
+          }
+          if !freshIDs.isEmpty {
+            let listID = try GroceryRepository.tripListID(
+              title: "\(context.title) — Fresh", in: db, now: now, uuid: { uuid() }
+            )
+            freshListID = listID
+            try addSelectedIngredients(
+              context: context, selectedIDs: freshIDs, mealRows: mealRows,
+              groceryListID: listID, in: db
+            )
+          }
+          let switches = Dictionary(uniqueKeysWithValues: switchedCanonicalNames.compactMap { name in
+            tripByCanonicalName[name].map { (name, $0) }
+          })
+          try GroceryTripRepository.recordSwitches(switches, in: db, now: now)
+          guard let selectedID = advanceListID ?? freshListID else { return nil }
+          return (selectedID, advanceIDs.count, freshIDs.count)
+        }
         let listID = try selectedOrDefaultGroceryListID(
           selectedListID,
           in: db,
           now: now,
           uuid: { uuid() }
         )
-        switch context.source {
-        case let .recipe(recipeID, scaleContext):
-          switch scaleContext {
-          case .recipe:
-            try GroceryRepository.addRecipe(
-              recipeID: recipeID,
-              groceryListID: listID,
-              in: db,
-              now: now,
-              uuid: { uuid() },
-              includedIngredientLineIDs: selectedIngredientLineIDs
-            )
-
-          case let .mealPlanItem(itemID):
-            try GroceryRepository.addMealPlanItem(
-              itemID: itemID,
-              groceryListID: listID,
-              in: db,
-              now: now,
-              uuid: { uuid() },
-              includedIngredientLineIDs: selectedIngredientLineIDs
-            )
-
-          case let .menuItem(itemID):
-            try GroceryRepository.addMenuItem(
-              itemID: itemID,
-              groceryListID: listID,
-              in: db,
-              now: now,
-              uuid: { uuid() },
-              includedIngredientLineIDs: selectedIngredientLineIDs
-            )
-          }
-
-        case let .mealPlanRows(itemIDs):
-          let rows = mealRows.filter { itemIDs.contains($0.item.id) }
-          try GroceryRepository.addMealPlanRows(
-            rows,
-            groceryListID: listID,
-            in: db,
-            now: now,
-            uuid: { uuid() },
-            includedIngredientLineIDs: selectedIngredientLineIDs
-          )
-
-        case let .menu(menuID):
-          try GroceryRepository.addMenu(
-            menuID: menuID,
-            groceryListID: listID,
-            in: db,
-            now: now,
-            uuid: { uuid() },
-            includedIngredientLineIDs: selectedIngredientLineIDs
-          )
-        }
-        return listID
+        try addSelectedIngredients(
+          context: context, selectedIDs: selectedIngredientLineIDs, mealRows: mealRows,
+          groceryListID: listID, in: db
+        )
+        return (listID, selectedIngredientLineIDs.count, 0)
       }
+      guard let (listID, advanceCount, freshCount) = result else { return false }
       self.selectedListID = listID
-      toastCenter?.postSuccess(
-        GroceryAddConfirmation(
-          sourceTitle: context.title,
-          sourceSubtitle: context.subtitle,
-          listTitle: title(forList: listID),
-          ingredientCount: selectedIngredientLineIDs.count
-        ).message
-      )
+      if tripByCanonicalName != nil {
+        let clauses = [
+          advanceCount > 0 ? "\(advanceCount) to Advance list" : nil,
+          freshCount > 0 ? "\(freshCount) to Fresh list" : nil,
+        ].compactMap(\.self)
+        toastCenter?.postSuccess("Added \(clauses.joined(separator: " and "))")
+      } else {
+        toastCenter?.postSuccess(
+          GroceryAddConfirmation(
+            sourceTitle: context.title,
+            sourceSubtitle: context.subtitle,
+            listTitle: title(forList: listID),
+            ingredientCount: selectedIngredientLineIDs.count
+          ).message
+        )
+      }
       scheduleCategorization()
       return true
     } catch {
@@ -608,6 +620,37 @@ final class GroceryLibraryModel {
     selectRecipeButtonTapped(recipeID: recipeID, scaleContext: scaleContext)
   }
 
+}
+
+private extension GroceryLibraryModel {
+  func addSelectedIngredients(
+    context: GroceryIngredientSelectionContext,
+    selectedIDs: Set<IngredientLine.ID>,
+    mealRows: [MealPlanItemRowData],
+    groceryListID: CoreGroceryList.ID,
+    in db: Database
+  ) throws {
+    switch context.source {
+    case let .recipe(recipeID, scaleContext):
+      switch scaleContext {
+      case .recipe:
+        try GroceryRepository.addRecipe(recipeID: recipeID, groceryListID: groceryListID, in: db, now: now,
+          uuid: { uuid() }, includedIngredientLineIDs: selectedIDs)
+      case let .mealPlanItem(itemID):
+        try GroceryRepository.addMealPlanItem(itemID: itemID, groceryListID: groceryListID, in: db, now: now,
+          uuid: { uuid() }, includedIngredientLineIDs: selectedIDs)
+      case let .menuItem(itemID):
+        try GroceryRepository.addMenuItem(itemID: itemID, groceryListID: groceryListID, in: db, now: now,
+          uuid: { uuid() }, includedIngredientLineIDs: selectedIDs)
+      }
+    case let .mealPlanRows(itemIDs):
+      try GroceryRepository.addMealPlanRows(mealRows.filter { itemIDs.contains($0.item.id) },
+        groceryListID: groceryListID, in: db, now: now, uuid: { uuid() }, includedIngredientLineIDs: selectedIDs)
+    case let .menu(menuID):
+      try GroceryRepository.addMenu(menuID: menuID, groceryListID: groceryListID, in: db, now: now,
+        uuid: { uuid() }, includedIngredientLineIDs: selectedIDs)
+    }
+  }
 }
 
 extension GroceryLibraryModel {

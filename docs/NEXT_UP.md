@@ -1,6 +1,6 @@
-# Next Up — Groceries split into two trips
+# Next Up — Today's Prep
 
-**Slices:** effort `grocery-two-trips`
-**Briefs:** [docs/efforts/grocery-two-trips.md](efforts/grocery-two-trips.md)
+**Slices:** effort `today-prep`
+**Briefs:** [docs/efforts/today-prep.md](efforts/today-prep.md)
 **Done when:** per the brief
 **Owed:** see [device-passes.md](device-passes.md)
