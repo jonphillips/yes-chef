@@ -136,13 +136,7 @@ final class ChatMenuDayReviewModel: Identifiable {
   }
 
   var removedRows: [MenuItem] {
-    plan.removed + plan.entries.enumerated().compactMap { index, entry -> MenuItem? in
-      guard !keptIndices.contains(index) else { return nil }
-      switch entry {
-      case let .kept(row, _), let .changed(row, _, _): return row
-      case .new: return nil
-      }
-    }
+    plan.removedRows(keeping: keptIndices)
   }
 }
 

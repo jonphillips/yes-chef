@@ -76,24 +76,24 @@ public enum ChatAccessInbox {
     public let menuTitle: String
     public let dayTitle: String
     public let isMenuAvailable: Bool
-    public let isReadable: Bool
+    public let hasMenuMetadata: Bool
     public let stagedAt: Date
     public let downloadState: DownloadState
     public var id: String { url.path }
-    public var canOpen: Bool { isReadable ? isMenuAvailable : true }
+    public var canOpen: Bool { hasMenuMetadata ? isMenuAvailable : true }
     public var title: String {
-      guard isReadable else { return "Unreadable menu day · \(menuTitle)" }
+      guard hasMenuMetadata else { return "Menu day · \(menuTitle)" }
       return isMenuAvailable ? "Menu day · \(menuTitle), \(dayTitle)" : "Menu not found on this device"
     }
 
-    public init(url: URL, menuID: UUID?, dayOffset: Int?, menuTitle: String, dayTitle: String, isMenuAvailable: Bool, isReadable: Bool = true, stagedAt: Date, downloadState: DownloadState) {
+    public init(url: URL, menuID: UUID?, dayOffset: Int?, menuTitle: String, dayTitle: String, isMenuAvailable: Bool, hasMenuMetadata: Bool = true, stagedAt: Date, downloadState: DownloadState) {
       self.url = url
       self.menuID = menuID
       self.dayOffset = dayOffset
       self.menuTitle = menuTitle
       self.dayTitle = dayTitle
       self.isMenuAvailable = isMenuAvailable
-      self.isReadable = isReadable
+      self.hasMenuMetadata = hasMenuMetadata
       self.stagedAt = stagedAt
       self.downloadState = downloadState
     }
@@ -134,7 +134,7 @@ public enum ChatAccessInbox {
       let menuTitle = trimmedTitle.flatMap { $0.isEmpty ? nil : $0 } ?? displayName(slug: staged.slug, recipeName: nil)
       return MenuDayRow(url: snapshot.url, menuID: menuID, dayOffset: day, menuTitle: menuTitle,
         dayTitle: dateTitle, isMenuAvailable: availability?.menuExists ?? false,
-        isReadable: menuID != nil && day != nil, stagedAt: staged.stagedAt,
+        hasMenuMetadata: menuID != nil && day != nil, stagedAt: staged.stagedAt,
         downloadState: snapshot.isCurrent ? .current : .downloading)
     }.sorted { $0.stagedAt > $1.stagedAt }
   }

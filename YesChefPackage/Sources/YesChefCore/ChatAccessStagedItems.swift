@@ -279,6 +279,16 @@ public enum ChatMenuDayImport {
       self.removed = removed
       self.dayChangedSinceStage = dayChangedSinceStage
     }
+
+    public func removedRows(keeping: Set<Int>) -> [MenuItem] {
+      removed + entries.enumerated().compactMap { index, entry -> MenuItem? in
+        guard !keeping.contains(index) else { return nil }
+        switch entry {
+        case let .kept(row, _), let .changed(row, _, _): return row
+        case .new: return nil
+        }
+      }
+    }
   }
 
   public static func plan(_ envelope: ChatAccessStagedMenuDay, in db: Database) throws -> Plan {
@@ -329,19 +339,7 @@ public enum ChatMenuDayImport {
     guard let menu = try Menu.find(plan.menuID).fetchOne(db) else { throw Error.menuUnavailable }
     guard (0..<menu.dayCount).contains(plan.dayOffset) else { throw Error.dayOutOfRange }
     var rowsByIndex: [(Int, MenuItem)] = []
-    let retainedIDs = Set(keeping.compactMap { index -> UUID? in
-      guard plan.entries.indices.contains(index) else { return nil }
-      switch plan.entries[index] {
-      case let .kept(row, _), let .changed(row, _, _): return row.id
-      case .new: return nil
-      }
-    })
-    for row in plan.removed + (plan.entries.compactMap { entry -> MenuItem? in
-      switch entry {
-      case let .kept(row, _), let .changed(row, _, _): row
-      case .new: nil
-      }
-    }.filter { !retainedIDs.contains($0.id) }) where !retainedIDs.contains(row.id) {
+    for row in plan.removedRows(keeping: keeping) {
       try MenuRepository.deleteItem(itemID: row.id, in: db)
     }
     for (index, entry) in plan.entries.enumerated() where keeping.contains(index) {
@@ -377,7 +375,7 @@ public enum ChatMenuDayImport {
       }
     }
     for slot in MealPlanItemSlot.allCases {
-      let group = rowsByIndex.filter { plan.entries[$0.0].itemSlot == slot }.sorted { $0.0 < $1.0 }
+      let group = rowsByIndex.filter { $0.1.mealSlot == slot }.sorted { $0.0 < $1.0 }
       for (order, pair) in group.enumerated() where pair.1.sortOrder != order {
         var updated = pair.1
         updated.sortOrder = order
@@ -408,14 +406,5 @@ public enum ChatMenuDayImport {
     if lhs.slot != rhs.slot { return lhs.slot.sortOrder < rhs.slot.sortOrder }
     if lhs.note != rhs.note { return (lhs.note ?? "") < (rhs.note ?? "") }
     return lhs.scale < rhs.scale
-  }
-}
-
-private extension ChatMenuDayImport.Entry {
-  var itemSlot: MealPlanItemSlot {
-    switch self {
-    case let .kept(row, _), let .changed(row, _, _): row.mealSlot
-    case let .new(item, _): item.slot
-    }
   }
 }

@@ -49,15 +49,15 @@ struct ChatAccessInboxTests {
     #expect(rows.last?.title == "Recipe not found on this device")
   }
 
-  @Test func unreadableMenuDayStillHasAnOpenableInboxRow() throws {
+  @Test func menuDayWithoutLoadedMetadataUsesSlugTitleAndRemainsOpenable() throws {
     let root = URL(fileURLWithPath: "/tmp/MCP/Inbox", isDirectory: true)
     let url = root.appending(path: "20261110T120000Z-week-day-2.ycmenuday")
     let row = try #require(ChatAccessInbox.menuDayRows(from: [
       .init(url: url, name: url.lastPathComponent, isCurrent: true),
     ], resolve: { _, _ in (false, nil) }).first)
-    #expect(!row.isReadable)
+    #expect(!row.hasMenuMetadata)
     #expect(row.canOpen)
-    #expect(row.title.contains("Unreadable menu day"))
+    #expect(row.title == "Menu day · Week Day 2")
     let missing = try #require(ChatAccessInbox.menuDayRows(from: [
       .init(url: url, name: url.lastPathComponent, isCurrent: true, menuTitle: "Week", menuDayMenuID: UUID(), menuDayOffset: 1),
     ], resolve: { _, _ in (false, nil) }).first)
