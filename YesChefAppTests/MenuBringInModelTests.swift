@@ -182,4 +182,39 @@ struct MenuBringInModelTests {
       #expect(try database.read { db in try MenuItem.where { $0.menuID.eq(sourceID) }.fetchAll(db).map(\.id) } == [sourceItemID])
     }
   }
+
+  @Test
+  func addMenuWithStaleOfferClosesSheetAndShowsError() throws {
+    try withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 900_400_000)
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 900_400_000)
+      let targetID = UUID(uuidString: "00000000-0000-0000-0000-000000000411")!
+      let sourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000412")!
+      try database.write { db in
+        try Menu.insert { Menu(id: targetID, title: "Week", dayCount: 5, dateCreated: now, dateModified: now) }.execute(db)
+        try Menu.insert { Menu(id: sourceID, title: "Dinner", dayCount: 1, dateCreated: now, dateModified: now) }.execute(db)
+        try MenuItem.insert {
+          MenuItem(id: UUID(uuidString: "00000000-0000-0000-0000-000000000413")!, menuID: sourceID, kind: .note,
+            title: "Roast chicken", dayOffset: 0, mealSlot: .dinner, sortOrder: 0, dateCreated: now, dateModified: now)
+        }.execute(db)
+      }
+
+      let model = MenuLibraryModel()
+      model.addMenuToMenuButtonTapped(targetMenuID: targetID)
+      guard case let .addMenuToMenu(presentation) = model.destination else {
+        Issue.record("Expected Add Menu presentation")
+        return
+      }
+      try database.write { db in try Menu.find(sourceID).delete().execute(db) }
+      model.confirmAddMenuToMenu(presentation, sourceMenuID: sourceID, startDayOffset: 0)
+
+      #expect(model.destination == nil)
+      #expect(model.isShowingError)
+      #expect(try database.read { db in try MenuItem.where { $0.menuID.eq(targetID) }.fetchCount(db) } == 0)
+    }
+  }
 }

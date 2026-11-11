@@ -143,36 +143,67 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func offerOnlyAddsCalendarOverlapNoteForOneWhollyContainedTargetPlacement() throws {
+    func offerOmitsCalendarOverlapNoteForPartiallyOverlappingSource() throws {
       @Dependency(\.defaultDatabase) var database
       let calendar = Calendar(identifier: .gregorian)
       let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 25)))
-      let secondTargetDate = try #require(calendar.date(byAdding: .day, value: 12, to: start))
       let partialStart = try #require(calendar.date(byAdding: .day, value: 1, to: start))
       let now = start
-      let multiplePlacementTargetID = SampleUUIDSequence.uuid(92_001)
+      let targetID = SampleUUIDSequence.uuid(92_001)
       let partialSourceID = SampleUUIDSequence.uuid(92_002)
-      let itemID = SampleUUIDSequence.uuid(92_003)
 
       try database.write { db in
         try Menu.insert {
-          Menu(id: multiplePlacementTargetID, title: "Two dinners", dayCount: 2, dateCreated: now, dateModified: now)
+          Menu(id: targetID, title: "Three dinners", dayCount: 3, dateCreated: now, dateModified: now)
         }.execute(db)
         try Menu.insert {
           Menu(id: partialSourceID, title: "Three day event", dayCount: 3, dateCreated: now, dateModified: now)
         }.execute(db)
         for placement in [
-          MenuPlacement(id: SampleUUIDSequence.uuid(92_004), menuID: multiplePlacementTargetID, startDate: start, dateCreated: now, dateModified: now),
-          MenuPlacement(id: SampleUUIDSequence.uuid(92_005), menuID: multiplePlacementTargetID, startDate: secondTargetDate, dateCreated: now, dateModified: now),
-          MenuPlacement(id: SampleUUIDSequence.uuid(92_006), menuID: partialSourceID, startDate: partialStart, dateCreated: now, dateModified: now),
+          MenuPlacement(id: SampleUUIDSequence.uuid(92_003), menuID: targetID, startDate: start, dateCreated: now, dateModified: now),
+          MenuPlacement(id: SampleUUIDSequence.uuid(92_004), menuID: partialSourceID, startDate: partialStart, dateCreated: now, dateModified: now),
         ] { try MenuPlacement.insert { placement }.execute(db) }
         try MenuItem.insert {
-          MenuItem(id: itemID, menuID: partialSourceID, kind: .note, title: "Brunch", dayOffset: 0,
+          MenuItem(id: SampleUUIDSequence.uuid(92_005), menuID: partialSourceID, kind: .note, title: "Brunch", dayOffset: 0,
             mealSlot: .breakfast, sortOrder: 0, dateCreated: now, dateModified: now)
         }.execute(db)
 
-        let offer = try MenuRepository.addMenuOffer(targetMenuID: multiplePlacementTargetID, in: db)
+        let offer = try MenuRepository.addMenuOffer(targetMenuID: targetID, in: db)
         #expect(offer.sources.map(\.title) == ["Three day event"])
+        #expect(offer.sources.first?.overlappingPlacementStartDate == nil)
+      }
+    }
+
+    @Test
+    func offerOmitsCalendarOverlapNoteWhenTargetHasSeveralPlacements() throws {
+      @Dependency(\.defaultDatabase) var database
+      let calendar = Calendar(identifier: .gregorian)
+      let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 25)))
+      let secondTargetDate = try #require(calendar.date(byAdding: .day, value: 12, to: start))
+      let containedStart = try #require(calendar.date(byAdding: .day, value: 1, to: start))
+      let now = start
+      let targetID = SampleUUIDSequence.uuid(92_011)
+      let containedSourceID = SampleUUIDSequence.uuid(92_012)
+
+      try database.write { db in
+        try Menu.insert {
+          Menu(id: targetID, title: "Two dinners", dayCount: 2, dateCreated: now, dateModified: now)
+        }.execute(db)
+        try Menu.insert {
+          Menu(id: containedSourceID, title: "Dinner", dayCount: 1, dateCreated: now, dateModified: now)
+        }.execute(db)
+        for placement in [
+          MenuPlacement(id: SampleUUIDSequence.uuid(92_013), menuID: targetID, startDate: start, dateCreated: now, dateModified: now),
+          MenuPlacement(id: SampleUUIDSequence.uuid(92_014), menuID: targetID, startDate: secondTargetDate, dateCreated: now, dateModified: now),
+          MenuPlacement(id: SampleUUIDSequence.uuid(92_015), menuID: containedSourceID, startDate: containedStart, dateCreated: now, dateModified: now),
+        ] { try MenuPlacement.insert { placement }.execute(db) }
+        try MenuItem.insert {
+          MenuItem(id: SampleUUIDSequence.uuid(92_016), menuID: containedSourceID, kind: .note, title: "Roast", dayOffset: 0,
+            mealSlot: .dinner, sortOrder: 0, dateCreated: now, dateModified: now)
+        }.execute(db)
+
+        let offer = try MenuRepository.addMenuOffer(targetMenuID: targetID, in: db)
+        #expect(offer.sources.map(\.title) == ["Dinner"])
         #expect(offer.sources.first?.overlappingPlacementStartDate == nil)
       }
     }

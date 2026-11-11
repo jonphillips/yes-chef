@@ -23,6 +23,9 @@ extension MenuLibraryModel {
     sourceMenuID: CoreMenu.ID,
     startDayOffset: Int
   ) {
+    // A failure means the offer went stale, so close the sheet either way: the
+    // root error alert can't present over it, and reopening rebuilds the offer.
+    destination = nil
     do {
       try database.write { db in
         try MenuRepository.addMenu(
@@ -34,7 +37,6 @@ extension MenuLibraryModel {
           uuid: { uuid() }
         )
       }
-      destination = nil
     } catch {
       errorMessage = String(describing: error)
       isShowingError = true
