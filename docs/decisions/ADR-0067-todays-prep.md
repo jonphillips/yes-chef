@@ -5,7 +5,7 @@
 > is a synced `completedAt` date on the step, so it survives the night and shows on the other device. Tapping a step
 > shows its dish's recipe alongside. Editing the plan stays in the Prep Plan column.
 
-Status: **Proposed** — 2026-11-11. Origin: Jon, 2026-11-11: *"The prep plan UI we have today is fine for
+Status: **Accepted** — 2026-11-11 (Proposed the same day). Brief: [`today-prep`](../efforts/today-prep.md). Origin: Jon, 2026-11-11: *"The prep plan UI we have today is fine for
 designing/editing. It's much less fun for actually doing the prep work. Just as we have a 'Cook These' flame icon in the
 toolbar, I wonder if you could brainstorm what a 'Today's Prep' view would look like."* He chose a synced done date
 (option 3 of three) the same day.
@@ -46,7 +46,7 @@ recipe you finish within the hour. Prep doesn't fit that, and Jon chose a synced
 
 The menu toolbar gains **Prep** beside **Cook these**, shown when the menu's plan has at least one step. It opens a
 full-screen cover (`TodayPrepView`), presented the way the cook session is, with `.keepsScreenAwakeWhilePresented()` and
-a **Done** button to dismiss.
+a **Close** button, as the cook session's cover has.
 
 The glyph is a literal `checklist`. Under ADR-0065 D3 a glyph joins `AppSymbol` when its concept first appears on a
 second surface, and this is one surface. If a second entry point arrives (see Deferred), it joins the table then.
@@ -121,15 +121,24 @@ A step whose task text changes is a new step and starts unchecked, which is hone
 
 ### D6 — A check belongs to one run of the menu
 
-A menu can be placed more than once (Thanksgiving, again next year), but its steps are shared rows. So whether a step
-counts as done depends on the mode:
+A menu can be placed more than once (Thanksgiving, again next year), but its steps are shared rows. So "done" is
+judged against the menu's **current run**:
 
-- **Dated mode:** done means `completedAt` falls on or after the anchoring placement's work-range start (D2). A menu
-  placed again starts unchecked, with no reset to remember. Last year's dates stay as harmless history.
-- **Manual mode:** done means `completedAt` is set. The view's `⋯` menu has **Uncheck All** for reusing an unplaced menu.
-  It writes nil to every step of the menu, after a confirmation.
+- **The current run** is the placement whose work range (D2) contains today. If none does, it's the next placement to
+  start, and if none is upcoming, the latest one.
+- **A step is done** when `completedAt` is later than the end of the **previous run**: the placement that started
+  latest before the current run, through its last day. If there's no previous run, or the menu is unplaced, any
+  `completedAt` counts.
+
+So a menu placed again starts unchecked, with no reset to remember, and last year's dates stay as harmless history.
+Early prep still counts: a Flexible step checked ten days before the work range is done, because it's after last
+year's run. The view's `⋯` menu has **Uncheck All** for reusing an unplaced menu, after a confirmation. It writes nil
+to every step of the menu.
 
 The rule is one Core function, used by both this view and D8.
+
+*Refined at acceptance (2026-11-11). The Proposed D6 counted checks only from the run's work-range start in dated mode,
+and any check otherwise. That dropped early prep, and it showed last year's checks before this year's range began.*
 
 ### D7 — Only light edits happen here
 
@@ -191,8 +200,7 @@ ADR-0034 Amd 3's `timeOfDay` hasn't deployed by then, both go in the same deploy
 - One more field in CloudKit Production, permanently.
 - Done state syncs, and it survives re-weaves and restages for every step whose task text is unchanged.
 - A reused unplaced menu needs **Uncheck All**. A reused placed menu doesn't.
-- When ADR-0067 is accepted, ADR-0034's Deferred **Cook mode** bullet gets a pointer here, as ADR-0063 did for real-date
-  anchoring.
+- ADR-0034's Deferred **Cook mode** bullet points here.
 
 ## Cost and slice plan
 
