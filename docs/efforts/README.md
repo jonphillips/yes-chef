@@ -26,3 +26,4 @@ discoverable"):
 ## Live
 
 - [Groceries split into two trips](grocery-two-trips.md) — **Ready.** Add Ingredients can split into Advance and Fresh lists by a fixed rule; switches stick in a new synced table; the sheet skips only **Always have it** items; Groceries help page. Due before ~Nov 19.
+- [Today's Prep](today-prep.md) — **Ready.** A **Prep** button opens a full-screen checklist of the steps due now, with each step's recipe beside it; checks are a synced `completedAt` that every writer keeps or starts at nil, judged per run of the menu. One nullable synced column.

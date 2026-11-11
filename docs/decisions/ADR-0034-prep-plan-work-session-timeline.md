@@ -163,6 +163,8 @@ Because the clipboard now carries a runnable prompt rather than raw context, the
   checkable steps, keep-awake, a live countdown ticking against the sub-label times, "next up" peeking at
   the bottom. The banded reader + ordered timing + tappable serves (D4) delivers ~80% of that feeling with
   zero new surface; cook mode is the last 20% and its own milestone.
+  **Decided in [ADR-0067](ADR-0067-todays-prep.md)** (2026-11-11): Today's Prep, a checklist of the steps due now with
+  synced checks, and without the countdown.
 - **Retire/realign the meal-calendar per-day make-ahead note verb** now that the menu owns the prep-plan
   home. Decided in [Amendment 1](#amendment-1--a-calendar-day-gets-a-real-plan-2026-11-05): realign.
 

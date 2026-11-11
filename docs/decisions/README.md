@@ -74,6 +74,6 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0064](ADR-0064-menu-detail-declutter.md) — Menu detail: one AI menu, an Edit sheet, and rows without buttons *(Accepted, 2026-11-10)*
 - [ADR-0065](ADR-0065-one-glyph-per-concept.md) — One glyph per concept, owned by `AppSymbol`; recipe is `richtext.page` everywhere and there is no recipe-collection glyph *(Accepted, 2026-11-10)*
 - [ADR-0066](ADR-0066-in-app-help-pages.md) — A screen can carry a short help page, and the chat reads it too; menus gain Add Menu… *(Accepted, 2026-11-11)*
-- [ADR-0067](ADR-0067-todays-prep.md) — **Today's Prep**: a view for doing the prep plan, checking steps off with a synced `completedAt` that counts per run of the menu *(Proposed, 2026-11-11)*
+- [ADR-0067](ADR-0067-todays-prep.md) — **Today's Prep**: a view for doing the prep plan, checking steps off with a synced `completedAt` that counts per run of the menu *(Accepted, 2026-11-11)*
 - [ADR-0068](ADR-0068-two-trip-grocery-split.md) — Groceries split into two trips by a fixed rule, your switches stick, the add sheet skips only **Always have it** pantry items, and Groceries gets a help page *(Accepted, 2026-11-11)*
 
