@@ -857,6 +857,7 @@ say), widen it to **Inbox** then.
 - One place to look after a chat stages something, with a badge that says so.
 - Create Recipe is honest again.
 - One more sidebar entry. It's always there, even when it's empty.
+
 ## Amendment 5 — A chat can replace the prep plan for the dishes it names (2026-11-10)
 
 Status: **Accepted** on the merge of its plan PR. Adds one staging tool, one inbox kind and one review sheet, and
