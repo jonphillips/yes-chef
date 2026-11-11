@@ -43,6 +43,7 @@ struct ChatAccessExportTests {
     let menuID = UUID()
     let sectionID = UUID()
     let photoID = UUID()
+    let beansDishID = UUID()
     let outside31 = calendar.date(byAdding: .day, value: -31, to: today)!
     let firstDay = calendar.date(byAdding: .day, value: -30, to: today)!
     let lastDay = calendar.date(byAdding: .day, value: 60, to: today)!
@@ -59,8 +60,11 @@ struct ChatAccessExportTests {
         [
           MenuItem(id: UUID(), menuID: menuID, kind: .note, title: "Dinner note", dayOffset: 0, mealSlot: .dinner, sortOrder: 0, dateCreated: generatedAt, dateModified: generatedAt),
           MenuItem(id: UUID(), menuID: menuID, kind: .note, title: "Lunch note", dayOffset: 0, mealSlot: .lunch, sortOrder: 0, dateCreated: generatedAt, dateModified: generatedAt),
-          MenuItem(id: UUID(), menuID: menuID, kind: .recipe, recipeID: recipeID, title: "Beans", dayOffset: 1, mealSlot: .breakfast, sortOrder: 0, dateCreated: generatedAt, dateModified: generatedAt),
+          MenuItem(id: beansDishID, menuID: menuID, kind: .recipe, recipeID: recipeID, title: "Beans", dayOffset: 1, mealSlot: .breakfast, sortOrder: 0, dateCreated: generatedAt, dateModified: generatedAt),
         ]
+      }.execute(db)
+      try PrepPlanStepRecord.insert {
+        PrepPlanStepRecord(id: UUID(), menuID: menuID, sortOrder: 0, session: "Day before", task: "Soak beans", serves: "Beans", sourceDish: beansDishID, workDayOffset: 0)
       }.execute(db)
       for (index, date) in [outside31, firstDay, lastDay, outside61].enumerated() {
         try MealPlanItem.insert {
@@ -76,6 +80,15 @@ struct ChatAccessExportTests {
     #expect(bundle.photos.isEmpty)
     #expect(bundle.recipe.originalSnapshot == nil)
     #expect(export.menus.first?.items.map(\.title) == ["Lunch note", "Dinner note", "Beans"])
+    #expect(export.menus.first?.prepPlan?.first?.dishIndex == 2)
+    #expect(export.menus.first?.prepPlan?.first?.task == "Soak beans")
     #expect(export.mealPlan.map(\.title) == ["Plan 1", "Plan 2"])
+  }
+
+  @Test func olderMenuExportWithoutPrepPlanDecodesAsUnknown() throws {
+    let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Older", notes: nil, dayCount: 1, modified: .now, items: [])
+    let export = ChatAccessExport(generatedAt: .now, device: "iPhone", recipes: [], menus: [menu], mealPlan: [])
+    let decoded = try ChatAccessExportCoding.decode(ChatAccessExportCoding.encode(export))
+    #expect(decoded.menus.first?.prepPlan == nil)
   }
 }

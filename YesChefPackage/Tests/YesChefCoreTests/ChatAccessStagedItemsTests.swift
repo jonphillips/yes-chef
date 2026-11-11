@@ -31,6 +31,160 @@ struct ChatAccessStagedItemsTests {
     }
   }
 
+  @Test func prepPlanReplacementKeepsMatchedIdentityAndLinksNewSteps() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_100), menuID = UUID(), recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+      let actualMenuID = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+      let dishID = try MenuRepository.addRecipeItem(menuID: actualMenuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day before", task: "Toast spices", serves: "Beans", sourceDish: dishID, workDayOffset: -1), for: actualMenuID, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day before", task: "Old step", serves: "Beans", sourceDish: dishID, workDayOffset: -1), for: actualMenuID, in: db, now: now, uuid: { UUID() })
+      let original = try PrepPlanStepRepository.steps(for: actualMenuID, in: db)
+      let envelope = ChatAccessStagedPrepPlan(menuID: actualMenuID, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: [
+          .init(workDayOffset: -1, session: "Day before", task: "Toast spices"),
+          .init(workDayOffset: -1, session: "Day before", task: "Chop herbs"),
+        ]),
+      ], planAtStage: original.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil) })
+      let plan = try ChatPrepPlanImport.plan(envelope, in: db)
+      #expect(plan.planChangedSinceStage == false)
+      #expect(plan.newCount == 1)
+      try ChatPrepPlanImport.apply(plan, keeping: [1], in: db, now: now.addingTimeInterval(1), uuid: { UUID() })
+      let updated = try PrepPlanStepRepository.steps(for: actualMenuID, in: db)
+      #expect(updated.count == 2)
+      #expect(updated.first?.id == original.first?.id)
+      #expect(updated.map(\.task) == ["Toast spices", "Chop herbs"])
+      #expect(updated.last?.sourceDish == dishID)
+      #expect(updated.last?.serves == "Beans")
+      let droppedNew = try ChatPrepPlanImport.plan(.init(menuID: actualMenuID, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: [
+          .init(workDayOffset: -1, session: "Day before", task: "Toast spices"),
+          .init(workDayOffset: -1, session: "Day before", task: "Do not add"),
+        ]),
+      ], planAtStage: nil), in: db)
+      try ChatPrepPlanImport.apply(droppedNew, keeping: [], in: db, now: now.addingTimeInterval(2), uuid: { UUID() })
+      #expect(try PrepPlanStepRepository.steps(for: actualMenuID, in: db).map(\.task) == ["Toast spices"])
+    }
+  }
+
+  @Test func prepPlanLinksKeptByNameWithoutChangingOtherRowsOrOrder() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_200), menuID = UUID(), beansID = UUID(), pieID = UUID()
+    try database.write { db in
+      try Recipe.insert { [
+        Recipe(id: beansID, title: "Beans", dateCreated: now, dateModified: now),
+        Recipe(id: pieID, title: "Pie", dateCreated: now, dateModified: now),
+      ] }.execute(db)
+      let menu = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+      let beansDish = try MenuRepository.addRecipeItem(menuID: menu, recipeID: beansID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let pieDish = try MenuRepository.addRecipeItem(menuID: menu, recipeID: pieID, dayOffset: 0, mealSlot: .snack, notes: nil, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day before", task: "Soak beans", serves: "Beans", workDayOffset: -1), for: menu, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day of", task: "Make crust", serves: "Pie", sourceDish: pieDish, workDayOffset: 0), for: menu, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Anytime", task: "Set the table"), for: menu, in: db, now: now, uuid: { UUID() })
+      let before = try PrepPlanStepRepository.steps(for: menu, in: db)
+      let plan = try ChatPrepPlanImport.plan(.init(menuID: menu, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: beansID, title: "Beans", steps: [.init(workDayOffset: -1, session: "Day before", task: "Soak beans")]),
+      ], planAtStage: nil), in: db)
+      guard case .kept(_, let matched, let matchedByName) = try #require(plan.dishes.first?.1.first) else { Issue.record("Expected the name-matched step to be Kept"); return }
+      #expect(matched.id == before[0].id)
+      #expect(matchedByName)
+      #expect(matched.sourceDish == nil)
+      try ChatPrepPlanImport.apply(plan, keeping: [], in: db, now: now.addingTimeInterval(1), uuid: { UUID() })
+      let after = try PrepPlanStepRepository.steps(for: menu, in: db)
+      #expect(after.map(\.id) == before.map(\.id))
+      #expect(after.map(\.sortOrder) == before.map(\.sortOrder))
+      #expect(after.map(\.task) == before.map(\.task))
+      #expect(after[0].sourceDish == beansDish)
+      #expect(after[1].sourceDish == pieDish)
+      #expect(after[2].sourceDish == nil)
+    }
+  }
+
+  @Test func prepPlanClearsAnEmptyDishAndLeavesAmbiguousAndOtherLinkedStepsAlone() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_300), menuID = UUID(), beansID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: beansID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+      let menu = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 1, in: db, now: now, uuid: { menuID })
+      let recipeDish = try MenuRepository.addRecipeItem(menuID: menu, recipeID: beansID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let noteDish = try MenuRepository.addNoteItem(menuID: menu, title: "Beans", notes: nil, dayOffset: 0, mealSlot: .lunch, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day of", task: "Cook beans", serves: "Beans", sourceDish: recipeDish), for: menu, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day of", task: "Ambiguous beans", serves: "Beans"), for: menu, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day of", task: "Dress salad", serves: "Beans", sourceDish: noteDish), for: menu, in: db, now: now, uuid: { UUID() })
+      let before = try PrepPlanStepRepository.steps(for: menu, in: db)
+      let plan = try ChatPrepPlanImport.plan(.init(menuID: menu, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: beansID, title: "Beans", steps: []),
+      ], planAtStage: nil), in: db)
+      #expect(plan.dishes.first?.1 == [.removed(dish: plan.dishes[0].0, step: before[0], matchedByName: false)])
+      try ChatPrepPlanImport.apply(plan, keeping: [], in: db, now: now, uuid: { UUID() })
+      let after = try PrepPlanStepRepository.steps(for: menu, in: db)
+      #expect(after.map(\.id) == [before[1].id, before[2].id])
+      #expect(after.map(\.sortOrder) == [0, 1])
+      #expect(after.map(\.task) == ["Ambiguous beans", "Dress salad"])
+    }
+  }
+
+  @Test func prepPlanOrdersNewStepsByBandThenDayThenPlanEnd() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_400), menuID = UUID(), beansID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: beansID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+      let menu = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 3, in: db, now: now, uuid: { menuID })
+      _ = try MenuRepository.addRecipeItem(menuID: menu, recipeID: beansID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let pieDish = try MenuRepository.addNoteItem(menuID: menu, title: "Pie", notes: nil, dayOffset: 1, mealSlot: .snack, in: db, now: now, uuid: { UUID() })
+      for (session, task, workDay) in [("Same", "same-1", -1), ("Same", "same-2", -1), ("Other", "other-day", -1), ("Day zero", "day-zero", 0), ("Tail", "tail", 2)] {
+        try PrepPlanStepRepository.create(.init(session: session, task: task, sourceDish: pieDish, workDayOffset: workDay), for: menu, in: db, now: now, uuid: { UUID() })
+      }
+      let plan = try ChatPrepPlanImport.plan(.init(menuID: menu, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: beansID, title: "Beans", steps: [
+          .init(workDayOffset: -1, session: "Same", task: "new-band"),
+          .init(workDayOffset: 0, session: "No band", task: "new-day"),
+          .init(workDayOffset: 1, session: "No day", task: "new-end"),
+        ]),
+      ], planAtStage: nil), in: db)
+      try ChatPrepPlanImport.apply(plan, keeping: [0, 1, 2], in: db, now: now, uuid: { UUID() })
+      let tasks = try PrepPlanStepRepository.steps(for: menu, in: db).map(\.task)
+      #expect(tasks == ["same-1", "same-2", "new-band", "other-day", "day-zero", "new-day", "tail", "new-end"])
+    }
+  }
+
+  @Test func prepPlanReportsDriftAndRejectsDeletedMenuOrDishWithoutPartialApply() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_500), menuID = UUID(), recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+      let menu = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+      let dishID = try MenuRepository.addRecipeItem(menuID: menu, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day before", task: "Soak beans", sourceDish: dishID, workDayOffset: -1), for: menu, in: db, now: now, uuid: { UUID() })
+      let current = try PrepPlanStepRepository.steps(for: menu, in: db)
+      let envelope = ChatAccessStagedPrepPlan(menuID: menu, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: [.init(workDayOffset: -1, session: "Day before", task: "Soak beans")]),
+      ], planAtStage: current.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil) })
+      #expect(try ChatPrepPlanImport.plan(envelope, in: db).planChangedSinceStage == false)
+      try PrepPlanStepRecord.find(current[0].id).update { $0.task = #bind("Changed") }.execute(db)
+      #expect(try ChatPrepPlanImport.plan(envelope, in: db).planChangedSinceStage == true)
+      var withoutBaseline = envelope; withoutBaseline.planAtStage = nil
+      #expect(try ChatPrepPlanImport.plan(withoutBaseline, in: db).planChangedSinceStage == nil)
+      let plan = try ChatPrepPlanImport.plan(envelope, in: db)
+      let beforeFailedApply = try PrepPlanStepRepository.steps(for: menu, in: db)
+      try MenuItem.find(dishID).delete().execute(db)
+      #expect(throws: ChatPrepPlanImport.Error.dishUnavailable("Beans")) { try ChatPrepPlanImport.plan(envelope, in: db) }
+      #expect(throws: ChatPrepPlanImport.Error.dishUnavailable("Beans")) { try ChatPrepPlanImport.apply(plan, keeping: [], in: db, now: now, uuid: { UUID() }) }
+      #expect(try PrepPlanStepRepository.steps(for: menu, in: db) == beforeFailedApply)
+
+      let secondMenu = try MenuRepository.addMenu(title: "Other", notes: nil, dayCount: 1, in: db, now: now, uuid: { UUID() })
+      _ = try MenuRepository.addRecipeItem(menuID: secondMenu, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let missingMenuEnvelope = ChatAccessStagedPrepPlan(menuID: secondMenu, menuTitle: "Other", dishes: [
+        .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: []),
+      ], planAtStage: [])
+      let missingMenuPlan = try ChatPrepPlanImport.plan(missingMenuEnvelope, in: db)
+      try Menu.find(secondMenu).delete().execute(db)
+      #expect(throws: ChatPrepPlanImport.Error.menuUnavailable) { try ChatPrepPlanImport.plan(missingMenuEnvelope, in: db) }
+      #expect(throws: ChatPrepPlanImport.Error.menuUnavailable) { try ChatPrepPlanImport.apply(missingMenuPlan, keeping: [], in: db, now: now, uuid: { UUID() }) }
+    }
+  }
+
   @Test func recipeReturnCreatesReviewAndRollsBackOnEmptyBody() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 840_100_000)

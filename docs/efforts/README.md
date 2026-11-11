@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [`stage_prep_plan`: a chat replaces the prep plan for the dishes it names](stage-prep-plan.md) — **Ready.** Chat sends every step for each dish it names; the app reviews per dish and Apply replaces only those dishes' steps, linked. `get_menu` shows the plan. No schema; optional export field.

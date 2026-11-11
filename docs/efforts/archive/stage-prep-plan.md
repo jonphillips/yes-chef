@@ -7,12 +7,12 @@ Origin: the S6 device pass (2026-11-10). The chat that planned Thanksgiving Week
 plan and, with no tool for it, offered to put the schedule in the dish notes. One dispatch, one PR. **No schema
 change.**
 
-Decisions: [ADR-0060 Amendment 5](../decisions/ADR-0060-chat-access-over-mcp.md#amendment-5--a-chat-can-replace-the-prep-plan-for-the-dishes-it-names-2026-11-10)
+Decisions: [ADR-0060 Amendment 5](../../decisions/ADR-0060-chat-access-over-mcp.md#amendment-5--a-chat-can-replace-the-prep-plan-for-the-dishes-it-names-2026-11-10)
 (D1–D6; read it first). Builds on Amd 3 (the closest precedent: a staged replacement, matched rows keep their ids,
-a drift banner) and Amd 2-D1 (refs resolved at staging). Related: [archived `stage-menu-day`](archive/stage-menu-day.md)
-(copy its shape) · [ADR-0034](../decisions/ADR-0034-prep-plan-work-session-timeline.md) and
-[ADR-0063](../decisions/ADR-0063-menus-absorb-calendar-days.md) (the plan's sessions and work days) ·
-[`from-chat-destination`](archive/from-chat-destination.md) (moves the From Chat list; if it merges first, this row and
+a drift banner) and Amd 2-D1 (refs resolved at staging). Related: [archived `stage-menu-day`](stage-menu-day.md)
+(copy its shape) · [ADR-0034](../../decisions/ADR-0034-prep-plan-work-session-timeline.md) and
+[ADR-0063](../../decisions/ADR-0063-menus-absorb-calendar-days.md) (the plan's sessions and work days) ·
+[`from-chat-destination`](from-chat-destination.md) (moves the From Chat list; if it merges first, this row and
 sheet live there, unchanged).
 
 ## Where things are (architect, 2026-11-10, `origin/main` 5153ee0)
@@ -178,7 +178,7 @@ This touches `YesChefApp/` model code, so the target runs (guardrail #9).
 - The review shows New, Kept and Removed per dish, with the drift banner.
 - Apply replaces only the named dishes' steps, in one transaction, and the new steps are linked.
 - No ids in tool output. The opening is per Amd 5-D6.
-- Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above. Verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
 - The PR body gives Jon the install order: the app on both devices first (it writes the new export field), then the
   helper.

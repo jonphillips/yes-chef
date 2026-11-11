@@ -474,6 +474,40 @@ struct ChatAccessInboxModelTests {
     }
   }
 
+  @Test func prepPlanReviewAppliesAndClaimsTheStagedFile() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let now = Date(timeIntervalSince1970: 1_800_000_000), recipeID = UUID(), menuID = UUID()
+    let envelope = ChatAccessStagedPrepPlan(menuID: menuID, menuTitle: "Week", dishes: [
+      .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: [.init(workDayOffset: -1, session: "Day before", task: "Toast spices")]),
+    ], planAtStage: [])
+    let text = String(decoding: try JSONEncoder().encode(envelope), as: UTF8.self)
+    let url = folder.inboxURL.appending(path: "20261110T120000Z-week.ycprepplan"), recorder = InboxClaims()
+    try await withDependencies {
+      try $0.bootstrapDatabase(); $0.date.now = now; $0.uuid = .incrementing
+      $0.chatAccessInboxFileClient = .init(read: { _ in text }, openAndClaim: { _, _ in "" }, claim: { _, url in await recorder.add(url) }, maintain: { _, _, _ in })
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let dishID = try await database.write { db -> UUID in
+        try Recipe.insert { Recipe(id: recipeID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+        _ = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+        return try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      }
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      let row = try #require(ChatAccessInbox.prepPlanRows(from: [.init(url: url, name: url.lastPathComponent, isCurrent: true, menuTitle: "Week", prepPlanMenuID: menuID)], resolve: { _ in true }).first)
+      await model.open(row)
+      let review = try #require(model.prepPlanReview)
+      model.onMenuSelected = { _ in }
+      await model.applyPrepPlan(from: review)
+      #expect(model.prepPlanReview == nil)
+      #expect(await recorder.urls == [url])
+      let steps = try await database.read { db in try PrepPlanStepRepository.steps(for: menuID, in: db) }
+      #expect(steps.count == 1)
+      #expect(steps.first?.sourceDish == dishID)
+      #expect(steps.first?.task == "Toast spices")
+    }
+  }
+
   @Test func archivedRecipeReturnStaysUnclaimedUntilDiscarded() async throws {
     let (folder, defaults, suiteName, temporary) = try fixture()
     defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }

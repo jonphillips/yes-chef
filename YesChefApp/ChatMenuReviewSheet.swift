@@ -4,6 +4,86 @@ import YesChefCore
 
 @Observable
 @MainActor
+final class ChatPrepPlanReviewModel: Identifiable {
+  nonisolated let id = UUID()
+  let row: ChatAccessInbox.PrepPlanRow
+  let plan: ChatPrepPlanImport.Plan
+  var keptIndices: Set<Int>
+  var errorMessage: String?
+  init(row: ChatAccessInbox.PrepPlanRow, plan: ChatPrepPlanImport.Plan) {
+    self.row = row; self.plan = plan
+    keptIndices = Set(plan.dishes.flatMap(\.1).enumerated().compactMap { index, entry in if case .new = entry { index } else { nil } })
+  }
+  func setKept(_ kept: Bool, at index: Int) { if kept { keptIndices.insert(index) } else { keptIndices.remove(index) } }
+}
+
+@MainActor
+struct ChatPrepPlanReviewSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  @Bindable var model: ChatPrepPlanReviewModel
+  let isApplying: Bool
+  let apply: @MainActor () async -> Void
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        if model.plan.planChangedSinceStage != false {
+          Section { Text(model.plan.planChangedSinceStage == true ? "This plan changed since Chat read it." : "Chat couldn't see the current plan.").font(.subheadline) }.attentionCard()
+        }
+        ForEach(Array(model.plan.dishes.enumerated()), id: \.element.0.id) { dishIndex, dish in
+          Section("\(dish.0.title) · Day \(dish.0.dayOffset + 1)") {
+            let baseIndex = model.plan.dishes.prefix(dishIndex).reduce(0) { $0 + $1.1.count }
+            let new = dish.1.enumerated().compactMap { offset, entry -> (Int, ChatPrepPlanImport.Entry)? in
+              guard case .new = entry else { return nil }
+              return (baseIndex + offset, entry)
+            }
+            if !new.isEmpty {
+              Text("New").font(.caption).foregroundStyle(.secondary)
+              ForEach(new, id: \.0) { index, entry in
+                if case let .new(_, step) = entry {
+                  Toggle(isOn: Binding(get: { model.keptIndices.contains(index) }, set: { model.setKept($0, at: index) })) {
+                    stepRow(workDay: step.workDayOffset, session: step.session, task: step.task)
+                  }
+                }
+              }
+            }
+            let kept = dish.1.compactMap { if case let .kept(_, step, _) = $0 { step } else { nil } }
+            if !kept.isEmpty { Text("Kept").font(.caption).foregroundStyle(.secondary) }
+            ForEach(kept) { step in stepRow(workDay: step.workDayOffset, session: step.session, task: step.task) }
+            let removed = dish.1.compactMap { if case let .removed(_, step, byName) = $0 { (step, byName) } else { nil } }
+            if !removed.isEmpty { Text("Removed").font(.caption).foregroundStyle(.secondary) }
+            ForEach(Array(removed.enumerated()), id: \.offset) { _, item in
+              let (step, byName) = item
+              VStack(alignment: .leading) { stepRow(workDay: step.workDayOffset, session: step.session, task: step.task); if byName { Text("Matched by name").font(.caption).foregroundStyle(.secondary) } }
+            }
+          }
+        }
+        if let error = model.errorMessage { Section { Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange) } }
+      }
+      .navigationTitle(model.plan.menuTitle)
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+        ToolbarItem(placement: .confirmationAction) { Button("Apply") { Task { await apply() } }.disabled(isApplying) }
+      }
+    }
+    .presentationDetents([.medium, .large])
+  }
+
+  private func stepRow(workDay: Int?, session: String, task: String) -> some View {
+    VStack(alignment: .leading, spacing: 3) {
+      let day = workDay.map { offset in
+        model.plan.startDate.flatMap { Calendar.current.date(byAdding: .day, value: offset, to: $0) }
+          .map { $0.formatted(date: .abbreviated, time: .omitted) } ?? "Day \(offset + 1)"
+      }
+      Text(day.map { "\($0) · \(session)" } ?? session).font(.subheadline)
+      Text(task).foregroundStyle(.secondary)
+    }
+  }
+}
+
+@Observable
+@MainActor
 final class ChatMenuReviewModel: Identifiable {
   nonisolated let id = UUID()
   let row: ChatAccessInbox.MenuRow

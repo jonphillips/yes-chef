@@ -27,6 +27,7 @@ Dev, on CloudKit Development.
 - **menu-row-note-on-recipe (one PR):** On Thanksgiving Week, open the souvlaki from the menu (card shows), the calendar (card shows), and the library (no card); change the note in Edit Dish, reopen the recipe from the menu, and confirm the new text. ([brief](efforts/archive/menu-row-note-on-recipe.md))
 - **stage-menu-day:** In ChatGPT, read Thanksgiving Week, then restage one day: keep the souvlaki with a new note, drop one dish and add one new dish. Confirm Changed, Removed and New in review; after Apply, check the kept grocery source and the updated calendar day. ([brief](efforts/archive/stage-menu-day.md))
 - **from-chat-destination:** On iPad, then iPhone, verify the From Chat badge and staged items, staged recipe routing to the Create Recipe draft, menu-day review and Apply routing to its menu, and the empty state with no inbox section in Create Recipe. ([brief](efforts/archive/from-chat-destination.md))
+- **stage-prep-plan:** In ChatGPT, read Thanksgiving Week and stage Day 3 dinner dishes. Confirm review grouping by dish, apply places each step on the correct work day with a dish link, then restage one dish with one changed step and confirm New/Removed/Kept while other dishes remain untouched. ([brief](efforts/archive/stage-prep-plan.md))
 
 ## Held
 

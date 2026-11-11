@@ -41,6 +41,13 @@ private struct StageMenuDayResult: Encodable, Sendable {
   var next: String
 }
 
+private struct StagePrepPlanResult: Encodable, Sendable {
+  var staged: String
+  var dishes: Int
+  var steps: Int
+  var next: String
+}
+
 private struct StageContext: Sendable {
   let home: URL
   let now: @Sendable () -> Date
@@ -109,6 +116,15 @@ private struct StageContext: Sendable {
     _ = try inbox.stage(String(decoding: data, as: UTF8.self), slug: "\(envelope.menuTitle)-day-\(envelope.dayOffset + 1)", now: now())
     return StageMenuDayResult(staged: "\(envelope.menuTitle), day \(envelope.dayOffset + 1)", dishes: envelope.items.count,
       next: "Jon reviews it in Yes Chef → From Chat.")
+  }
+
+  func stagePrepPlan(_ envelope: ChatAccessStagedPrepPlan) throws -> StagePrepPlanResult {
+    let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try encoder.encode(envelope)
+    let inbox = HandoffInbox(root: try stagingFolder().inboxURL, fileExtension: "ycprepplan")
+    _ = try inbox.stage(String(decoding: data, as: UTF8.self), slug: envelope.menuTitle, now: now())
+    return StagePrepPlanResult(staged: "\(envelope.menuTitle) prep plan", dishes: envelope.dishes.count,
+      steps: envelope.dishes.reduce(0) { $0 + $1.steps.count }, next: "Jon reviews it in Yes Chef → From Chat.")
   }
 
   private func stagingFolder() throws -> ChatAccessFolder {
@@ -252,7 +268,7 @@ public enum YesChefMCPServer {
       },
       MCPTool(
         name: "stage_menu_day",
-        description: "Replace one day of a menu found with `list_menus`. Read the menu with `get_menu` first and send every dish for that day, with each note and scale that should stay; anything not sent is removed, including a note or scale that is not carried over. A note is for this dish on this menu only. A change to the recipe itself goes through `stage_recipe_return`. The day must already exist.",
+        description: "Replace one day of a menu found with `list_menus`. Read the menu with `get_menu` first and send every dish for that day, with each note and scale that should stay; anything not sent is removed, including a note or scale that is not carried over. A note is for this dish on this menu only. A change to the recipe itself goes through `stage_recipe_return`. The day must already exist. To stage its prep plan, use `stage_prep_plan`.",
         inputSchema: .object(["type": .string("object"), "properties": .object([
           "menu": string, "day": integer,
           "items": .object(["type": .string("array"), "items": menuDayItemSchema]),
@@ -262,7 +278,75 @@ public enum YesChefMCPServer {
         do { return .json(try await Self.decodeAndStageMenuDay(input, context: context, exportStore: exportStore)) }
         catch { return .error(error.localizedDescription) }
       },
+      MCPTool(
+        name: "stage_prep_plan",
+        description: "Replace the whole prep plan for each named dish; anything not sent for a named dish is removed, while unnamed dishes stay untouched. Read the menu with `get_menu` first. Send every separable task for each dish, not cooking instructions woven across recipes. Don't put the schedule in dish notes. A step serving several dishes goes under the dish it mostly serves and its task can name the others. Nothing is saved until Jon reviews it.",
+        inputSchema: .object(["type": .string("object"), "properties": .object([
+          "menu": string,
+          "dishes": .object(["type": .string("array"), "minItems": .integer(1), "maxItems": .integer(20), "items": .object([
+            "type": .string("object"), "properties": .object([
+              "day": integer, "ref": string, "title": string,
+              "steps": .object(["type": .string("array"), "maxItems": .integer(40), "items": .object([
+                "type": .string("object"), "properties": .object(["workDay": integer, "session": string, "task": string]),
+                "required": .array([.string("session"), .string("task")]), "additionalProperties": .bool(false),
+              ])]),
+            ]), "required": .array([.string("day"), .string("steps")]), "additionalProperties": .bool(false),
+          ])]),
+        ]), "required": .array([.string("menu"), .string("dishes")]), "additionalProperties": .bool(false)]),
+        annotations: .init(readOnly: false, destructive: false, openWorld: false)
+      ) { input in
+        do { return .json(try await Self.decodeAndStagePrepPlan(input, context: context, exportStore: exportStore)) }
+        catch { return .error(error.localizedDescription) }
+      },
     ]
+  }
+
+  private static func decodeAndStagePrepPlan(_ input: MCPValue, context: StageContext, exportStore: ChatAccessExportStore) async throws -> StagePrepPlanResult {
+    guard let args = input.objectValue, let ref = args["menu"]?.stringValue, let raw = args["dishes"]?.arrayValue else {
+      throw StageInputError("Provide a menu ref and 1 to 20 dishes.")
+    }
+    guard (1...20).contains(raw.count) else { throw StageInputError("dishes must contain 1 to 20 entries.") }
+    let menu = try await exportStore.resolveMenu(ref)
+    var dishes: [ChatAccessStagedPrepPlan.Dish] = []; var problems: [String] = []; var totalSteps = 0; var selectedRows = Set<Int>()
+    for (i, value) in raw.enumerated() {
+      let row = value.objectValue ?? [:], label = "dish \(i + 1)"
+      guard let day = row["day"]?.integerValue else { problems.append("\(label): day must be a whole number"); continue }
+      if !(0..<menu.dayCount).contains(day) { problems.append("\(label): day must be from 0 to \(menu.dayCount - 1)") }
+      let ref = row["ref"]?.stringValue, title = row["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+      if (ref == nil) == (title == nil) { problems.append("\(label): provide exactly one of ref or title"); continue }
+      let matches: [(Int, ChatAccessExport.MenuItemRecord)]
+      if let ref {
+        do {
+          let recipe = try await exportStore.resolveRecipe(ref)
+          matches = menu.items.enumerated().filter { $0.element.dayOffset == day && $0.element.kind == .recipe && $0.element.recipeID == recipe.id }
+        } catch { problems.append("\(label): \(error.localizedDescription)"); continue }
+      } else {
+        matches = menu.items.enumerated().filter { $0.element.dayOffset == day && ($0.element.kind == .note || $0.element.kind == .reservation) && $0.element.title.trimmingCharacters(in: .whitespacesAndNewlines).localizedCaseInsensitiveCompare(title ?? "") == .orderedSame }
+      }
+      guard matches.count == 1 else { problems.append("\(label): dish must identify exactly one row on that day"); continue }
+      guard selectedRows.insert(matches[0].0).inserted else { problems.append("\(label): this dish is already named"); continue }
+      guard let steps = row["steps"]?.arrayValue, steps.count <= 40 else { problems.append("\(label): steps must contain at most 40 entries"); continue }
+      totalSteps += steps.count
+      var decoded: [ChatAccessStagedPrepPlan.Dish.Step] = []
+      for (j, rawStep) in steps.enumerated() {
+        let step = rawStep.objectValue ?? [:], session = step["session"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "", task = step["task"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var workDay: Int? = step["workDay"]?.integerValue
+        if step["workDay"] != nil && workDay == nil { problems.append("\(label), step \(j + 1): workDay must be a whole number") }
+        if menu.dayCount == 1 {
+          if let workDay, workDay != 0 { problems.append("\(label), step \(j + 1): workDay must be absent or 0 on a one-day menu") }
+          workDay = nil
+        } else if let workDay, !(-7...(menu.dayCount - 1)).contains(workDay) { problems.append("\(label), step \(j + 1): workDay must be from -7 to \(menu.dayCount - 1)") }
+        if session.isEmpty { problems.append("\(label), step \(j + 1): session must not be empty") }
+        if task.isEmpty || task.count > 500 { problems.append("\(label), step \(j + 1): task must contain 1 to 500 characters") }
+        decoded.append(.init(workDayOffset: workDay, session: session, task: task))
+      }
+      let item = matches[0].1
+      dishes.append(.init(dayOffset: day, recipeID: item.recipeID, title: item.title, steps: decoded))
+    }
+    if totalSteps > 80 { problems.append("There may be at most 80 steps across all dishes.") }
+    guard problems.isEmpty else { throw StageInputError("Fix these prep plan items and retry: \(problems.joined(separator: "; "))") }
+    let staged = ChatAccessStagedPrepPlan(menuID: menu.id, menuTitle: menu.title, dishes: dishes, planAtStage: menu.prepPlan)
+    return try context.stagePrepPlan(staged)
   }
 
   private static func decodeAndStageMenu(_ input: MCPValue, context: StageContext, exportStore: ChatAccessExportStore) async throws -> StageMenuResult {

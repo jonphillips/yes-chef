@@ -16,8 +16,9 @@ public enum ChatAccessInbox {
     public let menuTitle: String?
     public let menuDayMenuID: UUID?
     public let menuDayOffset: Int?
+    public let prepPlanMenuID: UUID?
 
-    public init(url: URL, name: String, isCurrent: Bool, recipeName: String? = nil, menuTitle: String? = nil, menuDayMenuID: UUID? = nil, menuDayOffset: Int? = nil) {
+    public init(url: URL, name: String, isCurrent: Bool, recipeName: String? = nil, menuTitle: String? = nil, menuDayMenuID: UUID? = nil, menuDayOffset: Int? = nil, prepPlanMenuID: UUID? = nil) {
       self.url = url
       self.name = name
       self.isCurrent = isCurrent
@@ -25,6 +26,7 @@ public enum ChatAccessInbox {
       self.menuTitle = menuTitle
       self.menuDayMenuID = menuDayMenuID
       self.menuDayOffset = menuDayOffset
+      self.prepPlanMenuID = prepPlanMenuID
     }
   }
 
@@ -99,6 +101,23 @@ public enum ChatAccessInbox {
     }
   }
 
+  public struct PrepPlanRow: Equatable, Identifiable, Sendable {
+    public let url: URL
+    public let menuID: UUID?
+    public let menuTitle: String
+    public let isMenuAvailable: Bool
+    public let hasMetadata: Bool
+    public let stagedAt: Date
+    public let downloadState: DownloadState
+    public var id: String { url.path }
+    public var canOpen: Bool { hasMetadata ? isMenuAvailable : true }
+    public var title: String { hasMetadata && !isMenuAvailable ? "Menu not found on this device" : "Prep plan · \(menuTitle)" }
+    public init(url: URL, menuID: UUID?, menuTitle: String, isMenuAvailable: Bool, hasMetadata: Bool = true, stagedAt: Date, downloadState: DownloadState) {
+      self.url = url; self.menuID = menuID; self.menuTitle = menuTitle; self.isMenuAvailable = isMenuAvailable
+      self.hasMetadata = hasMetadata; self.stagedAt = stagedAt; self.downloadState = downloadState
+    }
+  }
+
   public static func recipeReturnRows(from snapshots: [MetadataSnapshot], resolve: (UUID) -> Recipe?) -> [RecipeReturnRow] {
     snapshots.compactMap { snapshot in
       guard snapshot.url.pathExtension == "ycrecipereturn", let staged = StagedHandoff(url: snapshot.url),
@@ -143,6 +162,22 @@ public enum ChatAccessInbox {
     guard let data = text.data(using: .utf8),
       let envelope = try? JSONDecoder().decode(ChatAccessStagedMenuDay.self, from: data) else { return nil }
     return (envelope.menuID, envelope.menuTitle, envelope.dayOffset)
+  }
+
+  public static func prepPlanRows(from snapshots: [MetadataSnapshot], resolve: (UUID) -> Bool) -> [PrepPlanRow] {
+    snapshots.compactMap { snapshot in
+      guard snapshot.url.pathExtension == "ycprepplan", let staged = StagedHandoff(url: snapshot.url) else { return nil }
+      let title = snapshot.menuTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+      let menuTitle = title.flatMap { $0.isEmpty ? nil : $0 } ?? displayName(slug: staged.slug, recipeName: nil)
+      let id = snapshot.prepPlanMenuID
+      return PrepPlanRow(url: snapshot.url, menuID: id, menuTitle: menuTitle, isMenuAvailable: id.map(resolve) ?? false,
+        hasMetadata: id != nil, stagedAt: staged.stagedAt, downloadState: snapshot.isCurrent ? .current : .downloading)
+    }.sorted { $0.stagedAt > $1.stagedAt }
+  }
+
+  public static func prepPlanMetadata(from text: String) -> (menuID: UUID, menuTitle: String)? {
+    guard let data = text.data(using: .utf8), let envelope = try? JSONDecoder().decode(ChatAccessStagedPrepPlan.self, from: data) else { return nil }
+    return (envelope.menuID, envelope.menuTitle)
   }
 
   public static func menuTitle(from text: String) -> String? {

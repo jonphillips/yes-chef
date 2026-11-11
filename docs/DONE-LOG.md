@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-10 — Stage prep plans from chat (`effort/stage-prep-plan`)
+
+- **Result:** Added stage_prep_plan and exposed the menu prep plan through get_menu. From Chat reviews changes by dish and applies linked steps in one transaction.
+- **Verification:** scripts/check-drift.sh passed (802 Core tests, 20 MCP tests, app test target compiled); generic iOS build passed; YesChefTests passed (138 tests).
+- **Owed:** stage-prep-plan's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-10 — From Chat destination (`effort/from-chat-destination`)
 
 - **Result:** Moved the chat staging list and badge into a dedicated From Chat sidebar destination, added its empty state, and returned Create Recipe to compose and draft.
