@@ -24,6 +24,8 @@ and everything downstream move forward without waiting on it.
 - **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
   Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
 
+**Make-ahead dishes pull their groceries onto the Advance trip (ADR-0068, Later).** A dish whose prep starts before the Fresh trip needs its perishables bought on the Advance trip (pie, stock). The prep plan knows each dish's work days. It needs a Fresh-trip date: take it from the menu's calendar placement plus a "Fresh trip: N days before" setting on the split (ADR-0039 Amd 1, date over toggle), not calendar entries for trips. Pick up after Jon's Thanksgiving 2026 shop shows whether it's needed.
+
 **A staged menu opened on both devices at once can be created twice (found 2026-11-10, reviewing #473).**
 Create Menu writes the menu and then claims the `.ycmenu` file, as the brief specified. Claiming first would lose the
 staged menu if the write then failed. If the iPhone and iPad both open the review before either claims, both can

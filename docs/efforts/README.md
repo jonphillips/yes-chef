@@ -26,3 +26,4 @@ discoverable"):
 ## Live
 
 - [Prep steps sort by approximate time](prep-plan-time-order.md) — **Ready.** An optional approximate time keeps each work day in time order; matching ignores time and window, so a restage that adds times re-sorts instead of replacing. One nullable synced column.
+- [Groceries split into two trips](grocery-two-trips.md) — **Ready.** Add Ingredients can split into Advance and Fresh lists by a fixed rule; switches stick in a new synced table; the sheet skips only **Always have it** items; Groceries help page. Due before ~Nov 19.
