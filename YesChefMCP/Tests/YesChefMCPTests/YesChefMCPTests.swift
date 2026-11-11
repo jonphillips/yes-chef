@@ -419,6 +419,12 @@ struct YesChefMCPTests {
       #expect(responseJSON["result"]?.objectValue?["isError"] == .bool(true))
     }
     #expect(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").list().count == 1)
+
+    let nullWindow = try #require(await server.handle(line: genericToolCall("stage_prep_plan", args: [
+      "menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["session": .string("Later"), "task": .string("Salt"), "makeAheadWindow": .null])])])]),
+    ])))
+    #expect(try object(nullWindow)["result"]?.objectValue?["isError"] != .bool(true))
+    #expect(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").list().count == 2)
   }
 
   @Test func stageMenuDayRejectsEveryInvalidCallWithoutStaging() async throws {

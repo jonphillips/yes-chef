@@ -108,7 +108,7 @@ extension RecipeCoreTests {
       let serialized = context.serialized(for: .frontierPreferred)
       let prompt = context.prepPrompt()
       #expect(serialized.contains("Make-ahead window: Up to 3 days ahead"))
-      #expect(prompt.contains(MenuPrepPlanClient.makeAheadAndLeftoversGuidance))
+      #expect(prompt.components(separatedBy: MenuPrepPlanClient.makeAheadAndLeftoversGuidance).count == 2)
       #expect(prompt.contains("Keeps: <window>"))
     }
   }

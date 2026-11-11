@@ -241,8 +241,7 @@ public struct MenuChatContext: Equatable, Sendable {
     \(workDayInstruction) Example:
     \(formatExample)
 
-    Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix. If a recipe's Make-Ahead note or recipe text grounds a window, add an indented `  Keeps: <window>` line immediately below that task; omit it otherwise.
-    \(MenuPrepPlanClient.makeAheadAndLeftoversGuidance)\(transportInstruction)\(subjectContext)
+    Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix. If a recipe's Make-Ahead note or recipe text grounds a window, add an indented `  Keeps: <window>` line immediately below that task; omit it otherwise.\(transportInstruction)\(subjectContext)
     """
   }
 
