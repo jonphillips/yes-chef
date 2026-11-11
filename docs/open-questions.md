@@ -24,6 +24,12 @@ and everything downstream move forward without waiting on it.
 - **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
   Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
 
+**Add Menu and Bring In don't place copied steps by time (found 2026-11-11, reviewing #490).** `MenuBringIn` appends
+copied prep steps after the target's existing steps instead of placing them with `PrepPlanPlacement`. So when a target
+day already has timed steps, the copied ones read after them, out of time order, until the next weave re-sorts the
+plan. The #490 brief left this path out. Fix: place each copied step in turn, as `replace` does. It matters once a
+timed menu is added into another timed menu.
+
 **A staged menu opened on both devices at once can be created twice (found 2026-11-10, reviewing #473).**
 Create Menu writes the menu and then claims the `.ycmenu` file, as the brief specified. Claiming first would lose the
 staged menu if the write then failed. If the iPhone and iPad both open the review before either claims, both can
