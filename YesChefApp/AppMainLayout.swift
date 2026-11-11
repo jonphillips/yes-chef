@@ -33,6 +33,7 @@ struct AppMainLayout: View {
         groceriesTab
         mealCalendarTab
         menusTab
+        fromChatTab
         createRecipeTab
         powerBrowserTab
         browserTab
@@ -46,6 +47,7 @@ struct AppMainLayout: View {
         groceriesTab
         browserTab
         workbenchesTab
+        fromChatTab
         createRecipeTab
         settingsTab
       }
@@ -113,12 +115,22 @@ struct AppMainLayout: View {
       NavigationStack {
         CreateRecipeView(
           model: createRecipeModel,
-          chatAccessInboxModel: chatAccessInboxModel,
           onSaved: onRecipeCreated
         )
       }
     } label: {
       Label(AppSection.createRecipe.title, symbol: AppSection.createRecipe.symbol)
+    }
+    .defaultVisibility(.hidden, for: .tabBar)
+  }
+
+  private var fromChatTab: some TabContent<AppSection?> {
+    Tab(value: AppSection.fromChat) {
+      NavigationStack {
+        FromChatView(model: chatAccessInboxModel)
+      }
+    } label: {
+      Label(AppSection.fromChat.title, symbol: AppSection.fromChat.symbol)
     }
     .badge(chatAccessInboxModel.inboxCount)
     .defaultVisibility(.hidden, for: .tabBar)

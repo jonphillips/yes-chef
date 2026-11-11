@@ -77,6 +77,11 @@ final class ChatAccessInboxModel {
       + recipeReturnRows.filter { if case .openable = $0.destination { true } else { false } }.count
   }
 
+  var hasContent: Bool {
+    !rows.isEmpty || !returnRows.isEmpty || !recipeReturnRows.isEmpty || !menuRows.isEmpty
+      || !menuDayRows.isEmpty || message != nil
+  }
+
   init(folder: ChatAccessFolder? = nil, defaults: UserDefaults = .standard) {
     self.folder = folder
     self.defaults = defaults

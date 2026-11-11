@@ -12,7 +12,7 @@ Decisions: [ADR-0060 Amendment 5](../decisions/ADR-0060-chat-access-over-mcp.md#
 a drift banner) and Amd 2-D1 (refs resolved at staging). Related: [archived `stage-menu-day`](archive/stage-menu-day.md)
 (copy its shape) · [ADR-0034](../decisions/ADR-0034-prep-plan-work-session-timeline.md) and
 [ADR-0063](../decisions/ADR-0063-menus-absorb-calendar-days.md) (the plan's sessions and work days) ·
-[`from-chat-destination`](from-chat-destination.md) (moves the From Chat list; if it merges first, this row and
+[`from-chat-destination`](archive/from-chat-destination.md) (moves the From Chat list; if it merges first, this row and
 sheet live there, unchanged).
 
 ## Where things are (architect, 2026-11-10, `origin/main` 5153ee0)

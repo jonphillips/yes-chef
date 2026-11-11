@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-10 — From Chat destination (`effort/from-chat-destination`)
+
+- **Result:** Moved the chat staging list and badge into a dedicated From Chat sidebar destination, added its empty state, and returned Create Recipe to compose and draft.
+- **Verification:** scripts/check-drift.sh, the generic iOS app build, and the YesChefTests simulator target passed.
+- **Owed:** from-chat-destination's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-10 — S6 — stage_menu_day (`effort/stage-menu-day`)
 
 - **Result:** Added the stage_menu_day MCP handoff and a review that replaces one menu day while retaining matched dish rows and their linked data.
