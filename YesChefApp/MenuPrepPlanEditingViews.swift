@@ -84,6 +84,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
   var customSession: String
   var task: String
   var makeAheadWindow: String
+  var timeOfDay: Int?
   var serves: String
   var sourceDish: MenuItem.ID?
   var workDayOffset: Int?
@@ -95,6 +96,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
     customSession = ""
     task = ""
     makeAheadWindow = ""
+    timeOfDay = nil
     serves = ""
     sourceDish = nil
     workDayOffset = nil
@@ -106,6 +108,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
     customSession = step.session
     task = step.task
     makeAheadWindow = step.makeAheadWindow ?? ""
+    timeOfDay = step.timeOfDay
     serves = step.serves ?? ""
     sourceDish = step.sourceDish
     workDayOffset = step.workDayOffset
@@ -117,6 +120,7 @@ struct PrepPlanStepEditorDraft: Identifiable {
       task: task,
       serves: serves.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : serves,
       makeAheadWindow: makeAheadWindow.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : makeAheadWindow,
+      timeOfDay: workDayOffset == nil ? nil : timeOfDay,
       sourceDish: sourceDish,
       workDayOffset: workDayOffset
     )
@@ -170,11 +174,27 @@ struct PrepPlanStepEditorSheet: View {
                 Text(workDayTitle(offset)).tag(Optional(offset))
               }
             }.labelsHidden()
+              .onChange(of: draft.workDayOffset) { _, value in if value == nil { draft.timeOfDay = nil } }
           }
         }
         if draft.sessionBand == .other { VStack(alignment: .leading) { Text("Other session"); TextField("e.g. Wednesday evening", text: $draft.customSession) } }
         VStack(alignment: .leading) { Text("Task"); TextField("e.g. Salt the chicken", text: $draft.task, axis: .vertical).lineLimit(2...4) }
         VStack(alignment: .leading) { Text("Make-ahead window"); TextField("e.g. Up to 3 days ahead", text: $draft.makeAheadWindow) }
+        if dayCount > 1, draft.workDayOffset != nil {
+          Toggle("Time", isOn: Binding(
+            get: { draft.timeOfDay != nil },
+            set: { draft.timeOfDay = $0 ? (draft.timeOfDay ?? 9 * 60) : nil }
+          ))
+          if let timeOfDay = draft.timeOfDay {
+            DatePicker("Time", selection: Binding(
+              get: { Calendar.current.date(bySettingHour: timeOfDay / 60, minute: timeOfDay % 60, second: 0, of: Date()) ?? Date() },
+              set: { value in
+                let components = Calendar.current.dateComponents([.hour, .minute], from: value)
+                if let hour = components.hour, let minute = components.minute { draft.timeOfDay = hour * 60 + minute }
+              }
+            ), displayedComponents: .hourAndMinute)
+          }
+        }
         VStack(alignment: .leading) { Text("Serves"); TextField("Optional meal or day", text: $draft.serves) }
         VStack(alignment: .leading, spacing: 4) {
           Picker("Dish", selection: $draft.sourceDish) {

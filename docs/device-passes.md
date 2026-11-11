@@ -31,6 +31,7 @@ Dev, on CloudKit Development.
 - **dogfood-2026-11-10:** On iPad, with several items in From Chat, one tap on Open keeps a menu, menu-day or prep-plan review open. After reinstalling the MCP helper, restage one dish prep plan from ChatGPT and confirm its session labels are times only and bold.
 - **prep-step-make-ahead-window:** On Thanksgiving Week, rebuild with Yes Chef. Confirm steps show their make-ahead windows above the task, and a long-keeping sauce is scheduled with about 3 days of keeping left. Edit and save a window, then restage one dish from ChatGPT; confirm windows arrive and a changed window appears as Removed plus New. ([brief](efforts/archive/prep-step-make-ahead-window.md))
 - **menu-help-and-add-menu, the whole brief:** On iPad, read ⋯ › How Menus Work; add Thanksgiving at Day 2 to a scratch 3-day menu and confirm its dishes and prep steps land there while Thanksgiving remains unchanged; ask menu chat how to combine menus and check that it explains Add Menu… and Bring In. ([brief](efforts/archive/menu-help-and-add-menu.md))
+- **prep-plan-time-order:** In ChatGPT, restage Tuesday dinner steps with times and confirm they stay Kept and order by time after Apply; repeat Thursday. Change one step time in the editor and confirm it moves, then Move Earlier on another step and confirm its manual position holds. ([brief](efforts/archive/prep-plan-time-order.md))
 
 ## Held
 

@@ -64,7 +64,7 @@ struct ChatAccessExportTests {
         ]
       }.execute(db)
       try PrepPlanStepRecord.insert {
-        PrepPlanStepRecord(id: UUID(), menuID: menuID, sortOrder: 0, session: "Day before", task: "Soak beans", serves: "Beans", sourceDish: beansDishID, workDayOffset: 0)
+        PrepPlanStepRecord(id: UUID(), menuID: menuID, sortOrder: 0, session: "Day before", task: "Soak beans", serves: "Beans", timeOfDay: 15 * 60 + 15, sourceDish: beansDishID, workDayOffset: 0)
       }.execute(db)
       for (index, date) in [outside31, firstDay, lastDay, outside61].enumerated() {
         try MealPlanItem.insert {
@@ -82,6 +82,7 @@ struct ChatAccessExportTests {
     #expect(export.menus.first?.items.map(\.title) == ["Lunch note", "Dinner note", "Beans"])
     #expect(export.menus.first?.prepPlan?.first?.dishIndex == 2)
     #expect(export.menus.first?.prepPlan?.first?.task == "Soak beans")
+    #expect(export.menus.first?.prepPlan?.first?.time == "15:15")
     #expect(export.mealPlan.map(\.title) == ["Plan 1", "Plan 2"])
   }
 

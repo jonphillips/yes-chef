@@ -70,7 +70,7 @@ struct ChatAccessStagedItemsTests {
     }
   }
 
-  @Test func stagedPrepPlanTreatsAWindowChangeAsRemovedAndNew() throws {
+  @Test func stagedPrepPlanKeepsIdentityAndAppliesWindowChange() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 840_100_150), recipeID = UUID()
     try database.write { db in
@@ -88,8 +88,10 @@ struct ChatAccessStagedItemsTests {
       ], planAtStage: nil)
       let plan = try ChatPrepPlanImport.plan(envelope, in: db)
       let entries = try #require(plan.dishes.first?.1)
-      #expect(entries.contains { if case .new = $0 { true } else { false } })
-      #expect(entries.contains { if case .removed = $0 { true } else { false } })
+      #expect(entries.count == 1)
+      guard case let .kept(_, original, staged, _) = try #require(entries.first) else { Issue.record("Expected the changed step to remain Kept"); return }
+      #expect(original.makeAheadWindow == "No more than 24 hours")
+      #expect(staged.makeAheadWindow == "Up to 3 days ahead")
       try ChatPrepPlanImport.apply(plan, keeping: [0], in: db, now: now.addingTimeInterval(1), uuid: { UUID() })
       #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).first?.makeAheadWindow == "Up to 3 days ahead")
     }
@@ -113,7 +115,7 @@ struct ChatAccessStagedItemsTests {
       let plan = try ChatPrepPlanImport.plan(.init(menuID: menu, menuTitle: "Week", dishes: [
         .init(dayOffset: 0, recipeID: beansID, title: "Beans", steps: [.init(workDayOffset: -1, session: "Day before", task: "Soak beans")]),
       ], planAtStage: nil), in: db)
-      guard case .kept(_, let matched, let matchedByName) = try #require(plan.dishes.first?.1.first) else { Issue.record("Expected the name-matched step to be Kept"); return }
+      guard case .kept(_, let matched, _, let matchedByName) = try #require(plan.dishes.first?.1.first) else { Issue.record("Expected the name-matched step to be Kept"); return }
       #expect(matched.id == before[0].id)
       #expect(matchedByName)
       #expect(matched.sourceDish == nil)
@@ -125,6 +127,35 @@ struct ChatAccessStagedItemsTests {
       #expect(after[0].sourceDish == beansDish)
       #expect(after[1].sourceDish == pieDish)
       #expect(after[2].sourceDish == nil)
+    }
+  }
+
+  @Test func prepPlanApplyMatchesUntimedStepsAndReordersTheirExistingIDsByTime() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_250), recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Dinner", dateCreated: now, dateModified: now) }.execute(db)
+      let menu = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 3, in: db, now: now, uuid: { UUID() })
+      let dish = try MenuRepository.addRecipeItem(menuID: menu, recipeID: recipeID, dayOffset: 1, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let tasks = ["Souvlaki", "Köfte", "Chicken", "Tzatziki"]
+      for task in tasks {
+        try PrepPlanStepRepository.create(.init(session: "Dinner", task: task, sourceDish: dish, workDayOffset: 1), for: menu, in: db, now: now, uuid: { UUID() })
+      }
+      let old = try PrepPlanStepRepository.steps(for: menu, in: db)
+      let staged: [(String, Int)] = [("Souvlaki", 18 * 60 + 47), ("Chicken", 18 * 60 + 57), ("Köfte", 18 * 60 + 43), ("Tzatziki", 10 * 60)]
+      let envelope = ChatAccessStagedPrepPlan(menuID: menu, menuTitle: "Week", dishes: [
+        .init(dayOffset: 1, recipeID: recipeID, title: "Dinner", steps: staged.map { task, time in
+          .init(workDayOffset: 1, session: "Dinner", task: task, timeOfDay: time)
+        }),
+      ], planAtStage: nil)
+      let plan = try ChatPrepPlanImport.plan(envelope, in: db)
+      #expect(plan.newCount == 0)
+      #expect(plan.dishes.flatMap(\.1).allSatisfy { if case .kept = $0 { true } else { false } })
+      try ChatPrepPlanImport.apply(plan, keeping: [], in: db, now: now.addingTimeInterval(1), uuid: { Issue.record("Matching timed updates must keep their IDs"); return UUID() })
+      let updated = try PrepPlanStepRepository.steps(for: menu, in: db)
+      #expect(updated.map(\.task) == ["Tzatziki", "Köfte", "Souvlaki", "Chicken"])
+      #expect(Set(updated.map(\.id)) == Set(old.map(\.id)))
+      #expect(updated.map(\.timeOfDay) == [600, 18 * 60 + 43, 18 * 60 + 47, 18 * 60 + 57])
     }
   }
 
@@ -189,6 +220,8 @@ struct ChatAccessStagedItemsTests {
         .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: [.init(workDayOffset: -1, session: "Day before", task: "Soak beans")]),
       ], planAtStage: current.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil) })
       #expect(try ChatPrepPlanImport.plan(envelope, in: db).planChangedSinceStage == false)
+      try PrepPlanStepRecord.find(current[0].id).update { $0.timeOfDay = #bind(15 * 60 + 15) }.execute(db)
+      #expect(try ChatPrepPlanImport.plan(envelope, in: db).planChangedSinceStage == true)
       try PrepPlanStepRecord.find(current[0].id).update { $0.task = #bind("Changed") }.execute(db)
       #expect(try ChatPrepPlanImport.plan(envelope, in: db).planChangedSinceStage == true)
       var withoutBaseline = envelope; withoutBaseline.planAtStage = nil

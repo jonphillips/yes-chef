@@ -15,6 +15,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
   public var task: String
   public var serves: String?
   public var makeAheadWindow: String?
+  public var timeOfDay: Int?
   public var sourceDish: MenuItem.ID?
   public var workDayOffset: Int?
 
@@ -26,6 +27,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     task: String,
     serves: String? = nil,
     makeAheadWindow: String? = nil,
+    timeOfDay: Int? = nil,
     sourceDish: MenuItem.ID? = nil,
     workDayOffset: Int? = nil
   ) {
@@ -36,10 +38,25 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     self.task = task
     self.serves = serves
     self.makeAheadWindow = makeAheadWindow?.cleanedPrepPlanText
+    self.timeOfDay = timeOfDay
     self.sourceDish = sourceDish
     self.workDayOffset = workDayOffset
   }
 
+}
+
+public enum PrepPlanTime {
+  public static func minutes(from value: String) -> Int? {
+    guard let match = value.range(of: #"^(\d{1,2}):(\d{2})$"#, options: .regularExpression) else { return nil }
+    let pieces = value[match].split(separator: ":")
+    guard pieces.count == 2, let hour = Int(pieces[0]), let minute = Int(pieces[1]), hour < 24, minute < 60 else { return nil }
+    return hour * 60 + minute
+  }
+
+  public static func string(from minutes: Int) -> String? {
+    guard (0..<1440).contains(minutes) else { return nil }
+    return String(format: "%02d:%02d", minutes / 60, minutes % 60)
+  }
 }
 
 /// The picker vocabulary for new human-authored prep-plan rows. Existing and
@@ -87,6 +104,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
   public var task: String
   public var serves: String?
   public var makeAheadWindow: String?
+  public var timeOfDay: Int?
   public var sourceDish: MenuItem.ID?
   public var workDayOffset: Int?
 
@@ -95,6 +113,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     task: String,
     serves: String? = nil,
     makeAheadWindow: String? = nil,
+    timeOfDay: Int? = nil,
     sourceDish: MenuItem.ID? = nil,
     workDayOffset: Int? = nil
   ) {
@@ -102,6 +121,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     self.task = task
     self.serves = serves
     self.makeAheadWindow = makeAheadWindow?.cleanedPrepPlanText
+    self.timeOfDay = timeOfDay
     self.sourceDish = sourceDish
     self.workDayOffset = workDayOffset
   }
@@ -112,6 +132,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
       task: record.task,
       serves: record.serves,
       makeAheadWindow: record.makeAheadWindow,
+      timeOfDay: record.timeOfDay,
       sourceDish: record.sourceDish,
       workDayOffset: record.workDayOffset
     )
@@ -123,6 +144,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     case task
     case serves
     case makeAheadWindow
+    case time
     case sourceDish
     case workDay
   }
@@ -134,6 +156,11 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     task = try container.decode(String.self, forKey: .task)
     serves = try container.decodeIfPresent(String.self, forKey: .serves)
     makeAheadWindow = try container.decodeIfPresent(String.self, forKey: .makeAheadWindow)?.cleanedPrepPlanText
+    if let rawTime = try? container.decode(String.self, forKey: .time) {
+      timeOfDay = PrepPlanTime.minutes(from: rawTime)
+    } else {
+      timeOfDay = nil
+    }
     sourceDish = try container.decodeIfPresent(MenuItem.ID.self, forKey: .sourceDish)
     workDayOffset = try container.decodeIfPresent(Int.self, forKey: .workDay).map { $0 - 1 }
   }
@@ -144,6 +171,7 @@ public struct PrepPlanStep: Codable, Equatable, Sendable {
     try container.encode(task, forKey: .task)
     try container.encodeIfPresent(serves, forKey: .serves)
     try container.encodeIfPresent(makeAheadWindow, forKey: .makeAheadWindow)
+    try container.encodeIfPresent(timeOfDay.flatMap(PrepPlanTime.string(from:)), forKey: .time)
     try container.encodeIfPresent(sourceDish, forKey: .sourceDish)
     try container.encodeIfPresent(workDayOffset.map { $0 + 1 }, forKey: .workDay)
   }
@@ -189,6 +217,9 @@ public struct MenuPrepPlan: Equatable, Sendable {
       if let makeAheadWindow = step.makeAheadWindow {
         lines.append("  Keeps: \(makeAheadWindow)")
       }
+      if let timeOfDay = step.timeOfDay, let time = PrepPlanTime.string(from: timeOfDay) {
+        lines.append("  Time: \(time)")
+      }
     }
     return lines.joined(separator: "\n")
   }
@@ -203,12 +234,12 @@ public struct MenuPrepPlan: Equatable, Sendable {
     var revisedSteps: [PrepPlanStep] = []
     var unparsedLines: [String] = []
     var outOfRangeDayCount = 0
-    var previousLineWasBullet = false
+    var previousLineWasStep = false
 
     for rawLine in text.components(separatedBy: .newlines) {
       let line = rawLine.cleanedEditablePrepPlanLine
       guard !line.isEmpty else {
-        previousLineWasBullet = false
+        previousLineWasStep = false
         continue
       }
 
@@ -218,31 +249,39 @@ public struct MenuPrepPlan: Equatable, Sendable {
         if dayCount > 1, workDayOffset == nil, line.hasOutOfRangeWorkDayHeader(dayCount: dayCount) {
           outOfRangeDayCount += 1
         }
-        previousLineWasBullet = false
+        previousLineWasStep = false
         continue
       }
 
       guard let session else {
         unparsedLines.append(rawLine)
-        previousLineWasBullet = false
+        previousLineWasStep = false
         continue
       }
       guard rawLine.isEditablePrepPlanBullet else {
-        if previousLineWasBullet,
+        if previousLineWasStep,
           line.hasPrefix("Keeps:"),
           let window = String(line.dropFirst("Keeps:".count)).cleanedPrepPlanText,
           !revisedSteps.isEmpty {
           revisedSteps[revisedSteps.count - 1].makeAheadWindow = window
-          previousLineWasBullet = false
+          previousLineWasStep = true
           continue
         }
+        if previousLineWasStep, line.hasPrefix("Time:"), !revisedSteps.isEmpty {
+          let rawTime = String(line.dropFirst("Time:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+          if let time = PrepPlanTime.minutes(from: rawTime) {
+            revisedSteps[revisedSteps.count - 1].timeOfDay = time
+            previousLineWasStep = true
+            continue
+          }
+        }
         unparsedLines.append(rawLine)
-        previousLineWasBullet = false
+        previousLineWasStep = false
         continue
       }
       guard let parsedLine = PrepPlanStep.editableReviewLine(line) else {
         unparsedLines.append(rawLine)
-        previousLineWasBullet = false
+        previousLineWasStep = false
         continue
       }
       revisedSteps.append(
@@ -251,10 +290,11 @@ public struct MenuPrepPlan: Equatable, Sendable {
           task: parsedLine.task,
           serves: parsedLine.serves,
           makeAheadWindow: nil,
+          timeOfDay: nil,
           workDayOffset: workDayOffset
         )
       )
-      previousLineWasBullet = true
+      previousLineWasStep = true
     }
 
     return EditableReviewParseResult(
@@ -324,6 +364,7 @@ public enum MenuPrepPlanCoding {
 
 public struct MenuPrepPlanClient: Sendable {
   public static let makeAheadAndLeftoversGuidance = "When a dish keeps for days, schedule it so about 3 days of keeping remain after the meal it feeds: a sauce that keeps a week is made no more than 4 days before. Follow windows in hours, or of a few days or less, as written. The make-ahead preferences can change the 3 days."
+  public static let timeOfDayGuidance = "Give every step on a work day an approximate start time, \"HH:mm\" in 24-hour time, for sorting the day; estimate from the meal's time when the menu doesn't state one. Keep the session as the label people read. Flexible steps get no time."
 
   public var extract: @Sendable (
     _ selection: String,
@@ -384,7 +425,7 @@ extension MenuPrepPlanClient: DependencyKey {
   static let instructions = """
     You weave a staged prep plan for one multi-day menu from the current menu context and conversation.
     Return ONLY strict JSON:
-    {"steps":[{"workDay":1,"session":"time within that day","task":"concrete kitchen task","makeAheadWindow":"the recipe's own limit in a few words, e.g. Up to 3 days ahead, or null","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
+    {"steps":[{"workDay":1,"time":"HH:mm or null","session":"time within that day","task":"concrete kitchen task","makeAheadWindow":"the recipe's own limit in a few words, e.g. Up to 3 days ahead, or null","serves":"human-readable meal or day this feeds, or null","sourceDish":"menu item UUID or null"}]}.
     Include workDay as a 1-based day number for scheduled work, or null for Flexible work. Day 0 and negative numbers mean
     days before Day 1; no more than 7 days before Day 1. Keep session as the time within that day. For one-day menus,
     omit workDay and keep using session bands.
@@ -399,6 +440,7 @@ extension MenuPrepPlanClient: DependencyKey {
     to the meal or day each step feeds when useful.
     For makeAheadWindow, use the dish's Make-Ahead note first, else the recipe; use null when neither grounds a window.
     \(makeAheadAndLeftoversGuidance)
+    \(timeOfDayGuidance)
     Use sourceDish only when the step clearly comes from one menu item ID in the context; use null when a step spans
     dishes or the source is unclear. Return {"steps":[]} only when there is genuinely no prep plan to save.
     """
@@ -446,11 +488,13 @@ extension MenuPrepPlanClient: DependencyKey {
         let workDay = element["workDay"] as? Int
         let isOutOfRange = dayCount > 1 && workDay.map { $0 < -6 || $0 > dayCount } == true
         if isOutOfRange { outOfRangeDayCount += 1 }
+        let timeOfDay = (element["time"] as? String).flatMap(PrepPlanTime.minutes(from:))
         return PrepPlanStep(
           session: session,
           task: task,
           serves: (element["serves"] as? String)?.cleanedPrepPlanText,
           makeAheadWindow: (element["makeAheadWindow"] as? String)?.cleanedPrepPlanText,
+          timeOfDay: dayCount > 1 && !isOutOfRange && workDay != nil ? timeOfDay : nil,
           sourceDish: (element["sourceDish"] as? String)
             .flatMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespacesAndNewlines)) },
           workDayOffset: dayCount > 1 && !isOutOfRange ? workDay.map { $0 - 1 } : nil
@@ -510,21 +554,20 @@ public enum PrepPlanStepRepository {
     now: Date,
     uuid: () -> UUID
   ) throws {
-    let sortOrder = try nextSortOrder(for: menuID, in: db)
-    try PrepPlanStepRecord.insert {
-      PrepPlanStepRecord(
-        id: uuid(),
-        menuID: menuID,
-        sortOrder: sortOrder,
-        session: draft.session,
-        task: draft.task,
-        serves: draft.serves,
-        makeAheadWindow: draft.makeAheadWindow,
-        sourceDish: draft.sourceDish,
-        workDayOffset: draft.workDayOffset
-      )
-    }
-    .execute(db)
+    let existingSteps = try steps(for: menuID, in: db)
+    let menuDayCount = try Menu.find(menuID).fetchOne(db)?.dayCount ?? 1
+    let newStep = PrepPlanStepRecord(
+      id: uuid(), menuID: menuID, sortOrder: existingSteps.count, session: draft.session, task: draft.task,
+      serves: draft.serves, makeAheadWindow: draft.makeAheadWindow, timeOfDay: draft.timeOfDay,
+      sourceDish: draft.sourceDish, workDayOffset: draft.workDayOffset
+    )
+    var reordered = existingSteps
+    let insertionIndex = PrepPlanPlacement.insertionIndex(of: newStep, into: reordered, dayCount: menuDayCount, fallbackIndex: reordered.count)
+    reordered.insert(newStep, at: insertionIndex)
+    try writeSortOrder(reordered, in: db)
+    var inserted = newStep
+    inserted.sortOrder = insertionIndex
+    try PrepPlanStepRecord.insert { inserted }.execute(db)
     try Menu.find(menuID).update { $0.dateModified = #bind(now) }.execute(db)
   }
 
@@ -534,21 +577,40 @@ public enum PrepPlanStepRepository {
     task: String,
     serves: String?,
     makeAheadWindow: String? = nil,
+    timeOfDay: Int? = nil,
     sourceDish: MenuItem.ID?,
     workDayOffset: Int?,
     in db: Database,
     now: Date
   ) throws {
     guard let existing = try PrepPlanStepRecord.find(id).fetchOne(db) else { return }
+    var updated = existing
+    updated.session = session
+    updated.task = task
+    updated.serves = serves?.cleanedPrepPlanText
+    updated.makeAheadWindow = makeAheadWindow?.cleanedPrepPlanText
+    updated.timeOfDay = timeOfDay
+    updated.sourceDish = sourceDish
+    updated.workDayOffset = workDayOffset
+    let shouldReposition = existing.timeOfDay != timeOfDay || existing.workDayOffset != workDayOffset
     try PrepPlanStepRecord.find(id).update {
       $0.session = #bind(session)
       $0.task = #bind(task)
       $0.serves = #bind(serves?.cleanedPrepPlanText)
       $0.makeAheadWindow = #bind(makeAheadWindow?.cleanedPrepPlanText)
+      $0.timeOfDay = #bind(timeOfDay)
       $0.sourceDish = #bind(sourceDish)
       $0.workDayOffset = #bind(workDayOffset)
     }
     .execute(db)
+    if shouldReposition, let menu = try Menu.find(existing.menuID).fetchOne(db) {
+      let allSteps = try steps(for: existing.menuID, in: db)
+      let oldIndex = allSteps.firstIndex(where: { $0.id == id }) ?? allSteps.count
+      var remaining = allSteps.filter { $0.id != id }
+      let index = PrepPlanPlacement.insertionIndex(of: updated, into: remaining, dayCount: menu.dayCount, fallbackIndex: oldIndex)
+      remaining.insert(updated, at: index)
+      try writeSortOrder(remaining, in: db)
+    }
     try Menu.find(existing.menuID).update { $0.dateModified = #bind(now) }.execute(db)
   }
 
@@ -600,7 +662,7 @@ public enum PrepPlanStepRepository {
       Contents(step)
     }
     var survivors: [PrepPlanStepRecord] = []
-    for (sortOrder, draft) in drafts.enumerated() {
+    for draft in drafts {
       let contents = Contents(draft)
       var candidates = existingByContents[contents] ?? []
       let existing = candidates.isEmpty ? nil : candidates.removeFirst()
@@ -609,18 +671,28 @@ public enum PrepPlanStepRepository {
         PrepPlanStepRecord(
           id: existing?.id ?? uuid(),
           menuID: menuID,
-          sortOrder: sortOrder,
+          sortOrder: survivors.count,
           session: draft.session,
           task: draft.task,
           serves: draft.serves,
           makeAheadWindow: draft.makeAheadWindow,
+          timeOfDay: draft.timeOfDay,
           sourceDish: draft.sourceDish,
           workDayOffset: draft.workDayOffset
         )
       )
     }
+    var placed: [PrepPlanStepRecord] = []
+    let dayCount = try Menu.find(menuID).fetchOne(db)?.dayCount ?? 1
     for step in survivors {
-      try PrepPlanStepRecord.upsert { step }.execute(db)
+      let fallbackIndex = min(placed.count, survivors.firstIndex(where: { $0.id == step.id }) ?? placed.count)
+      let index = PrepPlanPlacement.insertionIndex(of: step, into: placed, dayCount: dayCount, fallbackIndex: fallbackIndex)
+      placed.insert(step, at: index)
+    }
+    for (sortOrder, step) in placed.enumerated() {
+      var ordered = step
+      ordered.sortOrder = sortOrder
+      try PrepPlanStepRecord.upsert { ordered }.execute(db)
     }
     let survivorIDs = Set(survivors.map(\.id))
     for remaining in existingByContents.values.flatMap({ $0 }) where !survivorIDs.contains(remaining.id) {
@@ -639,10 +711,6 @@ public enum PrepPlanStepRepository {
     }
   }
 
-  private static func nextSortOrder(for menuID: Menu.ID, in db: Database) throws -> Int {
-    (try steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
-  }
-
   private static func normalizeSortOrder(for menuID: Menu.ID, in db: Database) throws {
     try writeSortOrder(steps(for: menuID, in: db), in: db)
   }
@@ -657,7 +725,6 @@ public enum PrepPlanStepRepository {
     let session: String
     let task: String
     let serves: String?
-    let makeAheadWindow: String?
     let sourceDish: MenuItem.ID?
     let workDayOffset: Int?
 
@@ -666,7 +733,6 @@ public enum PrepPlanStepRepository {
         session: step.session,
         task: step.task,
         serves: step.serves,
-        makeAheadWindow: step.makeAheadWindow,
         sourceDish: step.sourceDish,
         workDayOffset: step.workDayOffset
       )
@@ -677,20 +743,38 @@ public enum PrepPlanStepRepository {
         session: step.session,
         task: step.task,
         serves: step.serves,
-        makeAheadWindow: step.makeAheadWindow,
         sourceDish: step.sourceDish,
         workDayOffset: step.workDayOffset
       )
     }
 
-    private init(session: String, task: String, serves: String?, makeAheadWindow: String?, sourceDish: MenuItem.ID?, workDayOffset: Int?) {
+    private init(session: String, task: String, serves: String?, sourceDish: MenuItem.ID?, workDayOffset: Int?) {
       self.session = session
       self.task = task
       self.serves = serves
-      self.makeAheadWindow = makeAheadWindow
       self.sourceDish = sourceDish
       self.workDayOffset = workDayOffset
     }
+  }
+}
+
+public enum PrepPlanPlacement {
+  public static func insertionIndex(
+    of step: PrepPlanStepRecord,
+    into steps: [PrepPlanStepRecord],
+    dayCount: Int,
+    fallbackIndex: Int
+  ) -> Int {
+    guard dayCount > 1, let day = step.workDayOffset, let time = step.timeOfDay else {
+      return min(max(fallbackIndex, 0), steps.count)
+    }
+    if let laterIndex = steps.firstIndex(where: { $0.workDayOffset == day && ($0.timeOfDay.map { $0 > time } ?? false) }) {
+      return laterIndex
+    }
+    if let lastDayIndex = steps.lastIndex(where: { $0.workDayOffset == day }) {
+      return lastDayIndex + 1
+    }
+    return min(max(fallbackIndex, 0), steps.count)
   }
 }
 

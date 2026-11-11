@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Prep steps sort by approximate time (`effort/prep-plan-time-order`)
+
+- **Result:** Prep steps store approximate times, sort by time through chat apply, weave, paste-back, and editor saves, and keep matched IDs when times or windows change.
+- **Verification:** scripts/check-drift.sh passed (823 Core tests, 20 helper tests, app test-target build); YesChefTests passed (140 tests); generic iOS build passed.
+- **Owed:** prep-plan-time-order's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Make-ahead window CloudKit fields deployed (`effort/prep-step-make-ahead-window`)
 
 - **Result:** The CloudKit gate for prep-step-make-ahead-window is done, and its line is gone from `device-passes.md`. `prepPlanSteps.makeAheadWindow` (Encrypted String) and `sqlitedata_icloud_userModificationTime_makeAheadWindow` (Encrypted Int64) are in Production. Following jon-platform `persistence-and-sync.md` § *Adding a synced table or column*, the architect added both fields to a fresh Development export, validated it, and imported it with `cktool` at Jon's request. Jon then deployed Development to Production in the Console.

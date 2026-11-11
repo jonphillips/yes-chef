@@ -42,19 +42,28 @@ struct ChatPrepPlanReviewSheet: View {
               ForEach(new, id: \.0) { index, entry in
                 if case let .new(_, step) = entry {
                   Toggle(isOn: Binding(get: { model.keptIndices.contains(index) }, set: { model.setKept($0, at: index) })) {
-                    stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow)
+                    stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow, timeOfDay: step.timeOfDay)
                   }
                 }
               }
             }
-            let kept = dish.1.compactMap { if case let .kept(_, step, _) = $0 { step } else { nil } }
+            let kept = dish.1.enumerated().compactMap { index, entry -> (Int, PrepPlanStepRecord, ChatAccessStagedPrepPlan.Dish.Step)? in
+              if case let .kept(_, step, staged, _) = entry { return (index, step, staged) }
+              return nil
+            }
             if !kept.isEmpty { Text("Kept").font(.caption).foregroundStyle(.secondary) }
-            ForEach(kept) { step in stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow) }
+            ForEach(kept, id: \.1.id) { _, step, staged in
+              VStack(alignment: .leading, spacing: 3) {
+                stepRow(workDay: staged.workDayOffset, session: staged.session, task: staged.task, makeAheadWindow: staged.makeAheadWindow, timeOfDay: staged.timeOfDay)
+                if step.timeOfDay != staged.timeOfDay { Text("time updated").font(.caption).foregroundStyle(.secondary) }
+                if step.makeAheadWindow != staged.makeAheadWindow { Text("window updated").font(.caption).foregroundStyle(.secondary) }
+              }
+            }
             let removed = dish.1.compactMap { if case let .removed(_, step, byName) = $0 { (step, byName) } else { nil } }
             if !removed.isEmpty { Text("Removed").font(.caption).foregroundStyle(.secondary) }
             ForEach(Array(removed.enumerated()), id: \.offset) { _, item in
               let (step, byName) = item
-              VStack(alignment: .leading) { stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow); if byName { Text("Matched by name").font(.caption).foregroundStyle(.secondary) } }
+              VStack(alignment: .leading) { stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow, timeOfDay: step.timeOfDay); if byName { Text("Matched by name").font(.caption).foregroundStyle(.secondary) } }
             }
           }
         }
@@ -70,13 +79,14 @@ struct ChatPrepPlanReviewSheet: View {
     .presentationDetents([.medium, .large])
   }
 
-  private func stepRow(workDay: Int?, session: String, task: String, makeAheadWindow: String?) -> some View {
+  private func stepRow(workDay: Int?, session: String, task: String, makeAheadWindow: String?, timeOfDay: Int? = nil) -> some View {
     VStack(alignment: .leading, spacing: 3) {
       let day = workDay.map { offset in
         model.plan.startDate.flatMap { Calendar.current.date(byAdding: .day, value: offset, to: $0) }
           .map { $0.formatted(date: .abbreviated, time: .omitted) } ?? "Day \(offset + 1)"
       }
-      Text(day.map { "\($0) · \(session)" } ?? session).font(.subheadline)
+      let time = timeOfDay.flatMap(PrepPlanTime.string(from:))
+      Text([day, session, time].compactMap { $0 }.joined(separator: " · ")).font(.subheadline)
       Text(task).foregroundStyle(.secondary)
       if let makeAheadWindow { Text(makeAheadWindow).font(.caption).foregroundStyle(.secondary) }
     }

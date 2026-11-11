@@ -64,7 +64,7 @@ extension MenuRepository {
       try PrepPlanStepRecord.insert {
         PrepPlanStepRecord(
           id: uuid(), menuID: targetMenuID, sortOrder: nextStepOrder + stepIndex, session: source.session,
-          task: source.task, serves: source.serves, makeAheadWindow: source.makeAheadWindow,
+          task: source.task, serves: source.serves, makeAheadWindow: source.makeAheadWindow, timeOfDay: source.timeOfDay,
           sourceDish: source.sourceDish.flatMap { copiedItemIDs[$0] }, workDayOffset: workDayOffset
         )
       }.execute(db)
