@@ -862,7 +862,7 @@ say), widen it to **Inbox** then.
 
 Status: **Accepted** on the merge of its plan PR. Adds one staging tool, one inbox kind and one review sheet, and
 adds the prep plan to the export's menus (additive, no export version bump). Schema-free. Built by effort
-[`stage-prep-plan`](../efforts/stage-prep-plan.md).
+[`stage-prep-plan`](../efforts/archive/stage-prep-plan.md).
 
 ### Context
 

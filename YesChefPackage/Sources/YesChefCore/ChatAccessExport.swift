@@ -40,14 +40,32 @@ public struct ChatAccessExport: Codable, Equatable, Sendable {
     public var dayCount: Int
     public var modified: Date
     public var items: [MenuItemRecord]
+    public var prepPlan: [PrepStepRecord]?
 
-    public init(id: UUID, title: String, notes: String?, dayCount: Int, modified: Date, items: [MenuItemRecord]) {
+    public init(id: UUID, title: String, notes: String?, dayCount: Int, modified: Date, items: [MenuItemRecord], prepPlan: [PrepStepRecord]? = nil) {
       self.id = id
       self.title = title
       self.notes = notes
       self.dayCount = dayCount
       self.modified = modified
       self.items = items
+      self.prepPlan = prepPlan
+    }
+  }
+
+  public struct PrepStepRecord: Codable, Equatable, Sendable {
+    public var workDayOffset: Int?
+    public var session: String
+    public var task: String
+    public var serves: String?
+    public var dishIndex: Int?
+
+    public init(workDayOffset: Int?, session: String, task: String, serves: String?, dishIndex: Int?) {
+      self.workDayOffset = workDayOffset
+      self.session = session
+      self.task = task
+      self.serves = serves
+      self.dishIndex = dishIndex
     }
   }
 
@@ -165,14 +183,19 @@ public enum ChatAccessExportBuilder {
     let menuItems = try MenuItem.fetchAll(db)
     let menuItemsByMenuID = Dictionary(grouping: menuItems, by: \.menuID)
     let menus = try Menu.fetchAll(db).map { menu in
-      ChatAccessExport.MenuRecord(
+      let sortedItems = menuItemsByMenuID[menu.id, default: []].sorted { ($0.dayOffset, $0.mealSlot.sortOrder, $0.sortOrder) < ($1.dayOffset, $1.mealSlot.sortOrder, $1.sortOrder) }
+      let dishIndices = Dictionary(uniqueKeysWithValues: sortedItems.enumerated().map { ($1.id, $0) })
+      return ChatAccessExport.MenuRecord(
         id: menu.id,
         title: menu.title,
         notes: menu.notes,
         dayCount: menu.dayCount,
         modified: menu.dateModified,
-        items: menuItemsByMenuID[menu.id, default: []].sorted { ($0.dayOffset, $0.mealSlot.sortOrder, $0.sortOrder) < ($1.dayOffset, $1.mealSlot.sortOrder, $1.sortOrder) }.map {
+        items: sortedItems.map {
           ChatAccessExport.MenuItemRecord(kind: $0.kind, title: $0.title, recipeID: $0.recipeID, dayOffset: $0.dayOffset, slot: $0.mealSlot, note: $0.notes, scale: $0.scale)
+        },
+        prepPlan: try PrepPlanStepRepository.steps(for: menu.id, in: db).map {
+          ChatAccessExport.PrepStepRecord(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: $0.sourceDish.flatMap { dishIndices[$0] })
         }
       )
     }

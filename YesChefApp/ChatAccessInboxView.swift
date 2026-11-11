@@ -112,6 +112,18 @@ struct ChatAccessInboxSection: View {
           }
           .accessibilityElement(children: .contain)
         }
+        ForEach(model.prepPlanRows) { row in
+          VStack(alignment: .leading, spacing: 8) {
+            Text(row.title).font(.headline)
+            Text(row.stagedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+            if row.downloadState == .downloading { Text("Downloading…").font(.caption).foregroundStyle(.secondary) }
+            if let error = model.rowErrors[row.id] { Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange) }
+            HStack {
+              if row.canOpen { Button("Open") { Task { await model.open(row) } }.disabled(row.downloadState != .current || model.workingIDs.contains(row.id)).buttonStyle(.bordered) }
+              Button("Discard", role: .destructive) { Task { await model.discard(row) } }.disabled(model.workingIDs.contains(row.id)).buttonStyle(.bordered)
+            }
+          }.accessibilityElement(children: .contain)
+        }
         if model.returnRows.contains(where: { if case .openable = $0.destination { false } else { true } }) {
           Text("Started on another device")
             .font(.headline)
@@ -138,6 +150,8 @@ struct ChatAccessInboxSection: View {
             isApplying: model.workingIDs.contains(menuDayReview.row.id),
             apply: { await model.applyMenuDay(from: menuDayReview) }
           )
+        case let .prepPlan(prepPlanReview):
+          ChatPrepPlanReviewSheet(model: prepPlanReview, isApplying: model.workingIDs.contains(prepPlanReview.row.id), apply: { await model.applyPrepPlan(from: prepPlanReview) })
         }
       }
     }

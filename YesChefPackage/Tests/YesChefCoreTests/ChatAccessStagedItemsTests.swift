@@ -31,6 +31,35 @@ struct ChatAccessStagedItemsTests {
     }
   }
 
+  @Test func prepPlanReplacementKeepsMatchedIdentityAndLinksNewSteps() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_100), menuID = UUID(), recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+      let actualMenuID = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+      let dishID = try MenuRepository.addRecipeItem(menuID: actualMenuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day before", task: "Toast spices", serves: "Beans", sourceDish: dishID, workDayOffset: -1), for: actualMenuID, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(session: "Day before", task: "Old step", serves: "Beans", sourceDish: dishID, workDayOffset: -1), for: actualMenuID, in: db, now: now, uuid: { UUID() })
+      let original = try PrepPlanStepRepository.steps(for: actualMenuID, in: db)
+      let envelope = ChatAccessStagedPrepPlan(menuID: actualMenuID, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: [
+          .init(workDayOffset: -1, session: "Day before", task: "Toast spices"),
+          .init(workDayOffset: -1, session: "Day before", task: "Chop herbs"),
+        ]),
+      ], planAtStage: original.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil) })
+      let plan = try ChatPrepPlanImport.plan(envelope, in: db)
+      #expect(plan.planChangedSinceStage == false)
+      #expect(plan.newCount == 1)
+      try ChatPrepPlanImport.apply(plan, keeping: [1], in: db, now: now.addingTimeInterval(1), uuid: { UUID() })
+      let updated = try PrepPlanStepRepository.steps(for: actualMenuID, in: db)
+      #expect(updated.count == 2)
+      #expect(updated.first?.id == original.first?.id)
+      #expect(updated.map(\.task) == ["Toast spices", "Chop herbs"])
+      #expect(updated.last?.sourceDish == dishID)
+      #expect(updated.last?.serves == "Beans")
+    }
+  }
+
   @Test func recipeReturnCreatesReviewAndRollsBackOnEmptyBody() throws {
     @Dependency(\.defaultDatabase) var database
     let now = Date(timeIntervalSinceReferenceDate: 840_100_000)

@@ -10,11 +10,13 @@ import YesChefCore
 enum ChatAccessInboxReview: Identifiable {
   case menu(ChatMenuReviewModel)
   case menuDay(ChatMenuDayReviewModel)
+  case prepPlan(ChatPrepPlanReviewModel)
 
   var id: UUID {
     switch self {
     case let .menu(model): model.id
     case let .menuDay(model): model.id
+    case let .prepPlan(model): model.id
     }
   }
 }
@@ -51,6 +53,7 @@ final class ChatAccessInboxModel {
   private(set) var recipeReturnRows: [ChatAccessInbox.RecipeReturnRow] = []
   private(set) var menuRows: [ChatAccessInbox.MenuRow] = []
   private(set) var menuDayRows: [ChatAccessInbox.MenuDayRow] = []
+  private(set) var prepPlanRows: [ChatAccessInbox.PrepPlanRow] = []
   var review: ChatAccessInboxReview?
   var menuReview: ChatMenuReviewModel? {
     get { if case let .menu(value) = review { value } else { nil } }
@@ -66,20 +69,24 @@ final class ChatAccessInboxModel {
       else if case .menuDay? = review { review = nil }
     }
   }
+  var prepPlanReview: ChatPrepPlanReviewModel? {
+    get { if case let .prepPlan(value) = review { value } else { nil } }
+    set { if let newValue { review = .prepPlan(newValue) } else if case .prepPlan? = review { review = nil } }
+  }
   var onMenuSelected: ((Menu.ID) -> Void)?
   private(set) var rowErrors: [String: String] = [:]
   private(set) var workingIDs: Set<String> = []
   private(set) var message: String?
 
   var inboxCount: Int {
-    rows.count + menuRows.count + menuDayRows.filter(\.canOpen).count
+    rows.count + menuRows.count + menuDayRows.filter(\.canOpen).count + prepPlanRows.filter(\.canOpen).count
       + returnRows.filter { if case .openable = $0.destination { true } else { false } }.count
       + recipeReturnRows.filter { if case .openable = $0.destination { true } else { false } }.count
   }
 
   var hasContent: Bool {
     !rows.isEmpty || !returnRows.isEmpty || !recipeReturnRows.isEmpty || !menuRows.isEmpty
-      || !menuDayRows.isEmpty || message != nil
+      || !menuDayRows.isEmpty || !prepPlanRows.isEmpty || message != nil
   }
 
   init(folder: ChatAccessFolder? = nil, defaults: UserDefaults = .standard) {
@@ -379,6 +386,40 @@ final class ChatAccessInboxModel {
     } catch { rowErrors[row.id] = error.localizedDescription }
   }
 
+  func open(_ row: ChatAccessInbox.PrepPlanRow) async {
+    guard row.canOpen, row.downloadState == .current, !workingIDs.contains(row.id) else { return }
+    workingIDs.insert(row.id); defer { workingIDs.remove(row.id) }
+    do {
+      let text = try await fileClient.read(row.url)
+      guard let data = text.data(using: .utf8) else { throw ChatInboxOpenError.invalidEncoding }
+      let envelope = try JSONDecoder().decode(ChatAccessStagedPrepPlan.self, from: data)
+      let plan = try await database.read { db in try ChatPrepPlanImport.plan(envelope, in: db) }
+      prepPlanReview = ChatPrepPlanReviewModel(row: row, plan: plan)
+    } catch { rowErrors[row.id] = error.localizedDescription }
+  }
+
+  func applyPrepPlan(from review: ChatPrepPlanReviewModel) async {
+    guard let folder, !workingIDs.contains(review.row.id) else { return }
+    workingIDs.insert(review.row.id); defer { workingIDs.remove(review.row.id) }; review.errorMessage = nil
+    do {
+      let plan = review.plan, keeping = review.keptIndices, currentNow = now, generator = uuid
+      let makeUUID: @Sendable () -> UUID = { generator() }
+      try await database.write { db in try ChatPrepPlanImport.apply(plan, keeping: keeping, in: db, now: currentNow, uuid: makeUUID) }
+    } catch { review.errorMessage = error.localizedDescription; return }
+    prepPlanReview = nil; toastCenter?.postSuccess("Prep plan updated."); onMenuSelected?(review.plan.menuID)
+    do { try await fileClient.claim(folder, review.row.url); forget([review.row.url]); prepPlanRows.removeAll { $0.id == review.row.id }; rowErrors[review.row.id] = nil }
+    catch let error as HandoffInboxError where error == .alreadyClaimed { forget([review.row.url]); prepPlanRows.removeAll { $0.id == review.row.id }; rowErrors[review.row.id] = nil }
+    catch { rowErrors[review.row.id] = "Prep plan updated, but this item couldn't be cleared: \(error.localizedDescription) Discard it." }
+  }
+
+  func discard(_ row: ChatAccessInbox.PrepPlanRow) async {
+    guard let folder, !workingIDs.contains(row.id) else { return }
+    workingIDs.insert(row.id); defer { workingIDs.remove(row.id) }
+    do { try await fileClient.claim(folder, row.url); forget([row.url]); prepPlanRows.removeAll { $0.id == row.id }; rowErrors[row.id] = nil }
+    catch let error as HandoffInboxError where error == .alreadyClaimed { forget([row.url]); prepPlanRows.removeAll { $0.id == row.id }; rowErrors[row.id] = nil }
+    catch { rowErrors[row.id] = error.localizedDescription }
+  }
+
   func copy(_ row: ChatAccessInbox.ReturnRow) async {
     guard row.downloadState == .current, !workingIDs.contains(row.id) else { return }
     workingIDs.insert(row.id)
@@ -420,7 +461,8 @@ final class ChatAccessInboxModel {
     let snapshots = latestSnapshots.map { snapshot in
       if !snapshot.isCurrent { rowErrors[snapshot.url.path] = snapshot.downloadError }
       return ChatAccessInbox.MetadataSnapshot(url: snapshot.url, name: snapshot.name,
-        isCurrent: snapshot.isCurrent, recipeName: recipeNamesByID[snapshot.url.path])
+        isCurrent: snapshot.isCurrent, recipeName: recipeNamesByID[snapshot.url.path], menuTitle: menuTitlesByID[snapshot.url.path],
+        menuDayMenuID: menuDayIDs[snapshot.url.path], menuDayOffset: menuDayOffsets[snapshot.url.path], prepPlanMenuID: prepPlanMenuIDs[snapshot.url.path])
     }
     updateRows(from: snapshots)
     metadataGeneration += 1
@@ -431,7 +473,7 @@ final class ChatAccessInboxModel {
 
   func updateRows(from snapshots: [ChatAccessInbox.MetadataSnapshot]) {
     rows = ChatAccessInbox.rows(from: snapshots)
-    let visibleIDs = Set(snapshots.map { $0.url.path } + returnRows.map(\.id) + recipeReturnRows.map(\.id) + menuRows.map(\.id) + menuDayRows.map(\.id))
+    let visibleIDs = Set(snapshots.map { $0.url.path } + returnRows.map(\.id) + recipeReturnRows.map(\.id) + menuRows.map(\.id) + menuDayRows.map(\.id) + prepPlanRows.map(\.id))
     rowErrors = rowErrors.filter { visibleIDs.contains($0.key) }
   }
 
@@ -474,6 +516,11 @@ final class ChatAccessInboxModel {
         let date = menu.flatMap { _ in placement }.flatMap { MenuPlacementDay.date(for: day, from: $0) }
         return (menu != nil, date)
       }
+      let prepMetadata = snapshots.map { snapshot in ChatAccessInbox.MetadataSnapshot(url: snapshot.url, name: snapshot.name, isCurrent: snapshot.isCurrent, menuTitle: menuTitlesByID[snapshot.url.path], prepPlanMenuID: prepPlanMenuIDs[snapshot.url.path]) }
+      let prepIDs = Set(prepMetadata.compactMap(\.prepPlanMenuID))
+      let prepMenus = try await database.read { db in try prepIDs.compactMap { try Menu.find($0).fetchOne(db) } }
+      let availablePrepMenus = Set(prepMenus.map(\.id))
+      prepPlanRows = ChatAccessInbox.prepPlanRows(from: prepMetadata) { availablePrepMenus.contains($0) }
       updateRows(from: snapshots)
     } catch {
       message = error.localizedDescription
@@ -481,7 +528,7 @@ final class ChatAccessInboxModel {
   }
 
   private func loadNames(for snapshots: [ChatAccessInbox.MetadataSnapshot]) {
-    for snapshot in snapshots where snapshot.isCurrent && ["json", "ycmenu", "ycmenuday"].contains(snapshot.url.pathExtension) {
+    for snapshot in snapshots where snapshot.isCurrent && ["json", "ycmenu", "ycmenuday", "ycprepplan"].contains(snapshot.url.pathExtension) {
       let id = snapshot.url.path
       guard !nameReadIDs.contains(id), nameReadsInProgress.insert(id).inserted else { continue }
       Task { await loadName(for: snapshot.url, id: id) }
@@ -501,6 +548,11 @@ final class ChatAccessInboxModel {
           menuDayIDs[id] = metadata.menuID
           menuDayOffsets[id] = metadata.dayOffset
         }
+      } else if url.pathExtension == "ycprepplan" {
+        if let metadata = ChatAccessInbox.prepPlanMetadata(from: text) {
+          menuTitlesByID[id] = metadata.menuTitle
+          prepPlanMenuIDs[id] = metadata.menuID
+        }
       } else if let name = ChatAccessInbox.recipeName(from: text) {
         recipeNamesByID[id] = name
       }
@@ -512,6 +564,7 @@ final class ChatAccessInboxModel {
 
   @ObservationIgnored private var menuDayIDs: [String: UUID] = [:]
   @ObservationIgnored private var menuDayOffsets: [String: Int] = [:]
+  @ObservationIgnored private var prepPlanMenuIDs: [String: UUID] = [:]
 
   private func resolveFolderIfNeeded() async throws -> ChatAccessFolder {
     if let folder { return folder }

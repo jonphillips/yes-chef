@@ -148,14 +148,15 @@ enum ChatAccessReadTools {
         let snapshot = try await store.load()
         let index = try resolveIndex(arguments(input)["ref"]?.stringValue, expectedKind: .recipe, snapshot: snapshot, count: snapshot.value.recipes.count)
         let bundle = snapshot.value.recipes[index]
-        return .json(["export": exportMeta(snapshot), "recipe": .object([
+        let recipeValue: [String: MCPValue] = [
           "name": .string(bundle.recipe.title), "description": optional(bundle.recipe.summary), "yield": optional(bundle.recipe.yieldText ?? bundle.recipe.servingsText),
           "makeAhead": optional(bundle.recipe.makeAhead), "chefItUp": optional(bundle.recipe.chefItUp),
           "prepTime": formattedMinutes(bundle.recipe.prepTimeMinutes), "cookTime": formattedMinutes(bundle.recipe.cookTimeMinutes), "totalTime": formattedMinutes(bundle.recipe.totalTimeMinutes),
           "ingredientSections": .array(bundle.ingredientSections.sorted { $0.sortOrder < $1.sortOrder }.map { section in .object(["name": optional(section.name), "ingredients": .array(bundle.ingredientLines.filter { $0.sectionID == section.id }.sorted { $0.sortOrder < $1.sortOrder }.map { .string($0.originalText) })]) }),
           "instructionSections": .array(bundle.instructionSections.sorted { $0.sortOrder < $1.sortOrder }.map { section in .object(["name": optional(section.name), "steps": .array(bundle.instructionSteps.filter { $0.sectionID == section.id }.sorted { $0.sortOrder < $1.sortOrder }.map { .string($0.text) })]) }),
           "notes": .array(bundle.recipeNotes.sorted { $0.dateCreated < $1.dateCreated }.map { .string($0.text) }), "categories": .array(bundle.categoryNames.map(MCPValue.string)), "sourceURL": optional(bundle.source?.url)
-        ])])
+        ]
+        return .json(["export": exportMeta(snapshot), "recipe": .object(recipeValue)])
       },
       tool("list_menus", "List menus from the latest Yes Chef export.", schema: objectSchema(["limit": integerSchema], required: [])) { input in
         let snapshot = try await store.load()
@@ -171,7 +172,16 @@ enum ChatAccessReadTools {
         let menu = snapshot.value.menus[index]
         let recipes = Dictionary(uniqueKeysWithValues: snapshot.value.recipes.map { ($0.recipe.id, $0.recipe.title) })
         let items = menu.items.map { item in MCPValue.object(["kind": .string(item.kind.rawValue), "title": .string(item.title), "recipe": optional(item.recipeID.flatMap { recipes[$0] }), "day": .integer(item.dayOffset), "slot": .string(item.slot.rawValue), "note": optional(item.note), "scale": .number(item.scale)]) }
-        return .json(["export": exportMeta(snapshot), "menu": .object(["title": .string(menu.title), "notes": optional(menu.notes), "items": .array(items)])])
+        let plan: [MCPValue]? = menu.prepPlan?.map { step in
+          let linkedDish = step.dishIndex.flatMap { index in menu.items.indices.contains(index) ? menu.items[index] : nil }
+          let dish = linkedDish.map { MCPValue.string("\($0.title), day \($0.dayOffset + 1)") } ?? step.serves.map(MCPValue.string) ?? .null
+          var fields: [String: MCPValue] = ["session": .string(step.session), "task": .string(step.task), "dish": dish]
+          if menu.dayCount > 1, let workDay = step.workDayOffset { fields["workDay"] = .integer(workDay) }
+          return MCPValue.object(fields)
+        } ?? []
+        var menuValue: [String: MCPValue] = ["title": .string(menu.title), "notes": optional(menu.notes), "items": .array(items)]
+        if let plan { menuValue["prepPlan"] = .array(plan) }
+        return .json(["export": exportMeta(snapshot), "menu": .object(menuValue)])
       },
       tool("get_meal_plan", "Read scheduled items in a date window of up to 31 days.", schema: objectSchema(["from": stringSchema, "to": stringSchema], required: ["from", "to"])) { input in
         let snapshot = try await store.load()
