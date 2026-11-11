@@ -24,6 +24,8 @@ started in ChatGPT can return changes to a recipe (`stage_recipe_return`) and st
 `stage_menu_day` replaces one day of an existing menu; a dish that stays keeps its row.
 **[Amendment 4](#amendment-4--from-chat-is-its-own-sidebar-destination-2026-11-10) — Accepted on the merge of
 its plan PR:** the inbox list moves out of Create Recipe into its own sidebar destination, **From Chat**.
+**[Amendment 5](#amendment-5--a-chat-can-replace-the-prep-plan-for-the-dishes-it-names-2026-11-10) — Accepted on the merge
+of its plan PR:** `stage_prep_plan` replaces the prep plan for the dishes a chat names, and `get_menu` shows the plan.
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
@@ -855,3 +857,141 @@ say), widen it to **Inbox** then.
 - One place to look after a chat stages something, with a badge that says so.
 - Create Recipe is honest again.
 - One more sidebar entry. It's always there, even when it's empty.
+
+## Amendment 5 — A chat can replace the prep plan for the dishes it names (2026-11-10)
+
+Status: **Accepted** on the merge of its plan PR. Adds one staging tool, one inbox kind and one review sheet, and
+adds the prep plan to the export's menus (additive, no export version bump). Schema-free. Built by effort
+[`stage-prep-plan`](../efforts/stage-prep-plan.md).
+
+### Context
+
+During the S6 device pass (2026-11-10), the chat that planned Thanksgiving Week's Day 3 dinner also worked out a
+prep plan for it. Asked to stage it, ChatGPT said there was no tool for that and offered to write the schedule into
+the seven dishes' notes instead. That's the wrong home. Amd 3-D1's table puts the menu's sequencing in the **prep
+plan**, which is already stored one step per row (`PrepPlanStepRecord`, ADR-0034, ADR-0063). Spread across the
+dishes' notes, the schedule would be invisible to the plan's bands and work days, and it would be deleted the next
+time a chat restaged the day.
+
+The app-started hand-off already writes a prep plan (Amd 1: Hand off → Menu, then `stage_handoff_return`), but only
+for a chat that began with a `YC-HANDOFF` line. It replaces the **whole** plan, and pasted plans can't carry a step's
+link to its dish (`AIHandoffReturn.droppedSourceDishEvidence`).
+
+Jon's call (2026-11-10): a chat doesn't need to *add* to a plan, **as long as it can replace the entire plan for only
+certain dishes.**
+
+What the code has, as of `origin/main` 5153ee0:
+
+- **A step** (`PrepPlanStepRecord`) has `session` (free-text "when", from which the band is derived), `task`,
+  `serves` (free text), `sourceDish` (an optional `MenuItem.ID`) and `workDayOffset` (multi-day menus only).
+- **`sourceDish` is usually empty.** Plans arrive as pasted text, and `PrepPlanDishMatcher` only *suggests* a link
+  in the step editor for Jon to confirm.
+- **`PrepPlanStepRepository.replace`** replaces the whole plan and keeps the id of every step whose content is
+  unchanged.
+- **The export has no prep plan,** so `get_menu` can't show one.
+
+### Amd 5-D1 — A chat replaces the plan for the dishes it names, and only those
+
+`stage_prep_plan` names a menu and a set of its dishes. For each dish it sends **every** prep step that dish
+should have. Apply removes the dish's current steps and puts the new ones in their place. **Steps that belong to
+other dishes, and steps that belong to no dish, are untouched.** A dish named with no steps has its steps cleared.
+
+That's Amd 3's replace rule, scoped to dishes instead of a day. The scope is dishes, not days, because prep for
+Tuesday's dinner happens on Monday: a step's work day is not its dish's day.
+
+### Amd 5-D2 — Which current steps a dish owns
+
+A current step belongs to a named dish if:
+
+1. **its `sourceDish` is that dish's row**; or
+2. **it has no `sourceDish`, and `PrepPlanDishMatcher` matches its `serves` to that dish and no other.** These
+   steps are marked **matched by name** in the review, so Jon sees why they're being replaced.
+
+Any other step stays. A dish is resolved to its row the way Amd 3-D3 matches: a recipe ref to a `.recipe` row with
+that recipe on that day, or a title to a `.note` or `.reservation` row with that title on that day (trimmed,
+case-insensitive).
+
+**New steps arrive linked.** Each staged step names its dish, so Apply sets `sourceDish` to the dish's row and
+`serves` to its title. This is the first path into the plan that carries links, and every later
+`stage_prep_plan` for the same dish finds its steps by rule 1.
+
+### Amd 5-D3 — The tool
+
+`stage_prep_plan {menu, dishes: [{day, ref | title, steps: [{workDay, session, task}]}]}`:
+
+- **`menu`** is a ref from `list_menus`.
+- **Each dish** is one already on the menu: `day` as in `get_menu` (0-based), with a recipe ref from
+  `search_recipes` *or* the row's title. It has 0 to 40 steps.
+- **Each step** has:
+  - `workDay`: 0-based like `day`, and may be negative for days before the menu starts (down to −7). Omit it on a
+    one-day menu.
+  - `session`: when, in words ("Monday evening", "2 hours before").
+  - `task`: one separable task.
+- **All-or-nothing checks,** with the read tools' messages where they exist: the ref, each dish existing on that
+  day in the export, each `day` and `workDay` in range, 1 to 20 dishes, at most 80 steps in all, and non-empty
+  `session` and `task` (`task` at most 500 characters).
+- **The staged file** (`.ycprepplan`) carries the menu id, the dishes as sent, and `planAtStage`, the export's whole
+  plan for that menu.
+- **The result** names the menu and counts the dishes and steps. No ids. Annotations: `readOnly false,
+  destructive false, openWorld false`. Nothing is written until Jon applies it.
+
+### Amd 5-D4 — `get_menu` shows the current plan
+
+The export's `MenuRecord` gains `prepPlan`, the menu's steps in plan order. Each step has its work day, session,
+task, `serves`, and its dish's index in `items` when it's linked. `get_menu` returns it with each dish as its title
+and day, never an id. That lets a chat rework a dish's plan rather than start blind, and it gives the review a
+baseline: when the menu's plan differs from `planAtStage` (as a multiset of work day, session, task, serves), the
+review shows **"This plan changed since Chat read it."** An export from an older build has no `prepPlan`; the field
+is optional, the version stays 1, and the review then reads **"Chat couldn't see the current plan."**
+
+### Amd 5-D5 — The review, and Apply
+
+The review is grouped by dish. Under each dish it shows:
+
+- **New**, the staged steps, each with a keep toggle;
+- **Kept**, a current step identical to a staged one (same work day, session and task), which keeps its id;
+- **Removed**, the dish's current steps that no staged step matches, with **matched by name** marked.
+
+A dish that's no longer on the menu, or a menu that's gone, makes the review say so, and Apply is unavailable; the
+file stays until it's discarded.
+
+**Apply** writes in one transaction: it deletes the removed steps, inserts the kept new steps (linked, per D2),
+leaves every other step alone, and touches the menu's `dateModified`. **Ordering:** a new step goes after the last
+remaining step with the same work day and session; failing that, after the last step on its work day; failing that,
+at the end. Then `sortOrder` is renumbered, writing only the rows whose order changes.
+
+### Amd 5-D6 — The description carries the rules
+
+ChatGPT doesn't show the model the server instructions, so `stage_prep_plan`'s description says it:
+
+- **For each dish, send the whole plan.** Anything not sent for a named dish is removed, and dishes not named are
+  untouched. Read the menu with `get_menu` first.
+- **Steps are tasks, not choreography.** Use separable tasks ("salt the chicken"), never cooking instructions woven
+  across recipes ("sear the beef while the salad rests"). The recipes hold the cooking (ADR-0039 D5).
+- **Don't put the schedule in dish notes.** A note is for this dish on this menu (Amd 3-D1); sequencing goes here.
+- **A step that serves several dishes** goes under the dish it mostly serves, and its task can name the others.
+
+The opening names `stage_prep_plan`. It must stay within 512 characters, so the opening's list gets shorter.
+
+### Amd 5 — rejected
+
+- **The dish notes** (ChatGPT's offer). Wrong home (Context).
+- **Whole-plan replacement only** (the hand-off's rule). One dinner's plan would have to carry every other day's
+  steps, or wipe them.
+- **Adding steps without replacing.** Restaging a dish would duplicate its plan. Jon doesn't need it (Context).
+- **Row ids in the export** to name dishes. ADR-0007 D5 keeps ids away from the model, and Amd 3 already resolves a
+  dish by ref or title.
+
+### Amd 5 — consequences
+
+- A chat that plans a dinner can leave its prep plan in the menu, linked to its dishes, without a hand-off token.
+- Steps that a chat stages are linked, so the plan gets more linked over time, and later restages find their steps
+  without matching by name.
+- Steps that belong to no dish are out of reach of this tool; they still go through the hand-off or the editor.
+- The export grows by the menus' plans. They're small.
+
+### Amd 5 — open questions
+
+- **OQ8 — steps that serve the whole menu** ("clean the grill", "set the table"). D6 files a multi-dish step under
+  one dish, and a step for no dish can't be staged. Revisit if chats keep producing menu-wide steps that end up
+  forced under a dish.
