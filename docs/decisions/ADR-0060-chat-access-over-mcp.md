@@ -22,6 +22,8 @@ started in ChatGPT can return changes to a recipe (`stage_recipe_return`) and st
 **[Amendment 3](#amendment-3--a-chat-can-replace-one-day-of-a-menu-that-already-exists-2026-11-10) — Accepted
 2026-11-10 (#476):** answers OQ6 one day at a time. A menu row's note is where a menu-specific annotation lives, and
 `stage_menu_day` replaces one day of an existing menu; a dish that stays keeps its row.
+**[Amendment 4](#amendment-4--from-chat-is-its-own-sidebar-destination-2026-11-10) — Accepted on the merge of
+its plan PR:** the inbox list moves out of Create Recipe into its own sidebar destination, **From Chat**.
 Origin: Jon, after Vinyl Fever M12 proved ChatGPT → MCP end to end ("we do a
 lot of copy/pasting of recipe prompts, and the resulting JSON recipe gets pasted back"). Queued after
 [`efforts/archive/sync-failure-surfacing.md`](../efforts/archive/sync-failure-surfacing.md). Effort:
@@ -788,3 +790,68 @@ menu's.
 
 - **OQ7 — adding days, or replacing several days at once.** One day per call, inside the existing day count. Revisit
   if a chat keeps making several calls in a row, or needs a day past the end.
+
+## Amendment 4 — From Chat is its own sidebar destination (2026-11-10)
+
+Status: **Accepted** on the merge of its plan PR. Moves where the app lists inbox items (D3's "the app lists inbox
+items"); changes no tool, no inbox kind, no review and no write. Schema-free. Built by effort
+[`from-chat-destination`](../efforts/from-chat-destination.md).
+
+### Context
+
+D3 had the app list inbox items without saying where. The first build put the list at the top of **Create Recipe**, which was
+right when the only item was a staged recipe and opening it meant "fill in Create Recipe's draft." Amendments 1–3
+added four kinds, and none of them ends in Create Recipe:
+
+| Item | Kind | Where it ends up |
+|---|---|---|
+| Staged recipe | `json` | Create Recipe's draft (D3) |
+| Handoff return | `ycreturn` | the handoff's review: a recipe, a prep plan (Amd 1) |
+| Recipe return | `ycrecipereturn` | that recipe's review (Amd 2-D2) |
+| New menu | `ycmenu` | the menu review, then Menus (Amd 2-D4) |
+| Menu day | `ycmenuday` | the day review, then that menu (Amd 3) |
+
+So Create Recipe is mostly hosting a list that isn't about creating recipes, and Jon reads its name as "more and
+more of a lie" (2026-11-10). Renaming it **Inbox** fixes that for four kinds and breaks it for the fifth: it would
+stop saying that this is where you make a recipe. The S6 device pass that evening also showed the cost of hiding
+the list in another destination's screen: ChatGPT had staged a menu day, and the first question was where it went.
+
+[ADR-0053](ADR-0053-create-recipe-destination.md) never placed the inbox on Create Recipe; it defines the screen as
+the compose material plus the structured draft. This amendment returns the screen to that, so ADR-0053 doesn't change.
+
+### Amd 4-D1 — From Chat is a sidebar destination, and Create Recipe goes back to compose and draft
+
+- A new `AppSection.fromChat`, titled **From Chat**, holds the list that's now `ChatAccessInboxSection`, with its
+  review sheets. It sits directly above Create Recipe in both the iPhone and the iPad tab orders, and like Create
+  Recipe it's hidden from the compact tab bar (`.defaultVisibility(.hidden, for: .tabBar)`).
+- **It's always in the sidebar,** with an empty state when nothing is staged. A destination that appears and
+  disappears with its contents moves the sidebar under Jon's finger.
+- **The badge moves with the list.** From Chat carries `.badge(inboxCount)`; Create Recipe loses its badge.
+- **Create Recipe** shows only the **Source** section and the draft (ADR-0053 D2).
+
+### Amd 4-D2 — Each row still goes where it belongs
+
+Nothing about opening an item changes. From Chat is a triage list, and each row routes to its home through the
+path it already uses: a staged recipe through `CreateRecipeCoordinator.stage(text:)`, which selects Create Recipe;
+returns through `handoffReviewCoordinator.presentStaged`; a menu or a menu day through its review sheet and then
+`onMenuSelected`, which selects Menus. Claiming, discarding, and the cross-device rules (D3, Amd 1-D3) are
+unchanged.
+
+### Amd 4-D3 — The name is "From Chat", not "Inbox"
+
+It says where the items come from, and it's already the section's name and the name every tool result uses ("Jon
+reviews it in Yes Chef → From Chat."). If a second, non-chat producer ever feeds this list (share-extension captures,
+say), widen it to **Inbox** then.
+
+### Amd 4 — rejected
+
+- **Rename Create Recipe to Inbox.** It hides the one job the screen is named for (above).
+- **Keep the list in Create Recipe and add a pointer elsewhere** ("3 from Chat →"). That's two homes for one list.
+- **Show each kind in the destination it ends up in** (menus in Menus, returns on their recipe). Five places to look
+  for one chat's output, and a staged recipe has no subject to sit under.
+
+### Amd 4 — consequences
+
+- One place to look after a chat stages something, with a badge that says so.
+- Create Recipe is honest again.
+- One more sidebar entry. It's always there, even when it's empty.
