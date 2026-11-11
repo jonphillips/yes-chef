@@ -25,4 +25,3 @@ discoverable"):
 
 ## Live
 
-- [A prep step shows its make-ahead window, and plans leave room for leftovers](prep-step-make-ahead-window.md) — **Ready.** Steps gain an optional, editable make-ahead window, filled by every producer; plans leave about 3 days for leftovers. One nullable synced column.

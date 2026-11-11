@@ -287,7 +287,7 @@ data pass for little value. Jon can delete any he doesn't want.
 ## Amendment 2 — A step shows its make-ahead window, and plans leave room for leftovers (2026-11-11)
 
 Accepted 2026-11-11 by Jon, while dogfooding Thanksgiving Week. Brief:
-[`prep-step-make-ahead-window`](../efforts/prep-step-make-ahead-window.md).
+[`prep-step-make-ahead-window`](../efforts/archive/prep-step-make-ahead-window.md).
 
 **The problem.** A step says when to do the work but not how far ahead the recipe allows it. Jon wants the step itself
 to say "No more than 24 hours ahead", "8–18 hours" or "Up to 3 days ahead". Placement also ignores leftovers. A sauce

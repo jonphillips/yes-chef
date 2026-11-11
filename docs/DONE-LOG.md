@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Prep steps show make-ahead windows and leave room for leftovers (`effort/prep-step-make-ahead-window`)
+
+- **Result:** Prep steps now store, display, and edit a make-ahead window. The in-app weave, Copy Prep Prompt, and stage_prep_plan share the approved leftover timing guidance.
+- **Verification:** scripts/check-drift.sh passed with 811 package tests and 20 MCP tests and compiled the app test target; generic iOS build passed; YesChefTests simulator run passed with 138 tests.
+- **Owed:** prep-step-make-ahead-window's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Dogfood 2026-11-10 fixes (`dogfood/2026-11-10`)
 
 - **Result:** The From Chat review sheet moved from the Section to the Form, so the first Open stays open. The prep-step session label is bold in the primary color, and stage_prep_plan tells the chat that session is only the time within the work day. Parked the prep-step placement finding in open-questions.

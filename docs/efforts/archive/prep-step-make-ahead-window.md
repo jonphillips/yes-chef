@@ -6,10 +6,10 @@ Summary: Prep steps gain an optional `makeAheadWindow` ("Up to 3 days ahead"), f
 Origin: Jon's Thanksgiving Week dogfood (2026-11-11). One dispatch, one PR. **Persistent model change, authorized by
 ADR-0034 Amd 2.**
 
-Decisions: [ADR-0034 Amendment 2](../decisions/ADR-0034-prep-plan-work-session-timeline.md#amendment-2--a-step-shows-its-make-ahead-window-and-plans-leave-room-for-leftovers-2026-11-11)
-(B1, B2; read it first). Precedent for every step below: [archived `menu-absorbs-calendar-days`](archive/menu-absorbs-calendar-days.md)
+Decisions: [ADR-0034 Amendment 2](../../decisions/ADR-0034-prep-plan-work-session-timeline.md#amendment-2--a-step-shows-its-make-ahead-window-and-plans-leave-room-for-leftovers-2026-11-11)
+(B1, B2; read it first). Precedent for every step below: [archived `menu-absorbs-calendar-days`](menu-absorbs-calendar-days.md)
 S3, which added `workDayOffset` to the same table and threaded it through the same producers. Related:
-[archived `stage-prep-plan`](archive/stage-prep-plan.md) (the chat tool) · ADR-0060 Amd 5.
+[archived `stage-prep-plan`](stage-prep-plan.md) (the chat tool) · ADR-0060 Amd 5.
 
 If #484 (dogfood fixes) merges first, it has changed `stage_prep_plan`'s description and the session-label styling in
 `MenuViews.swift`. Build on top of both.
@@ -114,7 +114,7 @@ runs (guardrail #9).
 
 - A step stores, shows and edits its make-ahead window, and every producer fills it when grounded.
 - All three producers carry the same B2 rule.
-- Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above. Verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
 - The PR body gives Jon the install order: the app on both devices, then the helper.
 - **Gate, before any TestFlight upload:** create `prepPlanSteps.makeAheadWindow` (STRING) in Development, confirm the
