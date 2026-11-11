@@ -63,19 +63,8 @@ public enum MenuPrepPlanBanding {
         return MenuPrepPlanBandStep(step: step, sessionLabel: label)
       }
       let workDate = placementStartDate.flatMap { calendar.date(byAdding: .day, value: offset, to: $0) }
-      let dayNumber = offset + 1
-      let undatedTitle = dayNumber <= 0
-        ? "\(-offset) \(-offset == 1 ? "day" : "days") before Day 1"
-        : "Day \(dayNumber)"
       let isToday = placementStartDate != nil && workDate.map { calendar.isDate($0, inSameDayAs: today) } == true
-      let title: String
-      if isToday {
-        title = "Today"
-      } else if let workDate {
-        title = "\(workDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · \(undatedTitle)"
-      } else {
-        title = undatedTitle
-      }
+      let title = isToday ? "Today" : dayTitle(offset: offset, start: placementStartDate, calendar: calendar)
       result.append(MenuPrepPlanBand(
         id: "day:\(offset)",
         title: title,
@@ -104,6 +93,16 @@ public enum MenuPrepPlanBanding {
         steps: group.steps.map { MenuPrepPlanBandStep(step: $0, sessionLabel: nil) }
       )
     }
+  }
+
+  static func dayTitle(offset: Int, start: Date?, calendar: Calendar) -> String {
+    let dayNumber = offset + 1
+    let dayLabel = dayNumber <= 0
+      ? "\(-offset) \(-offset == 1 ? "day" : "days") before Day 1"
+      : "Day \(dayNumber)"
+    guard let start else { return dayLabel }
+    let dayDate = calendar.date(byAdding: .day, value: offset, to: start) ?? start
+    return "\(dayDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · \(dayLabel)"
   }
 }
 
@@ -200,8 +199,8 @@ public struct TodayPrepLayout: Equatable, Sendable {
     let placement = covering[0]
     let start = calendar.startOfDay(for: placement.startDate)
     let offset = calendar.dateComponents([.day], from: start, to: calendar.startOfDay(for: today)).day ?? 0
-    func daySteps(_ filter: (PrepPlanStepRecord) -> Bool) -> [MenuPrepPlanBandStep] {
-      let sorted = steps.filter(filter).sorted { $0.sortOrder < $1.sortOrder }
+    func labeledSteps(_ steps: [PrepPlanStepRecord]) -> [MenuPrepPlanBandStep] {
+      let sorted = steps.sorted { $0.sortOrder < $1.sortOrder }
       var prior: String?
       return sorted.map { step in
         let label = prior == step.session ? nil : step.session
@@ -209,27 +208,28 @@ public struct TodayPrepLayout: Equatable, Sendable {
         return MenuPrepPlanBandStep(step: step, sessionLabel: label)
       }
     }
-    let earlier = daySteps { ($0.workDayOffset ?? Int.max) < offset && !done.contains($0.id) }
+    func daySteps(_ filter: (PrepPlanStepRecord) -> Bool) -> [MenuPrepPlanBandStep] {
+      labeledSteps(steps.filter(filter))
+    }
+    let earlierByDay = Dictionary(grouping: steps.filter {
+      ($0.workDayOffset ?? Int.max) < offset && !done.contains($0.id)
+    }, by: { $0.workDayOffset ?? 0 })
     let todaySteps = daySteps { $0.workDayOffset == offset }
     let ahead = daySteps { $0.workDayOffset == nil }
     let tomorrow = daySteps { $0.workDayOffset == offset + 1 }
-    let dayDate = calendar.date(byAdding: .day, value: offset, to: start)!
-    let dayNumber = offset + 1
-    let dayLabel = dayNumber <= 0
-      ? "\(-offset) \(-offset == 1 ? "day" : "days") before Day 1"
-      : "Day \(dayNumber)"
-    let dayTitle = "Today · \(dayDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · \(dayLabel)"
+    let dayTitle = "Today · \(MenuPrepPlanBanding.dayTitle(offset: offset, start: placement.startDate, calendar: calendar))"
     var sections: [TodayPrepSection] = []
-    if !earlier.isEmpty {
-      let grouped = Dictionary(grouping: earlier, by: { $0.step.workDayOffset ?? 0 })
-      for day in grouped.keys.sorted() {
-        let dayDate = calendar.date(byAdding: .day, value: day, to: start)!
-        let dayNumber = day + 1
-        let dayLabel = dayNumber <= 0
-          ? "\(-day) \(-day == 1 ? "day" : "days") before Day 1"
-          : "Day \(dayNumber)"
-        let title = "\(dayDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · \(dayLabel)"
-        sections.append(TodayPrepSection(id: "open:\(day)", title: title, kind: .stillOpen, steps: grouped[day] ?? []))
+    if !earlierByDay.isEmpty {
+      for day in earlierByDay.keys.sorted() {
+        let title = "Still open · \(MenuPrepPlanBanding.dayTitle(offset: day, start: placement.startDate, calendar: calendar))"
+        sections.append(
+          TodayPrepSection(
+            id: "open:\(day)",
+            title: title,
+            kind: .stillOpen,
+            steps: labeledSteps(earlierByDay[day] ?? [])
+          )
+        )
       }
     }
     sections.append(TodayPrepSection(id: "today", title: dayTitle, kind: .today, steps: todaySteps))

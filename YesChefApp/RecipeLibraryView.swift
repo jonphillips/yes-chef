@@ -125,7 +125,7 @@ struct AppContainer: View {
     }
     .mealCalendarItemEditorDestination(
       mealCalendarModel: mealCalendarModel,
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
     )
     .sheet(isPresented: $menuModel.destination.addMenu) {
       NavigationStack {
@@ -141,14 +141,14 @@ struct AppContainer: View {
     .groceryDestinations(
       groceryModel: groceryModel,
       mealCalendarModel: mealCalendarModel,
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
     )
     .recipeDetailDestinations(
       recipeModel: recipeModel,
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
     )
     .handoffReviewDestinations(
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
         && recipeModel.destination.workbench == nil && !hasNestedHandoffReviewHostClaim
     )
     .sheet(isPresented: $recipeModel.destination.captureRecipe) {

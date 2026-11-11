@@ -1372,10 +1372,6 @@ extension DependencyValues {
       try db.execute(sql: #"ALTER TABLE "prepPlanSteps" ADD COLUMN "timeOfDay" INTEGER"#)
     }
 
-    migrator.registerMigration("Add prep plan completion") { db in
-      try db.execute(sql: #"ALTER TABLE "prepPlanSteps" ADD COLUMN "completedAt" TEXT"#)
-    }
-
     migrator.registerMigration("Create grocery trip assignments") { db in
       try #sql("""
         CREATE TABLE "groceryTripAssignments" (
@@ -1385,6 +1381,10 @@ extension DependencyValues {
           "dateModified" TEXT NOT NULL
         ) STRICT
         """).execute(db)
+    }
+
+    migrator.registerMigration("Add prep plan completion") { db in
+      try db.execute(sql: #"ALTER TABLE "prepPlanSteps" ADD COLUMN "completedAt" TEXT"#)
     }
 
     try migrator.migrate(database)

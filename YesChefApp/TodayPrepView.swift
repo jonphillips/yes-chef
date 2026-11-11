@@ -3,6 +3,7 @@ import YesChefCore
 
 struct TodayPrepFullScreenCover: View {
   @Environment(\.dismiss) private var dismiss
+  @State private var hasNestedHandoffReviewHostClaim = false
   let presentation: TodayPrepPresentation
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
@@ -29,7 +30,8 @@ struct TodayPrepFullScreenCover: View {
     .mealCalendarItemEditorDestination(mealCalendarModel: mealCalendarModel)
     .groceryDestinations(groceryModel: groceryModel, mealCalendarModel: mealCalendarModel)
     .recipeDetailDestinations(recipeModel: recipeModel)
-    .handoffReviewDestinations()
+    .onPreferenceChange(HandoffReviewHostClaimKey.self) { hasNestedHandoffReviewHostClaim = $0 }
+    .handoffReviewDestinations(isPresentationEnabled: !hasNestedHandoffReviewHostClaim)
   }
 }
 
@@ -201,6 +203,10 @@ struct TodayPrepView: View {
   private func sectionRows(_ section: TodayPrepSection, detail: MenuDetailData, layout: TodayPrepLayout) -> some View {
     ForEach(section.steps, id: \.step.id) { row in
       let isDone = layout.doneStepIDs.contains(row.step.id)
+      let targetOffset = MenuDetailModel.nextPrepPlanDayOffset(layout: layout, selectedBand: manualBand)
+      let canMove = targetOffset.map {
+        MenuDetailModel.canMovePrepPlanStepToNextDay(row.step, targetOffset: $0, dayCount: detail.menu.dayCount)
+      } ?? false
       VStack(alignment: .leading, spacing: 5) {
         if let session = row.sessionLabel { Text(session).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary) }
         HStack(alignment: .top, spacing: 12) {
@@ -231,14 +237,18 @@ struct TodayPrepView: View {
       .padding(.vertical, 4)
       .listRowSeparator(.hidden)
       .swipeActions(edge: .trailing) {
-        if !isDone, canMoveTomorrow(row.step, layout: layout) {
-          Button(moveActionTitle(layout), systemImage: "arrow.right") { moveTomorrow(row.step, layout: layout) }
+        if !isDone, canMove, let targetOffset {
+          Button(moveActionTitle(layout), systemImage: "arrow.right") {
+            detailModel.movePrepPlanStepToNextDay(row.step, targetOffset: targetOffset)
+          }
             .tint(.indigo)
         }
       }
       .contextMenu {
-        if !isDone, canMoveTomorrow(row.step, layout: layout) {
-          Button(moveActionTitle(layout), systemImage: "arrow.right") { moveTomorrow(row.step, layout: layout) }
+        if !isDone, canMove, let targetOffset {
+          Button(moveActionTitle(layout), systemImage: "arrow.right") {
+            detailModel.movePrepPlanStepToNextDay(row.step, targetOffset: targetOffset)
+          }
         }
         Button { editor = PrepPlanStepEditorDraft(step: row.step) } label: {
           Label("Edit Step…", symbol: .editRow)
@@ -246,12 +256,14 @@ struct TodayPrepView: View {
       }
       .accessibilityElement(children: .contain)
     }
-    let count = section.steps.filter { layout.doneStepIDs.contains($0.step.id) }.count
-    Text("\(count) of \(section.steps.count) done")
-      .font(.caption)
-      .foregroundStyle(.secondary)
-      .frame(maxWidth: .infinity, alignment: .trailing)
-      .listRowSeparator(.hidden)
+    if section.kind != .stillOpen {
+      let count = section.steps.filter { layout.doneStepIDs.contains($0.step.id) }.count
+      Text("\(count) of \(section.steps.count) done")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .listRowSeparator(.hidden)
+    }
   }
 
   @ViewBuilder
@@ -345,35 +357,6 @@ struct TodayPrepView: View {
   private func moveActionTitle(_ layout: TodayPrepLayout) -> String {
     if case .dated = layout.mode { return "Tomorrow" }
     return "Next Day"
-  }
-
-  private func canMoveTomorrow(_ step: PrepPlanStepRecord, layout: TodayPrepLayout) -> Bool {
-    guard let detail, detail.menu.dayCount > 1, let stepOffset = step.workDayOffset,
-          let targetOffset = targetTomorrowOffset(layout), targetOffset < detail.menu.dayCount else { return false }
-    return stepOffset != targetOffset
-  }
-
-  private func targetTomorrowOffset(_ layout: TodayPrepLayout) -> Int? {
-    switch layout.mode {
-    case let .dated(_, dayOffset): dayOffset + 1
-    case .manual: manualBand?.steps.first?.step.workDayOffset.map { $0 + 1 }
-    }
-  }
-
-  private func moveTomorrow(_ step: PrepPlanStepRecord, layout: TodayPrepLayout) {
-    guard let targetOffset = targetTomorrowOffset(layout) else { return }
-    detailModel.updatePrepPlanStep(
-      PrepPlanStep(
-        session: step.session,
-        task: step.task,
-        serves: step.serves,
-        makeAheadWindow: step.makeAheadWindow,
-        timeOfDay: step.timeOfDay,
-        sourceDish: step.sourceDish,
-        workDayOffset: targetOffset
-      ),
-      id: step.id
-    )
   }
 
   private func selectReader(for step: PrepPlanStepRecord) {
