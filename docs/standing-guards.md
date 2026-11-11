@@ -3,7 +3,7 @@
 Closed decisions that stay closed. **Nothing here is work.** The architect reads this before curating
 `NEXT_UP.md` so a dispatch never re-queues a closed item; **the executor reads it when its dispatch touches
 text→recipe extraction, hand-off returns, the Shortcuts transport, variations/edit proposals, or chat
-presentation** — the ⚠️ items are review blocks. Moved from `CURRENT_HANDOFF.md` on 2026-09-29
+presentation, or a screen with a help page (`AppHelp.swift`)** — the ⚠️ items are review blocks. Moved from `CURRENT_HANDOFF.md` on 2026-09-29
 (jon-platform ADR-0005).
 
 Closed decisions that stay closed, here only so a dispatch does not re-queue them. **Nothing in this
@@ -82,6 +82,9 @@ section is work.**
 - **⚠️ A `RecipePhoto` row exists only with image bytes** ([`efforts/archive/raw-import-html-drop.md`](efforts/archive/raw-import-html-drop.md) S2).
   Capture persists only images it downloaded. A URL-only photo row, or a body-image scrape that runs although a
   structured source found an image, is a review block. Jon's rule: no dead data in the library.
+- **⚠️ A screen's help page changes with the screen ([ADR-0066](decisions/ADR-0066-in-app-help-pages.md) D5).**
+  A PR that adds, removes, renames or moves something a page in `AppHelp.swift` mentions updates that page in the
+  same PR. A stale help page is a review block, because the in-app chat repeats it as fact.
 - **The Recipe Workbench store/curate/compare arc (ADR-0019) is complete**, S1–S4 shipped. Parked follow-ons
   live in [`efforts/archive/recipe-workbench.md`](efforts/archive/recipe-workbench.md), not here.
 - **The workbench's experiment-outcome verb is NOT scoped** — only its *placement* is ratified (ADR-0042 D8's

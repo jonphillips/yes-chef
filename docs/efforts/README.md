@@ -25,3 +25,5 @@ discoverable"):
 
 ## Live
 
+- [menu-help-and-add-menu.md](menu-help-and-add-menu.md) — **Ready** · ADR-0066: the menu `⋯` gains Add Menu… (copy a
+  menu in at a chosen day) and How Menus Work (a bare-bones help sheet the menu chat also reads).

@@ -66,6 +66,7 @@ The type lives in the app target, and `YesChefCore` stays free of glyph names (D
 | Add to groceries | `.addToGroceries` | `cart.badge.plus` |
 | Workbench | `.workbench` | `hammer` |
 | Chat target | `.chatTarget` | `target` |
+| How this screen works (help page, [ADR-0066](ADR-0066-in-app-help-pages.md)) | `.help` | `questionmark.circle` |
 
 The rules behind the table:
 - **Plus means add, and an arrow in from the left means "make into" or "bring into"** (ADR-0064 D8). An overlay
