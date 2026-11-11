@@ -354,14 +354,26 @@ struct YesChefMCPTests {
     let now = Date(timeIntervalSince1970: 1_800_000_000), recipe = Recipe(id: UUID(), title: "Souvlaki", dateCreated: now, dateModified: now)
     let menu = ChatAccessExport.MenuRecord(id: UUID(), title: "Thanksgiving Week", notes: nil, dayCount: 7, modified: now, items: [
       .init(kind: .recipe, title: "Souvlaki", recipeID: recipe.id, dayOffset: 2, slot: .dinner, note: nil, scale: 1),
+      .init(kind: .note, title: "Pie", recipeID: nil, dayOffset: 1, slot: .snack, note: nil, scale: 1),
+      .init(kind: .note, title: "Salad", recipeID: nil, dayOffset: 0, slot: .dinner, note: nil, scale: 1),
     ], prepPlan: [.init(workDayOffset: 1, session: "Monday evening", task: "Salt the chicken", serves: "Souvlaki", dishIndex: 0)])
-    try ChatAccessExportCoding.encode(.init(generatedAt: now, device: "iPhone", recipes: [.init(recipe: recipe)], menus: [menu], mealPlan: [])).write(to: folder.exportsURL.appending(path: "install.json"))
+    let otherMenu = ChatAccessExport.MenuRecord(id: UUID(), title: "Other menu", notes: nil, dayCount: 1, modified: now, items: [],
+      prepPlan: [.init(workDayOffset: nil, session: "Later", task: "Other menu only", serves: nil, dishIndex: nil)])
+    let legacyMenu = ChatAccessExport.MenuRecord(id: UUID(), title: "Older export", notes: nil, dayCount: 1, modified: now, items: [])
+    try ChatAccessExportCoding.encode(.init(generatedAt: now, device: "iPhone", recipes: [.init(recipe: recipe)], menus: [menu, otherMenu, legacyMenu], mealPlan: [])).write(to: folder.exportsURL.appending(path: "install.json"))
     let server = YesChefMCPServer.make(home: temporary, now: { now })
     let listing = try #require(await server.handle(line: genericToolCall("list_menus", args: [:])))
-    let menuRef = try #require(object(toolText(listing))["menus"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
+    let menuRows = try #require(object(toolText(listing))["menus"]?.arrayValue)
+    func lookupMenuRef(_ title: String) throws -> String {
+      try #require(menuRows.first { $0.objectValue?["title"]?.stringValue == title }?.objectValue?["ref"]?.stringValue)
+    }
+    let menuRef = try lookupMenuRef("Thanksgiving Week")
     let detail = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(menuRef)])))
     let detailJSON = try object(toolText(detail))
-    #expect(detailJSON["menu"]?.objectValue?["prepPlan"]?.arrayValue?.first?.objectValue?["dish"]?.stringValue == "Souvlaki, day 3")
+    #expect(detailJSON["menu"]?.objectValue?["prepPlan"]?.arrayValue?.first?.objectValue?["dish"]?.stringValue == "Souvlaki, day 2")
+    let legacyDetail = try #require(await server.handle(line: genericToolCall("get_menu", args: ["ref": .string(try lookupMenuRef("Older export"))])))
+    let legacyDetailJSON = try object(toolText(legacyDetail))
+    #expect(legacyDetailJSON["menu"]?.objectValue?["prepPlan"] == nil)
     let recipeSearch = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("Souvlaki")])))
     let recipeRef = try #require(object(toolText(recipeSearch))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
     let staged = try #require(await server.handle(line: genericToolCall("stage_prep_plan", args: [
@@ -374,6 +386,33 @@ struct YesChefMCPTests {
     let file = try #require(HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").list().first)
     let envelope = try JSONDecoder().decode(ChatAccessStagedPrepPlan.self, from: Data(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").read(file).utf8))
     #expect(envelope.planAtStage?.first?.task == "Salt the chicken")
+    #expect(envelope.planAtStage?.contains { $0.task == "Other menu only" } == false)
+
+    let step = MCPValue.object(["workDay": .integer(1), "session": .string("Monday evening"), "task": .string("Salt the chicken")])
+    let validRecipeDish: MCPValue = .object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([step])])
+    let eightyOneSteps = MCPValue.array(Array(repeating: step, count: 27))
+    let invalidCalls: [[String: MCPValue]] = [
+      ["menu": .string("0.m0"), "dishes": .array([validRecipeDish])],
+      ["menu": .string(recipeRef), "dishes": .array([validRecipeDish])],
+      ["menu": .string(menuRef), "dishes": .array([])],
+      ["menu": .string(menuRef), "dishes": .array(Array(repeating: validRecipeDish, count: 21))],
+      ["menu": .string(menuRef), "dishes": .array([
+        .object(["day": .integer(2), "ref": .string(recipeRef), "steps": eightyOneSteps]),
+        .object(["day": .integer(1), "title": .string("Pie"), "steps": eightyOneSteps]),
+        .object(["day": .integer(0), "title": .string("Salad"), "steps": eightyOneSteps]),
+      ])],
+      ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(1), "ref": .string(recipeRef), "steps": .array([])])])],
+      ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "title": .string("Souvlaki"), "steps": .array([])])])],
+      ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .integer(7), "session": .string("Later"), "task": .string("Salt")])])])])],
+      ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .number(1.5), "session": .string("Later"), "task": .string("Salt")])])])])],
+      ["menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["session": .string("Later"), "task": .string("  ")])])])])],
+    ]
+    for args in invalidCalls {
+      let response = try #require(await server.handle(line: genericToolCall("stage_prep_plan", args: args)))
+      let responseJSON = try object(response)
+      #expect(responseJSON["result"]?.objectValue?["isError"] == .bool(true))
+    }
+    #expect(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").list().count == 1)
   }
 
   @Test func stageMenuDayRejectsEveryInvalidCallWithoutStaging() async throws {

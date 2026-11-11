@@ -174,11 +174,11 @@ enum ChatAccessReadTools {
         let items = menu.items.map { item in MCPValue.object(["kind": .string(item.kind.rawValue), "title": .string(item.title), "recipe": optional(item.recipeID.flatMap { recipes[$0] }), "day": .integer(item.dayOffset), "slot": .string(item.slot.rawValue), "note": optional(item.note), "scale": .number(item.scale)]) }
         let plan: [MCPValue]? = menu.prepPlan?.map { step in
           let linkedDish = step.dishIndex.flatMap { index in menu.items.indices.contains(index) ? menu.items[index] : nil }
-          let dish = linkedDish.map { MCPValue.string("\($0.title), day \($0.dayOffset + 1)") } ?? step.serves.map(MCPValue.string) ?? .null
+          let dish = linkedDish.map { MCPValue.string("\($0.title), day \($0.dayOffset)") } ?? step.serves.map(MCPValue.string) ?? .null
           var fields: [String: MCPValue] = ["session": .string(step.session), "task": .string(step.task), "dish": dish]
           if menu.dayCount > 1, let workDay = step.workDayOffset { fields["workDay"] = .integer(workDay) }
           return MCPValue.object(fields)
-        } ?? []
+        }
         var menuValue: [String: MCPValue] = ["title": .string(menu.title), "notes": optional(menu.notes), "items": .array(items)]
         if let plan { menuValue["prepPlan"] = .array(plan) }
         return .json(["export": exportMeta(snapshot), "menu": .object(menuValue)])

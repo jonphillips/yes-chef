@@ -56,7 +56,7 @@ public enum ChatPrepPlanImport {
   }
   public enum Entry: Equatable, Sendable {
     case new(dish: MenuItem, step: ChatAccessStagedPrepPlan.Dish.Step)
-    case kept(dish: MenuItem, step: PrepPlanStepRecord)
+    case kept(dish: MenuItem, step: PrepPlanStepRecord, matchedByName: Bool)
     case removed(dish: MenuItem, step: PrepPlanStepRecord, matchedByName: Bool)
   }
   public struct Plan: Equatable, Sendable {
@@ -96,7 +96,8 @@ public enum ChatPrepPlanImport {
       var entries: [Entry] = []
       for staged in dish.steps {
         if let i = current.firstIndex(where: { same($0.0, staged) }) {
-          entries.append(.kept(dish: row, step: current.remove(at: i).0))
+          let (step, matchedByName) = current.remove(at: i)
+          entries.append(.kept(dish: row, step: step, matchedByName: matchedByName))
         } else { entries.append(.new(dish: row, step: staged)) }
       }
       entries += current.map { .removed(dish: row, step: $0.0, matchedByName: $0.1) }
@@ -126,10 +127,11 @@ public enum ChatPrepPlanImport {
     for (dish, entries) in plan.dishes {
       for entry in entries {
         switch entry {
-        case let .kept(_, row):
-          if row.sourceDish == nil, let updated = try PrepPlanStepRecord.find(row.id).fetchOne(db) {
+        case let .kept(dish, row, matchedByName):
+          if matchedByName, let updated = try PrepPlanStepRecord.find(row.id).fetchOne(db) {
             var linked = updated; linked.sourceDish = dish.id
-            try PrepPlanStepRecord.upsert { linked }.execute(db); remaining.removeAll { $0.id == linked.id }; remaining.append(linked)
+            try PrepPlanStepRecord.find(row.id).update { $0.sourceDish = #bind(dish.id) }.execute(db)
+            if let index = remaining.firstIndex(where: { $0.id == linked.id }) { remaining[index] = linked }
           }
         case let .new(_, step):
           if keeping.contains(entryIndex) {

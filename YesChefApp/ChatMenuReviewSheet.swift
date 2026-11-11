@@ -47,7 +47,7 @@ struct ChatPrepPlanReviewSheet: View {
                 }
               }
             }
-            let kept = dish.1.compactMap { if case let .kept(_, step) = $0 { step } else { nil } }
+            let kept = dish.1.compactMap { if case let .kept(_, step, _) = $0 { step } else { nil } }
             if !kept.isEmpty { Text("Kept").font(.caption).foregroundStyle(.secondary) }
             ForEach(kept) { step in stepRow(workDay: step.workDayOffset, session: step.session, task: step.task) }
             let removed = dish.1.compactMap { if case let .removed(_, step, byName) = $0 { (step, byName) } else { nil } }

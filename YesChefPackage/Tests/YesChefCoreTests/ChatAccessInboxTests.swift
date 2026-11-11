@@ -130,16 +130,20 @@ struct ChatAccessInboxTests {
     #expect(extraction.instructionSections.flatMap(\.steps) == ["Heat the water."])
   }
 
-  @Test func serverInstructionsCarryTheProjectContractAndPasteFallback() {
+  @Test func serverInstructionsCarryTheProjectContractAndPasteFallback() throws {
     #expect(ChatAccessServerInstructions.text.hasPrefix("These are Yes Chef's recipe tools."))
     #expect(ChatAccessServerInstructions.text.contains(RecipeJSONLDContract.projectSource))
     let text = ChatAccessServerInstructions.text
+    let firstParagraph = try #require(text.components(separatedBy: "\n\n").first)
+    #expect(firstParagraph == "These are Yes Chef's recipe tools. Read with `search_recipes`, `get_recipe`, `list_menus`, `get_menu`, `get_meal_plan`. In a conversation with a `YC-HANDOFF:` line, finalize through `stage_handoff_return`. Without one, stage a new recipe (`stage_recipe`), changes to a recipe (`stage_recipe_return`), a new menu (`stage_menu`), one day of a menu (`stage_menu_day`), or the prep plan for some of a menu's dishes (`stage_prep_plan`). Nothing is saved until Jon reviews it in the app.")
+    #expect(firstParagraph.count <= 512)
     let opening = String(text.prefix(512))
     #expect(opening.contains("stage_recipe"))
     #expect(opening.contains("stage_handoff_return"))
     #expect(opening.contains("stage_recipe_return"))
     #expect(opening.contains("stage_menu"))
     #expect(opening.contains("stage_menu_day"))
+    #expect(opening.contains("stage_prep_plan"))
     #expect(opening.count <= 512)
     #expect(text.contains(RecipeReturnLabels.deliverableLines))
     #expect(text.contains(AIHandoffReturnContract.projectInstructions))
