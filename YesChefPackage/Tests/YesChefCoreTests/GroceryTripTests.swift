@@ -8,7 +8,8 @@ extension RecipeCoreTests {
   struct GroceryTripTests {
     @Test
     func defaultTripUsesKeeperListThenAreaThenFresh() {
-      for name in ["onion", "yellow onion", "garlic", "butternut squash", "cranberry"] {
+      for name in ["onion", "yellow onion", "garlic", "garlic clove", "lemon juice", "celery stalk", "butternut squash",
+                   "cranberry"] {
         #expect(GroceryTripRule.defaultTrip(canonicalName: name, area: nil) == .advance)
       }
       for name in ["green onion", "spring onion", "cilantro", "turkey", "baguette"] {

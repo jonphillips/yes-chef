@@ -58,7 +58,8 @@ For each ingredient, the first match wins:
 2. **Produce that keeps → Advance.** A short built-in list: onion, garlic, shallot, potato, sweet potato, yam, carrot,
    celery, beet, parsnip, turnip, rutabaga, cabbage, ginger, lemon, lime, orange, apple, cranberry, and the named
    winter squashes (butternut, acorn, kabocha, delicata, spaghetti squash, pumpkin). The match is on the canonical
-   name or its last word, except green onion and spring onion, which wilt.
+   name or its first or last word, except green onion and spring onion, which wilt. The first word is there because
+   recipes name the part: *garlic clove*, *lemon juice* and *celery stalk* are the usual forms.
 3. **Store area.** Advance: Canned & Dry, Condiments & Oils, Spices, Baking, Beverages, Dairy, Frozen, Household.
    Fresh: Produce, Bakery, Deli, Meat & Seafood, Other, any custom area. The area comes from the existing
    deterministic resolver (your area fix, then the built-in area list, then a model area already saved in the table).

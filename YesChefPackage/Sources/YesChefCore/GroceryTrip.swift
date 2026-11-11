@@ -44,9 +44,10 @@ public enum GroceryTripRule {
 
   public static func defaultTrip(canonicalName: String, area: String?) -> GroceryTrip {
     let name = CanonicalIngredient.canonicalName(canonicalName) ?? canonicalName
-    let lastWord = name.split(separator: " ").last.map(String.init) ?? name
+    let words = name.split(separator: " ").map(String.init)
     let isOnionThatWilts = ["green onion", "green onions", "spring onion", "spring onions"].contains(name)
-    if !isOnionThatWilts && (keepers.contains(name) || keepers.contains(lastWord)) { return .advance }
+    let isKeeper = keepers.contains(name) || [words.first, words.last].contains { $0.map(keepers.contains) == true }
+    if !isOnionThatWilts && isKeeper { return .advance }
     if let area, advanceAreas.contains(area) { return .advance }
     return .fresh
   }
