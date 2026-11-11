@@ -62,7 +62,9 @@ regardless. So verify with **compiler + tests once**, then hand off:
   in `YesChefPackage` (which Codex *can* compile and test). #185's break was `HandoffIntents.swift` calling
   `date: .full` — logic that belonged in Core, where the package build would have caught it instantly.
 - **`YesChefAppTests` compiles and links on every `check-drift.sh` run, but only *executes* behind
-  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). **29 tests in 9 suites
+  `YESCHEF_RUN_APP_TESTS=1`** (it boots a simulator, and there is a teardown hang). The hang follows
+  a **failed** run (2026-11-10: 3 of 8 failed runs, 0 of 20 passing). `quiet-run` kills it 60s after the
+  failed verdict and exits 1, so read the `✘` lines and fix the test; don't wait it out. **29 tests in 9 suites
   pass as of 2026-07-29** (the SQLiteData 1.8.2 bump fixed the link wall — see the DONE-LOG arc). So the old
   "a test there counts for nothing" rule is retired — but **Core is still the default home**, because
   `YesChefPackage/Tests/` runs on every dispatch with no flag and no simulator. Put a test in the app target
