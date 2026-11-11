@@ -20,14 +20,16 @@ final class MenuLibraryModel {
     case deleteItem(MenuItemDeletionContext)
     case deletePlacement(MenuPlacementDeletionContext)
     case bringIn(MenuBringInPresentation)
+    case addMenuToMenu(MenuAddMenuPresentation)
+    case help
   }
 
   @ObservationIgnored
-  @Dependency(\.date.now) private var now
+  @Dependency(\.date.now) var now
   @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
+  @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
-  @Dependency(\.uuid) private var uuid
+  @Dependency(\.uuid) var uuid
   @ObservationIgnored
   @Fetch(MenuListRequest(), animation: .default) var menuRows: [MenuRowData] = []
   @ObservationIgnored

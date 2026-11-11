@@ -426,7 +426,7 @@ private struct RecipeCaptureReviewSections: View {
                     .foregroundStyle(.secondary)
                 }
               } icon: {
-                Image(systemName: "questionmark.circle")
+                Image(symbol: .help)
               }
               .foregroundStyle(.secondary)
             }

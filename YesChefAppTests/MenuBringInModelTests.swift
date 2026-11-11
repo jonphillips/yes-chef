@@ -144,4 +144,42 @@ struct MenuBringInModelTests {
       #expect(try database.read { db in try Menu.find(menuID).fetchOne(db)?.dayCount } == 2)
     }
   }
+
+  @Test
+  func addMenuThroughModelCopiesIntoTargetAndClearsDestination() throws {
+    try withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSinceReferenceDate: 900_400_000)
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 900_400_000)
+      let targetID = UUID(uuidString: "00000000-0000-0000-0000-000000000401")!
+      let sourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000402")!
+      let sourceItemID = UUID(uuidString: "00000000-0000-0000-0000-000000000403")!
+      try database.write { db in
+        try Menu.insert { Menu(id: targetID, title: "Week", dayCount: 5, dateCreated: now, dateModified: now) }.execute(db)
+        try Menu.insert { Menu(id: sourceID, title: "Dinner", dayCount: 1, dateCreated: now, dateModified: now) }.execute(db)
+        try MenuItem.insert {
+          MenuItem(id: sourceItemID, menuID: sourceID, kind: .note, title: "Roast chicken", dayOffset: 0,
+            mealSlot: .dinner, sortOrder: 0, dateCreated: now, dateModified: now)
+        }.execute(db)
+      }
+
+      let model = MenuLibraryModel()
+      model.addMenuToMenuButtonTapped(targetMenuID: targetID)
+      guard case let .addMenuToMenu(presentation) = model.destination else {
+        Issue.record("Expected Add Menu presentation")
+        return
+      }
+      model.confirmAddMenuToMenu(presentation, sourceMenuID: sourceID, startDayOffset: 2)
+
+      #expect(model.destination == nil)
+      let copied = try database.read { db in try MenuItem.where { $0.menuID.eq(targetID) }.fetchAll(db).first }
+      #expect(copied?.title == "Roast chicken")
+      #expect(copied?.dayOffset == 2)
+      #expect(copied?.id != sourceItemID)
+      #expect(try database.read { db in try MenuItem.where { $0.menuID.eq(sourceID) }.fetchAll(db).map(\.id) } == [sourceItemID])
+    }
+  }
 }

@@ -892,7 +892,9 @@ public final class RecipeChatModel: Identifiable {
       continuationToken = nil
     }
     var contextLayers: ModelCallContextLayers = [.conversation]
-    contextLayers = .init(included: contextLayers.included.union([context.modelCallContextLayer]))
+    var includedLayers = contextLayers.included.union([context.modelCallContextLayer])
+    if context.helpPage != nil { includedLayers.insert(.help) }
+    contextLayers = .init(included: includedLayers)
     let assistantID = appendAssistantPlaceholder()
     do {
       if case .frontier = tier {
@@ -964,7 +966,7 @@ public final class RecipeChatModel: Identifiable {
 
       \(context.serialized(for: activeTier))
       """
-    return base
+    return context.helpPage?.appending(to: base) ?? base
   }
 
   private func history() -> [ModelMessage] {
