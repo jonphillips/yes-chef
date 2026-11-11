@@ -149,6 +149,18 @@ public enum GroceryRepository {
     return list.id
   }
 
+  public static func tripListID(
+    title: String,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> GroceryList.ID {
+    if let list = try GroceryList.fetchAll(db).first(where: { $0.title == title }) {
+      return list.id
+    }
+    return try addList(title: title, in: db, now: now, uuid: uuid)
+  }
+
   public static func updateList(
     listID: GroceryList.ID,
     title: String,

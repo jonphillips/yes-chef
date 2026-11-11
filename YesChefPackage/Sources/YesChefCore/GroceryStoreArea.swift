@@ -356,6 +356,16 @@ public enum GroceryStoreArea: Hashable, Sendable {
 }
 
 public enum GroceryStoreAreaCache {
+  public static func resolvedAreas(
+    for canonicalNames: [String],
+    in db: Database
+  ) throws -> [String: GroceryStoreArea] {
+    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db))
+    return Dictionary(uniqueKeysWithValues: canonicalNames.compactMap { name in
+      resolver.resolve(name).map { (name, $0) }
+    })
+  }
+
   public static func uncategorizedCanonicalNames(in db: Database) throws -> [String] {
     let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db))
     let names: [String] = try GroceryItem.fetchAll(db).compactMap { item in

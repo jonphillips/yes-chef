@@ -3,6 +3,10 @@ import Foundation
 public enum GroceryPantryAssumptions {
   public static let defaultStaples: [String] = CanonicalIngredient.defaultPantryStaples
 
+  public static func skippedStapleTitles(from pantryItems: [PantryItem]) -> [String] {
+    pantryItems.filter { $0.policy == .unlimited }.map(\.title)
+  }
+
   public static func isPantryStaple(_ line: IngredientLine) -> Bool {
     isPantryStaple(line, pantryStaples: defaultStaples)
   }

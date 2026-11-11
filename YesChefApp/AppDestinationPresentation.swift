@@ -125,6 +125,11 @@ private struct GroceryDestinationsModifier: ViewModifier {
           )
         }
       }
+      .sheet(isPresented: gatedBinding($groceryModel.destination.help, enabled: isPresentationEnabled)) {
+        NavigationStack {
+          AppHelpSheet(page: .groceries)
+        }
+      }
       .confirmationDialog(
         "Clear Purchased?",
         item: gatedBinding($groceryModel.destination.clearPurchased, enabled: isPresentationEnabled),

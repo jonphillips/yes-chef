@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Groceries split into two trips (`effort/grocery-two-trips`)
+
+- **Result:** The Add Ingredients sheet splits menu and calendar ingredients into reusable Advance and Fresh lists, remembers switches in a synced grocery-trip table, and skips only Always have it pantry items. The Groceries List Actions menu now includes How Groceries Work.
+- **Verification:** scripts/check-drift.sh passed (830 Core tests, 20 MCP tests, app test build-for-testing); the generic iOS build passed; YesChefTests passed all 142 tests.
+- **Owed:** grocery-two-trips's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Prep steps sort by approximate time (`effort/prep-plan-time-order`)
 
 - **Result:** Prep steps store approximate times, sort by time through chat apply, weave, paste-back, and editor saves, and keep matched IDs when times or windows change.
