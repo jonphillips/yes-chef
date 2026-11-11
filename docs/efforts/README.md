@@ -25,3 +25,4 @@ discoverable"):
 
 ## Live
 
+- [From Chat gets its own sidebar destination](from-chat-destination.md) — **Ready.** The From Chat list moves out of Create Recipe into its own badged sidebar destination with an empty state; Create Recipe goes back to compose and draft. View and navigation only, no schema.
