@@ -37,7 +37,7 @@ public enum YesChefCloudSync {
     preRestoreFilenamePrefix: "YesChef-PreRestore-",
     restoreStagingFilenamePrefix: "YesChef-Restore-",
     identifyingTableNames: ["recipes"],
-    declaredSchemaVersion: 59,
+    declaredSchemaVersion: 60,
     lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
     cloudSync: configuration,
     variant: backupVariant,

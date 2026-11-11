@@ -26,6 +26,12 @@ and everything downstream move forward without waiting on it.
 
 **Make-ahead dishes pull their groceries onto the Advance trip (ADR-0068, Later).** A dish whose prep starts before the Fresh trip needs its perishables bought on the Advance trip (pie, stock). The prep plan knows each dish's work days. It needs a Fresh-trip date: take it from the menu's calendar placement plus a "Fresh trip: N days before" setting on the split (ADR-0039 Amd 1, date over toggle), not calendar entries for trips. Pick up after Jon's Thanksgiving 2026 shop shows whether it's needed.
 
+**Add Menu and Bring In don't place copied steps by time (found 2026-11-11, reviewing #490).** `MenuBringIn` appends
+copied prep steps after the target's existing steps instead of placing them with `PrepPlanPlacement`. So when a target
+day already has timed steps, the copied ones read after them, out of time order, until the next weave re-sorts the
+plan. The #490 brief left this path out. Fix: place each copied step in turn, as `replace` does. It matters once a
+timed menu is added into another timed menu.
+
 **A staged menu opened on both devices at once can be created twice (found 2026-11-10, reviewing #473).**
 Create Menu writes the menu and then claims the `.ycmenu` file, as the brief specified. Claiming first would lose the
 staged menu if the write then failed. If the iPhone and iPad both open the review before either claims, both can

@@ -24,12 +24,11 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func replaceTreatsWindowAsStepIdentity() throws {
+    func replaceKeepsIdentityWhenWindowChanges() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_550_000)
       let menuID = SampleUUIDSequence.uuid(15_340)
       let firstID = SampleUUIDSequence.uuid(15_341)
-      let changedID = SampleUUIDSequence.uuid(15_342)
       try database.write { db in
         try Menu.insert {
           Menu(id: menuID, title: "Window Identity", dayCount: 1, dateCreated: now, dateModified: now)
@@ -40,9 +39,13 @@ extension RecipeCoreTests {
         )
         try PrepPlanStepRepository.replace(
           [.init(session: "Friday", task: "Make sauce", makeAheadWindow: "No more than 24 hours")],
-          for: menuID, in: db, now: now, uuid: { changedID }
+          for: menuID, in: db, now: now, uuid: {
+            Issue.record("A window change must keep the matched step ID")
+            return UUID()
+          }
         )
-        #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id) == [changedID])
+        #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id) == [firstID])
+        #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).first?.makeAheadWindow == "No more than 24 hours")
         try PrepPlanStepRepository.replace(
           [.init(session: "Friday", task: "Make sauce", makeAheadWindow: "No more than 24 hours")],
           for: menuID, in: db, now: now, uuid: {
@@ -50,7 +53,7 @@ extension RecipeCoreTests {
             return UUID()
           }
         )
-        #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id) == [changedID])
+        #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id) == [firstID])
       }
     }
   }

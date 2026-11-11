@@ -55,6 +55,7 @@ extension MenuDetailModel {
           task: draft.task,
           serves: draft.serves,
           makeAheadWindow: draft.makeAheadWindow,
+          timeOfDay: draft.timeOfDay,
           sourceDish: draft.sourceDish,
           workDayOffset: draft.workDayOffset,
           in: db,

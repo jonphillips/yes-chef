@@ -6,9 +6,9 @@ Summary: Prep steps gain an optional approximate time (`timeOfDay`). One Core pl
 Origin: Thanksgiving Week, staged from ChatGPT on 2026-11-11. One dispatch, one PR. **Persistent model change,
 authorized by ADR-0034 Amd 3.**
 
-Decisions: [ADR-0034 Amendment 3](../decisions/ADR-0034-prep-plan-work-session-timeline.md#amendment-3--a-step-carries-an-approximate-time-and-time-sets-its-place-in-the-day-2026-11-11)
+Decisions: [ADR-0034 Amendment 3](../../decisions/ADR-0034-prep-plan-work-session-timeline.md#amendment-3--a-step-carries-an-approximate-time-and-time-sets-its-place-in-the-day-2026-11-11)
 (C1–C3). Read it first. Precedent for threading a new step field through every producer:
-[archived `prep-step-make-ahead-window`](archive/prep-step-make-ahead-window.md), which did exactly this for
+[archived `prep-step-make-ahead-window`](prep-step-make-ahead-window.md), which did exactly this for
 `makeAheadWindow` (#486). Copy its shape; every file it touched is touched again here.
 
 ## Where things are (architect, 2026-11-11, `origin/main` 54b47d8)
@@ -122,7 +122,7 @@ sentence.
 - A work day stays in time order through chat apply, weave, paste-back and editor saves; Move Earlier/Later still
   works.
 - Restaging a day to add times re-sorts its existing steps without new ids.
-- Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above. Verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
 - The PR body gives the install order: the app on both devices, then the helper.
 - **Gate, before any TestFlight upload:** `prepPlanSteps.timeOfDay` (INT64) and its modification-time field are in

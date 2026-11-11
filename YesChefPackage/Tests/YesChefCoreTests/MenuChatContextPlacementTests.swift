@@ -93,7 +93,7 @@ extension RecipeCoreTests {
     func makeAheadWindowAppearsInContextAndCopyPrompt() {
       let context = MenuChatContext(
         title: "Thanksgiving",
-        dayCount: 1,
+        dayCount: 2,
         prepPlan: [
           PrepPlanStepRecord(
             id: SampleUUIDSequence.uuid(13_130),
@@ -101,14 +101,18 @@ extension RecipeCoreTests {
             sortOrder: 0,
             session: "Monday",
             task: "Make gravy",
-            makeAheadWindow: "Up to 3 days ahead"
+            makeAheadWindow: "Up to 3 days ahead",
+            timeOfDay: 15 * 60 + 15,
+            workDayOffset: 0
           )
         ]
       )
       let serialized = context.serialized(for: .frontierPreferred)
       let prompt = context.prepPrompt()
       #expect(serialized.contains("Make-ahead window: Up to 3 days ahead"))
+      #expect(serialized.contains("Time: 15:15"))
       #expect(prompt.components(separatedBy: MenuPrepPlanClient.makeAheadAndLeftoversGuidance).count == 2)
+      #expect(prompt.components(separatedBy: MenuPrepPlanClient.timeOfDayGuidance).count == 2)
       #expect(prompt.contains("Keeps: <window>"))
     }
   }

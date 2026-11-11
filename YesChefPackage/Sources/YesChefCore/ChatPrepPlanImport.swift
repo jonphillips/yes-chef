@@ -12,11 +12,31 @@ public struct ChatAccessStagedPrepPlan: Codable, Equatable, Sendable {
       public var session: String
       public var task: String
       public var makeAheadWindow: String?
-      public init(workDayOffset: Int? = nil, session: String, task: String, makeAheadWindow: String? = nil) {
+      public var timeOfDay: Int?
+      private enum CodingKeys: String, CodingKey { case workDayOffset, session, task, makeAheadWindow, time }
+      public init(workDayOffset: Int? = nil, session: String, task: String, makeAheadWindow: String? = nil, timeOfDay: Int? = nil) {
         self.workDayOffset = workDayOffset
         self.session = session
         self.task = task
         self.makeAheadWindow = makeAheadWindow?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.timeOfDay = timeOfDay
+      }
+      public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        workDayOffset = try container.decodeIfPresent(Int.self, forKey: .workDayOffset)
+        session = try container.decode(String.self, forKey: .session)
+        task = try container.decode(String.self, forKey: .task)
+        makeAheadWindow = try container.decodeIfPresent(String.self, forKey: .makeAheadWindow)
+          .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty }
+        timeOfDay = try container.decodeIfPresent(String.self, forKey: .time).flatMap(PrepPlanTime.minutes(from:))
+      }
+      public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(workDayOffset, forKey: .workDayOffset)
+        try container.encode(session, forKey: .session)
+        try container.encode(task, forKey: .task)
+        try container.encodeIfPresent(makeAheadWindow, forKey: .makeAheadWindow)
+        try container.encodeIfPresent(timeOfDay.flatMap(PrepPlanTime.string(from:)), forKey: .time)
       }
     }
     public var dayOffset: Int
@@ -62,7 +82,7 @@ public enum ChatPrepPlanImport {
   }
   public enum Entry: Equatable, Sendable {
     case new(dish: MenuItem, step: ChatAccessStagedPrepPlan.Dish.Step)
-    case kept(dish: MenuItem, step: PrepPlanStepRecord, matchedByName: Bool)
+    case kept(dish: MenuItem, step: PrepPlanStepRecord, staged: ChatAccessStagedPrepPlan.Dish.Step, matchedByName: Bool)
     case removed(dish: MenuItem, step: PrepPlanStepRecord, matchedByName: Bool)
   }
   public struct Plan: Equatable, Sendable {
@@ -103,7 +123,7 @@ public enum ChatPrepPlanImport {
       for staged in dish.steps {
         if let i = current.firstIndex(where: { same($0.0, staged) }) {
           let (step, matchedByName) = current.remove(at: i)
-          entries.append(.kept(dish: row, step: step, matchedByName: matchedByName))
+          entries.append(.kept(dish: row, step: step, staged: staged, matchedByName: matchedByName))
         } else { entries.append(.new(dish: row, step: staged)) }
       }
       entries += current.map { .removed(dish: row, step: $0.0, matchedByName: $0.1) }
@@ -129,35 +149,55 @@ public enum ChatPrepPlanImport {
     for id in removedIDs { try PrepPlanStepRecord.find(id).delete().execute(db) }
     var remaining = allRows.filter { !removedIDs.contains($0.id) }
     var insertions: [(Int, PrepPlanStepRecord)] = []
+    var newIDs = Set<UUID>()
     var entryIndex = 0
     for (dish, entries) in plan.dishes {
       for entry in entries {
         switch entry {
-        case let .kept(dish, row, matchedByName):
+        case let .kept(dish, row, staged, matchedByName):
           if matchedByName, let updated = try PrepPlanStepRecord.find(row.id).fetchOne(db) {
             var linked = updated; linked.sourceDish = dish.id
             try PrepPlanStepRecord.find(row.id).update { $0.sourceDish = #bind(dish.id) }.execute(db)
             if let index = remaining.firstIndex(where: { $0.id == linked.id }) { remaining[index] = linked }
           }
+          if row.timeOfDay != staged.timeOfDay || row.makeAheadWindow != staged.makeAheadWindow {
+            var updated = row
+            updated.timeOfDay = staged.timeOfDay
+            updated.makeAheadWindow = staged.makeAheadWindow
+            updated.sourceDish = dish.id
+            try PrepPlanStepRecord.find(row.id).update {
+              $0.timeOfDay = #bind(staged.timeOfDay)
+              $0.makeAheadWindow = #bind(staged.makeAheadWindow)
+              $0.sourceDish = #bind(dish.id)
+            }.execute(db)
+            if row.timeOfDay != staged.timeOfDay {
+              remaining.removeAll { $0.id == row.id }
+              insertions.append((entryIndex, updated))
+            } else if let index = remaining.firstIndex(where: { $0.id == row.id }) {
+              remaining[index] = updated
+            }
+          }
         case let .new(_, step):
           if keeping.contains(entryIndex) {
-            insertions.append((entryIndex, PrepPlanStepRecord(id: uuid(), menuID: menu.id, sortOrder: 0, session: step.session.trimmingCharacters(in: .whitespacesAndNewlines), task: step.task.trimmingCharacters(in: .whitespacesAndNewlines), serves: dish.title, makeAheadWindow: step.makeAheadWindow, sourceDish: dish.id, workDayOffset: step.workDayOffset)))
+            let inserted = PrepPlanStepRecord(id: uuid(), menuID: menu.id, sortOrder: 0, session: step.session.trimmingCharacters(in: .whitespacesAndNewlines), task: step.task.trimmingCharacters(in: .whitespacesAndNewlines), serves: dish.title, makeAheadWindow: step.makeAheadWindow, timeOfDay: step.timeOfDay, sourceDish: dish.id, workDayOffset: step.workDayOffset)
+            newIDs.insert(inserted.id)
+            insertions.append((entryIndex, inserted))
           }
         case .removed: break
         }
         entryIndex += 1
       }
     }
-    for (_, insertion) in insertions {
+    for (_, insertion) in insertions.sorted(by: { $0.0 < $1.0 }) {
       let sameBand = remaining.last { $0.workDayOffset == insertion.workDayOffset && $0.session == insertion.session }
       let sameDay = remaining.last { $0.workDayOffset == insertion.workDayOffset }
       let anchor = sameBand ?? sameDay
-      let position = anchor.flatMap { anchor in remaining.firstIndex(where: { $0.id == anchor.id }).map { $0 + 1 } } ?? remaining.endIndex
+      let fallbackIndex = anchor.flatMap { row in remaining.firstIndex(where: { $0.id == row.id }).map { $0 + 1 } } ?? remaining.endIndex
+      let position = PrepPlanPlacement.insertionIndex(of: insertion, into: remaining, dayCount: menu.dayCount, fallbackIndex: fallbackIndex)
       remaining.insert(insertion, at: position)
     }
-    let insertedIDs = Set(insertions.map { $0.1.id })
     for (order, row) in remaining.enumerated() {
-      if insertedIDs.contains(row.id) {
+      if newIDs.contains(row.id) {
         var inserted = row; inserted.sortOrder = order
         try PrepPlanStepRecord.insert { inserted }.execute(db)
       } else if row.sortOrder != order {
@@ -168,12 +208,12 @@ public enum ChatPrepPlanImport {
   }
 
   private static func same(_ row: PrepPlanStepRecord, _ step: ChatAccessStagedPrepPlan.Dish.Step) -> Bool {
-    row.workDayOffset == step.workDayOffset && row.session.trimmingCharacters(in: .whitespacesAndNewlines) == step.session.trimmingCharacters(in: .whitespacesAndNewlines) && row.task.trimmingCharacters(in: .whitespacesAndNewlines) == step.task.trimmingCharacters(in: .whitespacesAndNewlines) && row.makeAheadWindow == step.makeAheadWindow
+    row.workDayOffset == step.workDayOffset && row.session.trimmingCharacters(in: .whitespacesAndNewlines) == step.session.trimmingCharacters(in: .whitespacesAndNewlines) && row.task.trimmingCharacters(in: .whitespacesAndNewlines) == step.task.trimmingCharacters(in: .whitespacesAndNewlines)
   }
   private static func multiset(_ rows: [ChatAccessExport.PrepStepRecord]) -> [String: Int] {
-    Dictionary(rows.map { ("\($0.workDayOffset ?? 0)|\($0.session)|\($0.task)|\($0.serves ?? "")|\($0.makeAheadWindow ?? "")", 1) }, uniquingKeysWith: +)
+    Dictionary(rows.map { ("\($0.workDayOffset ?? 0)|\($0.session)|\($0.task)|\($0.serves ?? "")|\($0.makeAheadWindow ?? "")|\($0.time ?? "")", 1) }, uniquingKeysWith: +)
   }
   private static func trySteps(_ rows: [PrepPlanStepRecord]) -> [ChatAccessExport.PrepStepRecord] {
-    rows.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil, makeAheadWindow: $0.makeAheadWindow) }
+    rows.map { .init(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: nil, makeAheadWindow: $0.makeAheadWindow, timeOfDay: $0.timeOfDay) }
   }
 }

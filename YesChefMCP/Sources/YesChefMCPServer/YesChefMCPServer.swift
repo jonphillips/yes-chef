@@ -280,14 +280,14 @@ public enum YesChefMCPServer {
       },
       MCPTool(
         name: "stage_prep_plan",
-        description: "Replace the whole prep plan for each named dish; anything not sent for a named dish is removed, while unnamed dishes stay untouched. Read the menu with `get_menu` first. Send every separable task for each dish, not cooking instructions woven across recipes. Don't put the schedule in dish notes. A step serving several dishes goes under the dish it mostly serves and its task can name the others. `workDay` carries the day, so `session` is only the time within it (\"Afternoon\", \"About 6:45 PM\"); don't repeat the date. Set `makeAheadWindow` from the recipe's own limit, and leave it out when nothing grounds it. \(MenuPrepPlanClient.makeAheadAndLeftoversGuidance) Nothing is saved until Jon reviews it.",
+        description: "Replace the whole prep plan for each named dish; anything not sent for a named dish is removed, while unnamed dishes stay untouched. Read the menu with `get_menu` first. Send every separable task for each dish, not cooking instructions woven across recipes. Don't put the schedule in dish notes. A step serving several dishes goes under the dish it mostly serves and its task can name the others. `workDay` carries the day, so `session` is only the time within it (\"Afternoon\", \"About 6:45 PM\"); don't repeat the date. Set `makeAheadWindow` from the recipe's own limit, and leave it out when nothing grounds it. Add `time` as HH:mm for each work-day step, estimated from the meal's time when unstated; leave Flexible steps untimed. \(MenuPrepPlanClient.makeAheadAndLeftoversGuidance) \(MenuPrepPlanClient.timeOfDayGuidance) Nothing is saved until Jon reviews it.",
         inputSchema: .object(["type": .string("object"), "properties": .object([
           "menu": string,
           "dishes": .object(["type": .string("array"), "minItems": .integer(1), "maxItems": .integer(20), "items": .object([
             "type": .string("object"), "properties": .object([
               "day": integer, "ref": string, "title": string,
               "steps": .object(["type": .string("array"), "maxItems": .integer(40), "items": .object([
-                "type": .string("object"), "properties": .object(["workDay": integer, "session": string, "task": string, "makeAheadWindow": string]),
+                "type": .string("object"), "properties": .object(["workDay": integer, "time": string, "session": string, "task": string, "makeAheadWindow": string]),
                 "required": .array([.string("session"), .string("task")]), "additionalProperties": .bool(false),
               ])]),
             ]), "required": .array([.string("day"), .string("steps")]), "additionalProperties": .bool(false),
@@ -338,10 +338,21 @@ public enum YesChefMCPServer {
         } else if let workDay, !(-7...(menu.dayCount - 1)).contains(workDay) { problems.append("\(label), step \(j + 1): workDay must be from -7 to \(menu.dayCount - 1)") }
         if session.isEmpty { problems.append("\(label), step \(j + 1): session must not be empty") }
         if task.isEmpty || task.count > 500 { problems.append("\(label), step \(j + 1): task must contain 1 to 500 characters") }
+        let rawTime = step["time"].flatMap { $0 == .null ? nil : $0 }
+        let timeString = rawTime?.stringValue
+        let timeOfDay: Int?
+        if rawTime != nil {
+          if let timeString, let parsed = PrepPlanTime.minutes(from: timeString) {
+            timeOfDay = workDay == nil ? nil : parsed
+          } else {
+            problems.append("\(label), step \(j + 1): time must be HH:mm")
+            timeOfDay = nil
+          }
+        } else { timeOfDay = nil }
         let rawWindow = step["makeAheadWindow"].flatMap { $0 == .null ? nil : $0 }
         let makeAheadWindow = rawWindow?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
         if rawWindow != nil && makeAheadWindow == nil { problems.append("\(label), step \(j + 1): makeAheadWindow must be a string") }
-        decoded.append(.init(workDayOffset: workDay, session: session, task: task, makeAheadWindow: makeAheadWindow))
+        decoded.append(.init(workDayOffset: workDay, session: session, task: task, makeAheadWindow: makeAheadWindow, timeOfDay: timeOfDay))
       }
       let item = matches[0].1
       dishes.append(.init(dayOffset: day, recipeID: item.recipeID, title: item.title, steps: decoded))

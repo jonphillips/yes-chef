@@ -324,7 +324,7 @@ limit of a few days or less, is followed as written. The user's make-ahead prefe
 ## Amendment 3 — A step carries an approximate time, and time sets its place in the day (2026-11-11)
 
 Accepted 2026-11-11 by Jon, after staging Thanksgiving Week's whole plan from ChatGPT. Brief:
-[`prep-plan-time-order`](../efforts/prep-plan-time-order.md). Replaces [ADR-0060](ADR-0060-chat-access-over-mcp.md)
+[`prep-plan-time-order`](../efforts/archive/prep-plan-time-order.md). Replaces [ADR-0060](ADR-0060-chat-access-over-mcp.md)
 Amd 5-D5's ordering rule, and narrows Amd 2-B1's identity rule.
 
 **The problem.** Within a work day, steps sit in the order they arrived. A chat stages dish by dish, so a day reads by
