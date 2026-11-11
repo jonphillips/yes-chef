@@ -24,3 +24,5 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
+
+- [Prep steps sort by approximate time, and a chat can restage the whole plan](prep-plan-time-order-and-whole-plan.md) — **Ready.** An optional approximate time keeps each work day in time order; `stage_prep_plan` gains a `wholePlan` mode, and Removed steps can be kept. One nullable synced column.

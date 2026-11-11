@@ -320,3 +320,44 @@ limit of a few days or less, is followed as written. The user's make-ahead prefe
   enough (the [[llm-vs-determinism-surface-boundary]] line D1 already holds).
 - **Not built:** a setting for the allowance. Add one only if a dinner party and a week of family meals need different
   numbers.
+
+## Amendment 3 — A step carries an approximate time, and time sets its place in the day (2026-11-11)
+
+Accepted 2026-11-11 by Jon, after staging Thanksgiving Week's whole plan from ChatGPT. Brief:
+[`prep-plan-time-order-and-whole-plan`](../efforts/prep-plan-time-order-and-whole-plan.md). Replaces
+[ADR-0060](ADR-0060-chat-access-over-mcp.md) Amd 5-D5's ordering rule.
+
+**The problem.** Within a work day, steps sit in the order they arrived. A chat stages dish by dish, so a day reads by
+dish, not by time: Tuesday went 6:57 PM, 6:43 PM, 10:00 AM. The session text can't be the sort key, because most of
+Thursday's labels have no time in them ("About 45 minutes into roast", "After turkey is removed"). The 11-10 dogfood
+found this and parked it; staging 49 steps at once made it the main problem.
+
+### C1 — An optional approximate time, kept apart from the session label
+
+`prepPlanSteps` gains `timeOfDay INTEGER`, nullable: minutes after midnight, the approximate time the step starts on
+its work day. It's a sort key, not a promise. The session stays the label and keeps Jon's preference: approximate
+in the run-up, specific on the day. Nil means any time that day. Existing rows stay nil, with no backfill.
+
+- **Wire format:** `"HH:mm"`, 24-hour, wherever a producer or the export carries it.
+- **Producers:** the in-app weave, the Copy Prep Prompt round trip, and `stage_prep_plan` each give every step on a
+  work day an approximate time, for the meal's time when the menu doesn't state one. Flexible steps send none.
+- **Identity:** part of a step's contents wherever steps are matched, like B1's window.
+- **Shown:** in the step editor (an optional time) and in the chat review. The step row shows only the session.
+- **Cost:** one nullable column on a synced table, so another CloudKit Production deploy before any TestFlight
+  upload. Its consumer ships with it.
+
+### C2 — Time sets a step's place within its day; Move Earlier/Later still overrides
+
+One placement rule, used wherever a step is placed on a multi-day menu: a step with a time and a work day goes
+**before the first step on that day with a later time**, or after the day's last step if none is later. A step with
+no time goes where it goes today. The rule runs when:
+
+- a chat's staged steps are applied (replacing Amd 5-D5's "after the last step with the same session");
+- the weave or a paste-back replaces the plan (each step placed in turn, so a day comes out in time order);
+- a step is created, or saved with a changed time or work day, in the editor.
+
+Move Earlier/Later changes only `sortOrder`, never the time, so a manual order holds until that step's time or day
+changes. Nothing re-sorts on display. Flexible steps and one-day menus are unchanged.
+
+- **Rejected — parse the session text:** fails on relative labels, which are most of a dinner day.
+- **Rejected — sort on display:** it would undo Move Earlier/Later.

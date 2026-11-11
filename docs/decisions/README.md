@@ -41,7 +41,7 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0031](ADR-0031-llmclientkit-responses-api-migration.md) — Migrate the OpenAI backend of LLMClientKit to the Responses API *(Proposed, 2026-07-12)*
 - [ADR-0032](ADR-0032-workbench-reference-material-fetch.md) — Workbench reference material (app-side fetch, provider-agnostic context) *(Accepted, 2026-07-23)*
 - [ADR-0033](ADR-0033-recipe-detail-polish.md) — Recipe-detail polish: metadata chips + servings-attached scaler *(Accepted, 2026-07-12)*
-- [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) — The prep plan is one weaveable, work-session timeline *(Accepted, 2026-07-12; Amd 2 2026-11-11)*
+- [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) — The prep plan is one weaveable, work-session timeline *(Accepted, 2026-07-12; Amd 2–3 2026-11-11)*
 - [ADR-0035](ADR-0035-grocery-store-area-grouping.md) — Group the grocery list by store area, categorized on-device *(Accepted, 2026-07-12)*
 - [ADR-0036](ADR-0036-promote-note-to-recipe.md) — Promote a recipe-shaped note into a real recipe *(Accepted, 2026-07-12)*
 - [ADR-0037](ADR-0037-grocery-seed-coverage-diagnostic.md) — Seed-coverage diagnostic: a review queue for grocery store-area misses *(Accepted, 2026-07-13)*
@@ -67,7 +67,7 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0057](ADR-0057-prepared-components.md) — Prepared Components are **recipes with a `kind`**, linked to the dishes that use them by a **directional recipe-grain edge**; the flavor vocabulary is **one new facet surfaced as "Dimension"**; inventory stays out *(Accepted, 2026-09-17)*
 - [ADR-0058](ADR-0058-cockpit-find-referral-transport.md) — Cockpit Find referrals travel through a **pair-scoped App Group mailbox**, opened by a **single-purpose `yeschef://find-referral` door**; the verdict returns silently *(Accepted, 2026-09-24)*
 - [ADR-0059](ADR-0059-yes-chef-dev-variant.md) — Yes Chef Dev: after the cut, Debug builds get their own app identity, and backups say which build made them *(Accepted, 2026-11-01)*
-- [ADR-0060](ADR-0060-chat-access-over-mcp.md) — Chat assistants reach Yes Chef through a local MCP server, and an iCloud Drive folder carries the inbox and the read data to and from the phone *(Accepted, 2026-10-22; Amds 1–5 through 2026-11-10)*
+- [ADR-0060](ADR-0060-chat-access-over-mcp.md) — Chat assistants reach Yes Chef through a local MCP server, and an iCloud Drive folder carries the inbox and the read data to and from the phone *(Accepted, 2026-10-22; Amds 1–6 through 2026-11-11)*
 - [ADR-0061](ADR-0061-one-recipe-handoff.md) — One recipe hand-off: one button, one prompt, and the cook picks what comes back at finalize *(Accepted, 2026-11-03)*
 - [ADR-0062](ADR-0062-serve-with-recipe-links.md) — A Serve With row can link to a recipe *(Accepted, 2026-11-04)*
 - [ADR-0063](ADR-0063-menus-absorb-calendar-days.md) — A menu takes in the calendar days it covers, and a multi-day prep plan runs by work day *(Accepted, 2026-11-08)*
