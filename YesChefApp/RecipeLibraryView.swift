@@ -32,6 +32,7 @@ struct AppContainer: View {
   @State private var selectedSettingsPane: SettingsPane? = .categories
   @State private var presentedRecipe: RecipeDetailPresentation?
   @State private var presentedCookSession: CookSessionPresentation?
+  @State private var presentedTodayPrep: TodayPrepPresentation?
   @State private var hasNestedHandoffReviewHostClaim = false
 
   init() {
@@ -81,6 +82,7 @@ struct AppContainer: View {
       onCookSessionRequested: { presentation in
         presentedCookSession = presentation
       },
+      onTodayPrepRequested: { presentation in presentedTodayPrep = presentation },
       onRecipeCreated: recipeCreated
     )
     .onAppear {
@@ -105,6 +107,15 @@ struct AppContainer: View {
     }
     .fullScreenCover(item: $presentedCookSession) { presentation in
       CookSessionFullScreenCover(
+        presentation: presentation,
+        recipeModel: recipeModel,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel,
+        toastCenter: toastCenter
+      )
+    }
+    .fullScreenCover(item: $presentedTodayPrep) { presentation in
+      TodayPrepFullScreenCover(
         presentation: presentation,
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,

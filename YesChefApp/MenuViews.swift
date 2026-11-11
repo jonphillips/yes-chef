@@ -70,6 +70,7 @@ struct MenuDetailColumn: View {
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
+  var onTodayPrepRequested: ((TodayPrepPresentation) -> Void)?
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
 
@@ -81,6 +82,7 @@ struct MenuDetailColumn: View {
         menuID: menuID,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested,
+        onTodayPrepRequested: onTodayPrepRequested,
         isFocusActive: isFocusActive,
         focusButtonTapped: focusButtonTapped
       )
@@ -99,6 +101,7 @@ struct MenuDetailView: View {
   let recipeModel: RecipeLibraryModel
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var onCookSessionRequested: ((CookSessionPresentation) -> Void)?
+  var onTodayPrepRequested: ((TodayPrepPresentation) -> Void)?
   var isFocusActive = false
   var focusButtonTapped: (() -> Void)?
   @State private var detailModel: MenuDetailModel
@@ -110,6 +113,7 @@ struct MenuDetailView: View {
     menuID: CoreMenu.ID,
     onRecipeSelected: ((RecipeDetailPresentation) -> Void)? = nil,
     onCookSessionRequested: ((CookSessionPresentation) -> Void)? = nil,
+    onTodayPrepRequested: ((TodayPrepPresentation) -> Void)? = nil,
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil
   ) {
@@ -117,6 +121,7 @@ struct MenuDetailView: View {
     self.recipeModel = recipeModel
     self.onRecipeSelected = onRecipeSelected
     self.onCookSessionRequested = onCookSessionRequested
+    self.onTodayPrepRequested = onTodayPrepRequested
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
     _detailModel = State(wrappedValue: MenuDetailModel(menuID: menuID, toastCenter: model.toastCenter))
@@ -180,6 +185,13 @@ struct MenuDetailView: View {
               onCookSessionRequested?(cookSessionPresentation)
             } label: {
               Label("Cook these", systemImage: "flame")
+            }
+          }
+          if let detail = detailModel.detail, !detail.prepPlanSteps.isEmpty {
+            Button {
+              onTodayPrepRequested?(TodayPrepPresentation(menuID: detail.menu.id, title: detail.menu.title))
+            } label: {
+              Label("Prep", systemImage: "checklist")
             }
           }
           Button {
@@ -385,6 +397,7 @@ private extension CookSessionItem {
 
 struct MenuPrepPlanSection: View {
   let steps: [PrepPlanStepRecord]
+  let doneStepIDs: Set<PrepPlanStepRecord.ID>
   let dayCount: Int
   let placementStartDate: Date?
   let today: Date
@@ -467,6 +480,7 @@ struct MenuPrepPlanSection: View {
             ForEach(sessionBands) { band in
               MenuPrepPlanSessionBandView(
                 band: band,
+                doneStepIDs: doneStepIDs,
                 itemRows: itemRows,
                 isExpanded: expandedSessionIDs.contains(band.id) || (band.isToday && !expandedSessionIDs.contains("collapsed:\(band.id)")),
                 onToggle: {
@@ -519,6 +533,7 @@ struct MenuPrepPlanSection: View {
 
 private struct MenuPrepPlanSessionBandView: View {
   let band: MenuPrepPlanBand
+  let doneStepIDs: Set<PrepPlanStepRecord.ID>
   let itemRows: [MenuItemRowData]
   let isExpanded: Bool
   var onToggle: () -> Void
@@ -561,6 +576,7 @@ private struct MenuPrepPlanSessionBandView: View {
             }
             MenuPrepPlanStepView(
               step: presentation.step,
+              isDone: doneStepIDs.contains(presentation.step.id),
               itemRows: itemRows,
               onRecipeSelected: onRecipeSelected,
               editStep: editStep,

@@ -5,7 +5,7 @@
 > is a synced `completedAt` date on the step, so it survives the night and shows on the other device. Tapping a step
 > shows its dish's recipe alongside. Editing the plan stays in the Prep Plan column.
 
-Status: **Accepted** — 2026-11-11 (Proposed the same day). Brief: [`today-prep`](../efforts/today-prep.md). Origin: Jon, 2026-11-11: *"The prep plan UI we have today is fine for
+Status: **Accepted** — 2026-11-11 (Proposed the same day). Brief: [`today-prep`](../efforts/archive/today-prep.md). Origin: Jon, 2026-11-11: *"The prep plan UI we have today is fine for
 designing/editing. It's much less fun for actually doing the prep work. Just as we have a 'Cook These' flame icon in the
 toolbar, I wonder if you could brainstorm what a 'Today's Prep' view would look like."* He chose a synced done date
 (option 3 of three) the same day.

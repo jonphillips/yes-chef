@@ -75,8 +75,11 @@ extension RecipeCoreTests {
         try PrepPlanStepRepository.replace(drafts, for: menuID, in: db, now: now, uuid: UUID.init)
         #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.task) == ["Tzatziki", "Köfte", "Chicken", "Set table"])
         let originalIDs = try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id)
+        let checkedAt = now.addingTimeInterval(120)
+        try PrepPlanStepRepository.setCompleted(id: originalIDs[0], at: checkedAt, in: db)
         try PrepPlanStepRepository.replace(drafts, for: menuID, in: db, now: now, uuid: { Issue.record("Identical replacement must keep IDs"); return UUID() })
         #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id) == originalIDs)
+        #expect(try PrepPlanStepRecord.find(originalIDs[0]).fetchOne(db)?.completedAt == checkedAt)
       }
     }
 
@@ -110,6 +113,8 @@ extension RecipeCoreTests {
           [.init(session: "Dinner", task: "Warm pie", timeOfDay: 15 * 60, workDayOffset: 1)],
           for: menuID, in: db, now: now, uuid: { firstID }
         )
+        let checkedAt = now.addingTimeInterval(90)
+        try PrepPlanStepRepository.setCompleted(id: firstID, at: checkedAt, in: db)
         try PrepPlanStepRepository.replace(
           [.init(session: "Dinner", task: "Warm pie", timeOfDay: 16 * 60, workDayOffset: 1)],
           for: menuID, in: db, now: now, uuid: { Issue.record("A time change must keep the matched step ID"); return UUID() }
@@ -117,6 +122,19 @@ extension RecipeCoreTests {
         let step = try #require(PrepPlanStepRepository.steps(for: menuID, in: db).first)
         #expect(step.id == firstID)
         #expect(step.timeOfDay == 16 * 60)
+        #expect(step.completedAt == checkedAt)
+        let replacementID = UUID()
+        try PrepPlanStepRepository.replace(
+          [.init(session: "Dinner", task: "Bake pie", timeOfDay: 16 * 60, workDayOffset: 1)],
+          for: menuID,
+          in: db,
+          now: now,
+          uuid: { replacementID }
+        )
+        let maybeReplacement = try PrepPlanStepRecord.find(replacementID).fetchOne(db)
+        let replacement = try #require(maybeReplacement)
+        #expect(replacement.task == "Bake pie")
+        #expect(replacement.completedAt == nil)
       }
     }
 
@@ -131,7 +149,7 @@ extension RecipeCoreTests {
         try Menu.insert { Menu(id: menuID, title: "Manual order", dayCount: 3, dateCreated: now, dateModified: now) }.execute(db)
         try PrepPlanStepRecord.insert {
           [
-            PrepPlanStepRecord(id: earlierID, menuID: menuID, sortOrder: 0, session: "Dinner", task: "Earlier time", timeOfDay: 15 * 60, workDayOffset: 1),
+            PrepPlanStepRecord(id: earlierID, menuID: menuID, sortOrder: 0, session: "Dinner", task: "Earlier time", timeOfDay: 15 * 60, workDayOffset: 1, completedAt: now),
             PrepPlanStepRecord(id: laterID, menuID: menuID, sortOrder: 1, session: "Dinner", task: "Later time", timeOfDay: 16 * 60, workDayOffset: 1),
           ]
         }.execute(db)
@@ -139,6 +157,7 @@ extension RecipeCoreTests {
         let steps = try PrepPlanStepRepository.steps(for: menuID, in: db)
         #expect(steps.map(\.id) == [laterID, earlierID])
         #expect(steps.map(\.timeOfDay) == [16 * 60, 15 * 60])
+        #expect(steps.last?.completedAt == now)
       }
     }
   }

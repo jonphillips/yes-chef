@@ -37,6 +37,8 @@ extension RecipeCoreTests {
           [.init(session: "Friday", task: "Make sauce", makeAheadWindow: "Up to 3 days ahead")],
           for: menuID, in: db, now: now, uuid: { firstID }
         )
+        let checkedAt = now.addingTimeInterval(1)
+        try PrepPlanStepRepository.setCompleted(id: firstID, at: checkedAt, in: db)
         try PrepPlanStepRepository.replace(
           [.init(session: "Friday", task: "Make sauce", makeAheadWindow: "No more than 24 hours")],
           for: menuID, in: db, now: now, uuid: {
@@ -46,6 +48,7 @@ extension RecipeCoreTests {
         )
         #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id) == [firstID])
         #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).first?.makeAheadWindow == "No more than 24 hours")
+        #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).first?.completedAt == checkedAt)
         try PrepPlanStepRepository.replace(
           [.init(session: "Friday", task: "Make sauce", makeAheadWindow: "No more than 24 hours")],
           for: menuID, in: db, now: now, uuid: {
@@ -54,6 +57,7 @@ extension RecipeCoreTests {
           }
         )
         #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.id) == [firstID])
+        #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).first?.completedAt == checkedAt)
       }
     }
   }

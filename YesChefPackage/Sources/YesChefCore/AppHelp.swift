@@ -46,7 +46,8 @@ public struct AppHelpPage: Equatable, Sendable {
       ]),
       Section(heading: "Prep plan", bullets: [
         "The **Prep Plan** column lists work to do ahead. Build it from the **AI** menu: **Ask now** to work with the in-app chat, or **Hand off** to ChatGPT and **Paste** the reply. Tap a step to edit it.",
-        "On a menu longer than one day, steps are grouped by the day you do the work."
+        "On a menu longer than one day, steps are grouped by the day you do the work.",
+        "**Prep** opens steps due now as a checklist, with each dish's recipe beside it. Checks sync to your other devices. Swipe a step to move it to tomorrow."
       ]),
       Section(heading: "Cooking", bullets: [
         "**Cook these** opens the menu's recipes together for cooking."

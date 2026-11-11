@@ -24,6 +24,7 @@ struct AppMainLayout: View {
   let onBrowserCapture: (WebPage) async -> Void
   var onRecipeSelected: (RecipeDetailPresentation) -> Void
   var onCookSessionRequested: (CookSessionPresentation) -> Void
+  var onTodayPrepRequested: (TodayPrepPresentation) -> Void
   var onRecipeCreated: (Recipe.ID) -> Void
 
   var body: some View {
@@ -103,7 +104,8 @@ struct AppMainLayout: View {
         model: menuModel,
         recipeModel: recipeModel,
         onRecipeSelected: onRecipeSelected,
-        onCookSessionRequested: onCookSessionRequested
+        onCookSessionRequested: onCookSessionRequested,
+        onTodayPrepRequested: onTodayPrepRequested
       )
     } label: {
       Label(AppSection.menus.title, symbol: AppSection.menus.symbol)
@@ -283,6 +285,7 @@ private struct MenusTab: View {
   let recipeModel: RecipeLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let onCookSessionRequested: (CookSessionPresentation) -> Void
+  let onTodayPrepRequested: (TodayPrepPresentation) -> Void
 
   var body: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -293,6 +296,7 @@ private struct MenusTab: View {
         recipeModel: recipeModel,
         onRecipeSelected: onRecipeSelected,
         onCookSessionRequested: onCookSessionRequested,
+        onTodayPrepRequested: onTodayPrepRequested,
         isFocusActive: columnVisibility == .detailOnly,
         focusButtonTapped: focusButtonTapped
       )

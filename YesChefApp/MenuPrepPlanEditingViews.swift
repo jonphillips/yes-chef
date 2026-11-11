@@ -3,6 +3,7 @@ import YesChefCore
 
 struct MenuPrepPlanStepView: View {
   let step: PrepPlanStepRecord
+  var isDone = false
   let itemRows: [MenuItemRowData]
   var onRecipeSelected: ((RecipeDetailPresentation) -> Void)?
   var editStep: (PrepPlanStepRecord) -> Void
@@ -22,11 +23,19 @@ struct MenuPrepPlanStepView: View {
             .foregroundStyle(.secondary)
         }
         Text(step.task)
+          .foregroundStyle(isDone ? .secondary : .primary)
         if let dishChipLabel { servesLabel(dishChipLabel) }
       }
       Spacer(minLength: 8)
+      if isDone {
+        Image(systemName: "checkmark")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+          .accessibilityLabel("Done")
+      }
     }
     .padding(.vertical, 12)
+    .opacity(isDone ? 0.55 : 1)
     .contextMenu {
       Button { editStep(step) } label: { Label("Edit", symbol: .editRow) }
       Button("Move Earlier", systemImage: "arrow.up") { reorderStep(step.id, .earlier) }

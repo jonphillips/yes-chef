@@ -65,7 +65,8 @@ extension RecipeCoreTests {
               serves: index == 0 ? "Gravy" : nil,
               makeAheadWindow: index == 0 ? "Up to 3 days ahead" : nil,
               timeOfDay: index == 0 ? 13 * 60 + 30 : nil,
-              sourceDish: index == 0 ? containedItemID : nil
+              sourceDish: index == 0 ? containedItemID : nil,
+              completedAt: index == 0 ? now : nil
             )
           }.execute(db)
         }
@@ -158,6 +159,8 @@ extension RecipeCoreTests {
         #expect(copiedStep.makeAheadWindow == "Up to 3 days ahead")
         #expect(copiedStep.timeOfDay == 13 * 60 + 30)
         #expect(copiedStep.workDayOffset == 0)
+        #expect(copiedStep.completedAt == nil)
+        #expect(try PrepPlanStepRecord.find(containedStepID).fetchOne(db)?.completedAt == now)
         let copiedSteps = try PrepPlanStepRepository.steps(for: targetID, in: db)
         #expect(copiedSteps.first { $0.task == "Roast turkey" }?.workDayOffset == 1)
         #expect(copiedSteps.first { $0.task == "Carve turkey" }?.workDayOffset == 1)

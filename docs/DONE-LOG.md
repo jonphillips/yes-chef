@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Today's Prep checklist (`effort/today-prep`)
+
+- **Result:** Added the full-screen Prep checklist with synced completion dates, run-aware done state, recipe readers, light step editing, and done indicators in the Prep Plan column. Added the additive migration, CloudKit field expectations, and help text.
+- **Verification:** Passed scripts/check-drift.sh (SwiftLint, 833 package tests, app test-target build), generic iOS build, and YesChefTests (143 tests).
+- **Owed:** today-prep's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Groceries split into two trips (`effort/grocery-two-trips`)
 
 - **Result:** The Add Ingredients sheet splits menu and calendar ingredients into reusable Advance and Fresh lists, remembers switches in a synced grocery-trip table, and skips only Always have it pantry items. The Groceries List Actions menu now includes How Groceries Work.

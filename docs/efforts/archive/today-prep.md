@@ -7,9 +7,9 @@ Origin: Jon, 2026-11-11: the prep plan is fine for designing and "much less fun 
 dispatch, one PR. **Persistent model change, authorized by ADR-0067 D5.** Thanksgiving is Thu Nov 26. Landing by about
 Sat Nov 21 means the device pass is real use.
 
-Decisions: [ADR-0067](../decisions/ADR-0067-todays-prep.md) (D1–D10). Read it first. Patterns to copy: the cook
-session ([ADR-0016](../decisions/ADR-0016-multi-recipe-cook-session.md); `CookSessionView`, its root-level cover) and
-the archived [`prep-plan-time-order`](archive/prep-plan-time-order.md) brief, which threaded `timeOfDay` through every
+Decisions: [ADR-0067](../../decisions/ADR-0067-todays-prep.md) (D1–D10). Read it first. Patterns to copy: the cook
+session ([ADR-0016](../../decisions/ADR-0016-multi-recipe-cook-session.md); `CookSessionView`, its root-level cover) and
+the archived [`prep-plan-time-order`](prep-plan-time-order.md) brief, which threaded `timeOfDay` through every
 writer of `prepPlanSteps`. This effort touches the same writers.
 
 ## Where things are (architect, 2026-11-11, `origin/main` ab00a36)
@@ -177,7 +177,7 @@ This touches `YesChefApp/` model code, so the target runs (guardrail #9).
   re-weave of unchanged steps. Move to tomorrow, Add Step, Edit Step and Uncheck All work. The Prep Plan column shows
   done steps.
 - Nothing in the export, `get_menu`, the review text or the prompts changed.
-- Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above. Verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
 - The PR body gives the install order: the app on both devices. The helper doesn't change.
 - **Gate, before any TestFlight upload:** `prepPlanSteps.completedAt` and its modification-time field are in

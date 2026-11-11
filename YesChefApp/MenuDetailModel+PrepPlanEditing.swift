@@ -8,6 +8,24 @@ enum LearningCreationResult {
 }
 
 extension MenuDetailModel {
+  func setPrepPlanStepCompleted(_ id: PrepPlanStepRecord.ID, at date: Date?) {
+    do {
+      try database.write { db in try PrepPlanStepRepository.setCompleted(id: id, at: date, in: db) }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func uncheckAllPrepPlanSteps() {
+    do {
+      try database.write { db in try PrepPlanStepRepository.uncheckAll(menuID: menuID, in: db) }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func createLearning(_ text: String) -> LearningCreationResult {
     do {
       let inserted = try database.write { db in

@@ -52,6 +52,12 @@ struct ChatAccessStagedItemsTests {
       let plan = try ChatPrepPlanImport.plan(envelope, in: db)
       #expect(plan.planChangedSinceStage == false)
       #expect(plan.newCount == 1)
+      let checkedAt = now.addingTimeInterval(30)
+      try PrepPlanStepRepository.setCompleted(id: original[0].id, at: checkedAt, in: db)
+      #expect(try ChatPrepPlanImport.plan(envelope, in: db).planChangedSinceStage == false)
+      let export = try ChatAccessExportBuilder.build(in: db, generatedAt: now, device: "test")
+      let encodedExport = try ChatAccessExportCoding.encode(export)
+      #expect(String(decoding: encodedExport, as: UTF8.self).contains("completedAt") == false)
       try ChatPrepPlanImport.apply(plan, keeping: [1], in: db, now: now.addingTimeInterval(1), uuid: { UUID() })
       let updated = try PrepPlanStepRepository.steps(for: actualMenuID, in: db)
       #expect(updated.count == 2)
@@ -59,6 +65,8 @@ struct ChatAccessStagedItemsTests {
       #expect(updated.map(\.task) == ["Toast spices", "Chop herbs"])
       #expect(updated.last?.sourceDish == dishID)
       #expect(updated.last?.serves == "Beans")
+      #expect(updated.first?.completedAt == checkedAt)
+      #expect(updated.last?.completedAt == nil)
       let droppedNew = try ChatPrepPlanImport.plan(.init(menuID: actualMenuID, menuTitle: "Week", dishes: [
         .init(dayOffset: 0, recipeID: recipeID, title: "Beans", steps: [
           .init(workDayOffset: -1, session: "Day before", task: "Toast spices"),

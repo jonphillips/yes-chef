@@ -151,6 +151,12 @@ struct MenuDetailReader: View {
     VStack(alignment: .leading, spacing: 24) {
       MenuPrepPlanSection(
         steps: detail.prepPlanSteps,
+        doneStepIDs: PrepPlanProgress.doneStepIDs(
+          steps: detail.prepPlanSteps,
+          dayCount: detail.menu.dayCount,
+          placements: detail.placements,
+          today: detailModel.now
+        ),
         dayCount: detail.menu.dayCount,
         placementStartDate: detail.placements.count == 1 ? detail.placements[0].startDate : nil,
         today: detailModel.now,

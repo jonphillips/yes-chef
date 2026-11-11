@@ -33,6 +33,7 @@ Dev, on CloudKit Development.
 - **menu-help-and-add-menu, the whole brief:** On iPad, read ⋯ › How Menus Work; add Thanksgiving at Day 2 to a scratch 3-day menu and confirm its dishes and prep steps land there while Thanksgiving remains unchanged; ask menu chat how to combine menus and check that it explains Add Menu… and Bring In. ([brief](efforts/archive/menu-help-and-add-menu.md))
 - **prep-plan-time-order:** In ChatGPT, restage Tuesday dinner steps with times and confirm they stay Kept and order by time after Apply; repeat Thursday. Change one step time in the editor and confirm it moves, then Move Earlier on another step and confirm its manual position holds. ([brief](efforts/archive/prep-plan-time-order.md))
 - **grocery-two-trips:** Before Nov 19, Jon checks the Thanksgiving Advance/Fresh lists, a remembered switch, Butter set to Remind me, and How Groceries Work on iPad; before any TestFlight upload, groceryTripAssignments and its fields must be deployed to CloudKit Production. ([brief](efforts/archive/grocery-two-trips.md))
+- **today-prep:** On iPad, check two Thanksgiving Week Prep steps; on iPhone, confirm they are checked, then leave one unchecked overnight and find it under Still open. Move a step to Tomorrow, open its recipe, and confirm checkmarks in the Prep Plan column. ([brief](efforts/archive/today-prep.md))
 
 ## Held
 
