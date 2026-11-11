@@ -25,4 +25,3 @@ discoverable"):
 
 ## Live
 
-- [`stage_menu_day`: a chat replaces one day of an existing menu](stage-menu-day.md) — **Ready.** Chat sends a whole day; the app reviews before/after and Apply replaces it in one transaction, keeping the row of every dish that stays. No schema, no export change.

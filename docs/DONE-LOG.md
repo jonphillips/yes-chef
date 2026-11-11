@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-10 — S6 — stage_menu_day (`effort/stage-menu-day`)
+
+- **Result:** Added the stage_menu_day MCP handoff and a review that replaces one menu day while retaining matched dish rows and their linked data.
+- **Verification:** check-drift passed: 797 core tests, 19 helper tests, and the YesChefTests build. Generic iOS build passed; YesChefTests passed 136 tests.
+- **Owed:** stage-menu-day's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-10 — The menu row note shows on the recipe screen (`effort/menu-row-note-on-recipe`)
 
 - **Result:** RecipeDetailModel now observes a trimmed menu or calendar row note and the recipe screen shows it in a read-only card in compact and wide layouts. No schema or recipe writes were added.

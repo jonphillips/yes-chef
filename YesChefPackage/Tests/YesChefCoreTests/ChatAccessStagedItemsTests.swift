@@ -16,9 +16,18 @@ struct ChatAccessStagedItemsTests {
     ])
     let menuData = try JSONEncoder().encode(menu)
     #expect(try JSONDecoder().decode(ChatAccessStagedMenu.self, from: menuData) == menu)
+    let menuDay = ChatAccessStagedMenuDay(menuID: UUID(), menuTitle: "Supper", dayOffset: 1,
+      items: [.init(recipeID: nil, title: "Salad", dayOffset: 1, slot: .lunch, note: nil, scale: nil)],
+      dayAtStage: [.init(kind: .reservation, title: "Market", recipeID: nil, slot: .breakfast, note: "Get herbs", scale: 1)])
+    let menuDayData = try JSONEncoder().encode(menuDay)
+    #expect(try JSONDecoder().decode(ChatAccessStagedMenuDay.self, from: menuDayData) == menuDay)
     let newer = Data("{\"format\":\"yc-menu\",\"version\":2,\"title\":\"Supper\",\"dayCount\":1,\"items\":[]}".utf8)
     #expect(throws: ChatAccessStagedEnvelopeError.unsupportedVersion(found: 2, supported: 1)) {
       try JSONDecoder().decode(ChatAccessStagedMenu.self, from: newer)
+    }
+    let newerDay = Data("{\"format\":\"yc-menu-day\",\"version\":2}".utf8)
+    #expect(throws: ChatAccessStagedEnvelopeError.unsupportedVersion(found: 2, supported: 1)) {
+      try JSONDecoder().decode(ChatAccessStagedMenuDay.self, from: newerDay)
     }
   }
 
@@ -92,5 +101,224 @@ struct ChatAccessStagedItemsTests {
       #expect(rows.map(\.recipeID) == [recipeID, nil, nil])
       #expect(try RecipeScaleRepository.scale(for: .menuItem(rows[0].id), in: db) == 2)
     }
+  }
+
+  @Test func menuDayReplacementKeepsMatchedIdentityAndUntouchedDays() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_250_000)
+    let menuID = UUID()
+    let recipeID = UUID()
+    let otherRecipeID = UUID()
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(id: recipeID, title: "Souvlaki", dateCreated: now, dateModified: now)
+      }.execute(db)
+      try Recipe.insert {
+        Recipe(id: otherRecipeID, title: "Pie", dateCreated: now, dateModified: now)
+      }.execute(db)
+      _ = try MenuRepository.addMenu(title: "Thanksgiving Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+      let keptID = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: "Sauce aside", in: db, now: now, uuid: { UUID() })
+      try RecipeScaleRepository.setScale(2, for: .menuItem(keptID), in: db)
+      let groceryListID = UUID()
+      let groceryItemID = UUID()
+      let grocerySourceID = UUID()
+      let prepStepID = UUID()
+      try GroceryList.insert { GroceryList(id: groceryListID, title: "Shopping", sortOrder: 0, dateCreated: now, dateModified: now) }.execute(db)
+      try GroceryItem.insert { GroceryItem(id: groceryItemID, groceryListID: groceryListID, title: "Pita", sortOrder: 0, dateCreated: now, dateModified: now) }.execute(db)
+      try GroceryItemSource.insert {
+        GroceryItemSource(id: grocerySourceID, groceryItemID: groceryItemID, origin: .menuPlacement, menuID: menuID, menuItemID: keptID, dateCreated: now)
+      }.execute(db)
+      try PrepPlanStepRecord.insert {
+        PrepPlanStepRecord(id: prepStepID, menuID: menuID, sortOrder: 0, session: "Dinner", task: "Warm pita", sourceDish: keptID)
+      }.execute(db)
+      let reservationID = try MenuRepository.addNoteItem(menuID: menuID, title: "Bakery pickup", notes: nil, dayOffset: 0, mealSlot: .lunch, in: db, now: now, uuid: { UUID() })
+      let foundReservation = try MenuItem.find(reservationID).fetchOne(db)
+      var reservation = try #require(foundReservation)
+      reservation.kind = .reservation
+      try MenuItem.upsert { reservation }.execute(db)
+      let removedID = try MenuRepository.addNoteItem(menuID: menuID, title: "Remove me", notes: nil, dayOffset: 0, mealSlot: .breakfast, in: db, now: now, uuid: { UUID() })
+      let otherDayID = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: otherRecipeID, dayOffset: 1, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let before = try MenuItem.where { $0.menuID.eq(menuID) && $0.dayOffset.eq(0) }.fetchAll(db)
+      let staged = before.map { ChatAccessStagedMenuDay.LiveItem(kind: $0.kind, title: $0.title, recipeID: $0.recipeID, slot: $0.mealSlot, note: $0.notes, scale: $0.scale) }
+      let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Thanksgiving Week", dayOffset: 0, items: [
+        .init(recipeID: recipeID, title: "Souvlaki", dayOffset: 0, slot: .lunch, note: "Serve sauce separately", scale: nil),
+        .init(recipeID: nil, title: " bakery pickup ", dayOffset: 0, slot: .lunch, note: nil, scale: nil),
+      ], dayAtStage: staged)
+      let plan = try ChatMenuDayImport.plan(envelope, in: db)
+      #expect(!plan.dayChangedSinceStage)
+      #expect(plan.entries.count == 2)
+      guard case let .changed(row, changes, .libraryRecipe(id)) = plan.entries[0] else { Issue.record("Expected a changed recipe row"); return }
+      #expect(id == recipeID)
+      #expect(row.id == keptID)
+      #expect(changes.contains(.scale(from: 2, to: 1)))
+      guard case let .kept(reservationRow, .newDish) = plan.entries[1] else { Issue.record("Expected the matching reservation to stay"); return }
+      #expect(reservationRow.id == reservationID)
+      #expect(reservationRow.kind == .reservation)
+      #expect(plan.removed.map(\.id) == [removedID])
+      try ChatMenuDayImport.apply(plan, keeping: Set(plan.entries.indices), in: db, now: now.addingTimeInterval(1), uuid: { UUID() })
+      let after = try MenuItem.where { $0.menuID.eq(menuID) && $0.dayOffset.eq(0) }.fetchAll(db)
+      let matched = try #require(after.first { $0.id == keptID })
+      #expect(matched.mealSlot == .lunch)
+      #expect(matched.notes == "Serve sauce separately")
+      #expect(matched.scale == 1)
+      #expect(try GroceryItemSource.find(grocerySourceID).fetchOne(db)?.menuItemID == keptID)
+      #expect(try PrepPlanStepRecord.find(prepStepID).fetchOne(db)?.sourceDish == keptID)
+      #expect(after.contains { $0.id == reservationID && $0.kind == .reservation })
+      #expect(!after.contains { $0.id == removedID })
+      #expect(try MenuItem.find(otherDayID).fetchOne(db) != nil)
+      #expect(try Menu.find(menuID).fetchOne(db)?.dateModified == now.addingTimeInterval(1))
+    }
+  }
+
+  @Test func menuDayDriftAndDroppedMatchedRowAreVisibleAndApplied() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_260_000)
+    let menuID = UUID()
+    let recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Soup", dateCreated: now, dateModified: now) }.execute(db)
+      _ = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 1, in: db, now: now, uuid: { menuID })
+      let itemID = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let staged = ChatAccessStagedMenuDay.LiveItem(kind: .recipe, title: "Soup", recipeID: recipeID, slot: .dinner, note: nil, scale: 1)
+      try MenuRepository.updateRecipeItem(itemID: itemID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: "Changed after chat", in: db, now: now)
+      let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Week", dayOffset: 0,
+        items: [.init(recipeID: recipeID, title: "Soup", dayOffset: 0, slot: .dinner, note: nil, scale: nil)], dayAtStage: [staged])
+      let plan = try ChatMenuDayImport.plan(envelope, in: db)
+      #expect(plan.dayChangedSinceStage)
+      let changedRow = try MenuItem.find(itemID).fetchOne(db)
+      #expect(plan.entries == [.changed(row: try #require(changedRow), changes: [.note(nil)], resolution: .libraryRecipe(recipeID))])
+      try ChatMenuDayImport.apply(plan, keeping: [], in: db, now: now, uuid: { UUID() })
+      #expect(try MenuItem.find(itemID).fetchOne(db) == nil)
+    }
+  }
+
+  @Test func menuDayApplyRollsBackIfAnAddedRecipeBecomesUnavailable() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_270_000)
+    let menuID = UUID()
+    let recipeID = UUID()
+    let removedID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Pasta", dateCreated: now, dateModified: now) }.execute(db)
+      _ = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 1, in: db, now: now, uuid: { menuID })
+      _ = try MenuRepository.addNoteItem(menuID: menuID, title: "Old dish", notes: nil, dayOffset: 0, mealSlot: .breakfast, in: db, now: now, uuid: { removedID })
+    }
+    let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Week", dayOffset: 0, items: [
+      .init(recipeID: recipeID, title: "Pasta", dayOffset: 0, slot: .dinner, note: nil, scale: nil),
+    ], dayAtStage: [])
+    let plan = try database.read { db in try ChatMenuDayImport.plan(envelope, in: db) }
+    try database.write { db in
+      try Recipe.find(recipeID).update { $0.archived = true }.execute(db)
+    }
+    #expect(throws: MenuRepositoryError.recipeNotFound(recipeID)) {
+      try database.write { db in try ChatMenuDayImport.apply(plan, keeping: [0], in: db, now: now, uuid: { UUID() }) }
+    }
+    #expect(try database.read { db in try MenuItem.find(removedID).fetchOne(db) != nil })
+  }
+
+  @Test func menuDayMatchesDuplicateRecipeRowsToTheirOwnSlots() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_280_000)
+    let menuID = UUID(), recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Soup", dateCreated: now, dateModified: now) }.execute(db)
+      _ = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 1, in: db, now: now, uuid: { menuID })
+      let breakfastID = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .breakfast, notes: nil, in: db, now: now, uuid: { UUID() })
+      let dinnerID = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let rows = try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db)
+      let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Week", dayOffset: 0, items: [
+        .init(recipeID: recipeID, title: "Soup", dayOffset: 0, slot: .breakfast, note: nil, scale: nil),
+        .init(recipeID: recipeID, title: "Soup", dayOffset: 0, slot: .dinner, note: nil, scale: nil),
+      ], dayAtStage: rows.map { .init(kind: $0.kind, title: $0.title, recipeID: $0.recipeID, slot: $0.mealSlot, note: $0.notes, scale: $0.scale) })
+      let plan = try ChatMenuDayImport.plan(envelope, in: db)
+      guard case let .kept(breakfast, _) = plan.entries[0], case let .kept(dinner, _) = plan.entries[1] else {
+        Issue.record("Each proposal should match the row in its own slot")
+        return
+      }
+      #expect(breakfast.id == breakfastID)
+      #expect(dinner.id == dinnerID)
+    }
+  }
+
+  @Test func archivedRecipeBecomesAFlaggedNoteRowOnApply() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_290_000)
+    let menuID = UUID(), archivedID = UUID(), removedID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: archivedID, title: "Old roast", archived: true, dateCreated: now, dateModified: now) }.execute(db)
+      _ = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 1, in: db, now: now, uuid: { menuID })
+      _ = try MenuRepository.addNoteItem(menuID: menuID, title: "Remove", notes: nil, dayOffset: 0, mealSlot: .breakfast, in: db, now: now, uuid: { removedID })
+      let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Week", dayOffset: 0,
+        items: [.init(recipeID: archivedID, title: "Old roast", dayOffset: 0, slot: .dinner, note: "Rare", scale: 2)], dayAtStage: [])
+      let plan = try ChatMenuDayImport.plan(envelope, in: db)
+      guard case let .new(item, .recipeMissing) = plan.entries[0] else { Issue.record("The unavailable recipe should be flagged as new"); return }
+      #expect(item.title == "Old roast")
+      try ChatMenuDayImport.apply(plan, keeping: [0], in: db, now: now, uuid: { UUID() })
+      let rows = try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db)
+      #expect(rows.count == 1)
+      #expect(rows[0].kind == .note)
+      #expect(rows[0].recipeID == nil)
+      #expect(rows[0].title == "Old roast")
+      #expect(rows[0].scale == 2)
+      #expect(try MenuItem.find(removedID).fetchOne(db) == nil)
+    }
+  }
+
+  @Test func menuDayRowsMovingIntoASlotAreOrderedWithThatSlotsProposal() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_300_000)
+    let menuID = UUID(), firstRecipeID = UUID(), secondRecipeID = UUID()
+    try database.write { db in
+      try Recipe.insert {
+        Recipe(id: firstRecipeID, title: "A", dateCreated: now, dateModified: now)
+      }.execute(db)
+      try Recipe.insert {
+        Recipe(id: secondRecipeID, title: "B", dateCreated: now, dateModified: now)
+      }.execute(db)
+      _ = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 1, in: db, now: now, uuid: { menuID })
+      _ = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: firstRecipeID, dayOffset: 0, mealSlot: .lunch, notes: nil, in: db, now: now, uuid: { UUID() })
+      _ = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: secondRecipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Week", dayOffset: 0, items: [
+        .init(recipeID: firstRecipeID, title: "A", dayOffset: 0, slot: .dinner, note: nil, scale: nil),
+        .init(recipeID: secondRecipeID, title: "B", dayOffset: 0, slot: .dinner, note: nil, scale: nil),
+      ], dayAtStage: [])
+      let plan = try ChatMenuDayImport.plan(envelope, in: db)
+      try ChatMenuDayImport.apply(plan, keeping: [0, 1], in: db, now: now, uuid: { UUID() })
+      let rows = try MenuItem.where { $0.menuID.eq(menuID) && $0.dayOffset.eq(0) && $0.mealSlot.eq(MealPlanItemSlot.dinner) }
+        .fetchAll(db).sorted { $0.sortOrder < $1.sortOrder }
+      #expect(rows.map(\.title) == ["A", "B"])
+      #expect(rows.map(\.sortOrder) == [0, 1])
+    }
+  }
+
+  @Test func menuDayPlanAndApplyRejectDeletedMenusAndRemovedDays() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_310_000)
+    let menuID = UUID()
+    try database.write { db in
+      _ = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+      _ = try MenuRepository.addNoteItem(menuID: menuID, title: "Day one", notes: nil, dayOffset: 0, mealSlot: .dinner, in: db, now: now, uuid: { UUID() })
+    }
+    let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Week", dayOffset: 1, items: [
+      .init(recipeID: nil, title: "Supper", dayOffset: 1, slot: .dinner, note: nil, scale: nil),
+    ], dayAtStage: [])
+    let plan = try database.read { db in try ChatMenuDayImport.plan(envelope, in: db) }
+    try database.write { db in try Menu.find(menuID).update { $0.dayCount = 1 }.execute(db) }
+    #expect(throws: ChatMenuDayImport.Error.dayOutOfRange) {
+      try database.read { db in try ChatMenuDayImport.plan(envelope, in: db) }
+    }
+    #expect(throws: ChatMenuDayImport.Error.dayOutOfRange) {
+      try database.write { db in try ChatMenuDayImport.apply(plan, keeping: [0], in: db, now: now, uuid: { UUID() }) }
+    }
+    #expect(try database.read { db in try MenuItem.where { $0.menuID.eq(menuID) }.fetchAll(db).map(\.title) } == ["Day one"])
+
+    try database.write { db in try Menu.find(menuID).delete().execute(db) }
+    #expect(throws: ChatMenuDayImport.Error.menuUnavailable) {
+      try database.read { db in try ChatMenuDayImport.plan(envelope, in: db) }
+    }
+    #expect(throws: ChatMenuDayImport.Error.menuUnavailable) {
+      try database.write { db in try ChatMenuDayImport.apply(plan, keeping: [0], in: db, now: now, uuid: { UUID() }) }
+    }
+    #expect(try database.read { db in try Menu.fetchAll(db).isEmpty })
   }
 }

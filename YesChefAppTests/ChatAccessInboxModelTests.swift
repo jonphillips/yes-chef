@@ -401,6 +401,48 @@ struct ChatAccessInboxModelTests {
     }
   }
 
+  @Test func menuDayReviewAppliesReplacementThenClaimsTheStagedFile() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let recipeID = UUID()
+    let menuID = UUID()
+    let envelope = ChatAccessStagedMenuDay(menuID: menuID, menuTitle: "Thanksgiving Week", dayOffset: 0, items: [
+      .init(recipeID: recipeID, title: "Beans", dayOffset: 0, slot: .dinner, note: "Serve separately", scale: nil),
+    ], dayAtStage: [
+      .init(kind: .recipe, title: "Beans", recipeID: recipeID, slot: .dinner, note: nil, scale: 1),
+    ])
+    let text = String(decoding: try JSONEncoder().encode(envelope), as: UTF8.self)
+    let url = folder.inboxURL.appending(path: "20261110T120000Z-week-day-1.ycmenuday")
+    let recorder = InboxClaims()
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+      $0.chatAccessInboxFileClient = .init(read: { _ in text }, openAndClaim: { _, _ in "" },
+        claim: { _, url in await recorder.add(url) }, maintain: { _, _, _ in })
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let liveID = try await database.write { db -> UUID in
+        try Recipe.insert { Recipe(id: recipeID, title: "Beans", dateCreated: now, dateModified: now) }.execute(db)
+        _ = try MenuRepository.addMenu(title: "Thanksgiving Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { menuID })
+        return try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      }
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      let row = try #require(ChatAccessInbox.menuDayRows(from: [
+        .init(url: url, name: url.lastPathComponent, isCurrent: true, menuTitle: envelope.menuTitle, menuDayMenuID: menuID, menuDayOffset: 0),
+      ], resolve: { _, _ in (true, nil) }).first)
+      await model.open(row)
+      let review = try #require(model.menuDayReview)
+      review.setKept(false, at: 0)
+      review.setKept(true, at: 0)
+      await model.applyMenuDay(from: review)
+      #expect(model.menuDayReview == nil)
+      #expect(await recorder.urls == [url])
+      #expect(try await database.read { db in try MenuItem.find(liveID).fetchOne(db) }?.notes == "Serve separately")
+    }
+  }
+
   @Test func archivedRecipeReturnStaysUnclaimedUntilDiscarded() async throws {
     let (folder, defaults, suiteName, temporary) = try fixture()
     defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
