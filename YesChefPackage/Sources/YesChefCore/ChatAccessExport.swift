@@ -59,15 +59,17 @@ public struct ChatAccessExport: Codable, Equatable, Sendable {
     public var task: String
     public var serves: String?
     public var makeAheadWindow: String?
+    public var time: String?
     public var dishIndex: Int?
 
-    public init(workDayOffset: Int?, session: String, task: String, serves: String?, dishIndex: Int?, makeAheadWindow: String? = nil) {
+    public init(workDayOffset: Int?, session: String, task: String, serves: String?, dishIndex: Int?, makeAheadWindow: String? = nil, timeOfDay: Int? = nil) {
       self.workDayOffset = workDayOffset
       self.session = session
       self.task = task
       self.serves = serves
       self.dishIndex = dishIndex
       self.makeAheadWindow = makeAheadWindow
+      self.time = timeOfDay.flatMap(PrepPlanTime.string(from:))
     }
   }
 
@@ -197,7 +199,7 @@ public enum ChatAccessExportBuilder {
           ChatAccessExport.MenuItemRecord(kind: $0.kind, title: $0.title, recipeID: $0.recipeID, dayOffset: $0.dayOffset, slot: $0.mealSlot, note: $0.notes, scale: $0.scale)
         },
         prepPlan: try PrepPlanStepRepository.steps(for: menu.id, in: db).map {
-          ChatAccessExport.PrepStepRecord(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: $0.sourceDish.flatMap { dishIndices[$0] }, makeAheadWindow: $0.makeAheadWindow)
+          ChatAccessExport.PrepStepRecord(workDayOffset: $0.workDayOffset, session: $0.session, task: $0.task, serves: $0.serves, dishIndex: $0.sourceDish.flatMap { dishIndices[$0] }, makeAheadWindow: $0.makeAheadWindow, timeOfDay: $0.timeOfDay)
         }
       )
     }

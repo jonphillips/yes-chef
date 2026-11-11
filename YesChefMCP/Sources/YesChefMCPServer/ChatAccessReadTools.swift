@@ -178,6 +178,7 @@ enum ChatAccessReadTools {
           var fields: [String: MCPValue] = ["session": .string(step.session), "task": .string(step.task), "dish": dish]
           if menu.dayCount > 1, let workDay = step.workDayOffset { fields["workDay"] = .integer(workDay) }
           if let makeAheadWindow = step.makeAheadWindow { fields["makeAheadWindow"] = .string(makeAheadWindow) }
+          if let time = step.time { fields["time"] = .string(time) }
           return MCPValue.object(fields)
         }
         var menuValue: [String: MCPValue] = ["title": .string(menu.title), "notes": optional(menu.notes), "items": .array(items)]

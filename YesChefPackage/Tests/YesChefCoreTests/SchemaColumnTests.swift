@@ -52,9 +52,13 @@ struct SchemaColumnTests {
         )
       }.execute(db)
       try db.execute(sql: #"ALTER TABLE "prepPlanSteps" DROP COLUMN "makeAheadWindow""#)
+      try db.execute(sql: #"ALTER TABLE "prepPlanSteps" DROP COLUMN "timeOfDay""#)
       try db.execute(sql: #"ALTER TABLE "prepPlanSteps" DROP COLUMN "workDayOffset""#)
       try db.execute(
         sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Add prep plan make-ahead window'"#
+      )
+      try db.execute(
+        sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Add prep plan time of day'"#
       )
       try db.execute(
         sql: #"DELETE FROM "grdb_migrations" WHERE "identifier" = 'Add prep plan work day offset'"#
@@ -68,6 +72,7 @@ struct SchemaColumnTests {
       #expect(step.task == "Make dough")
       #expect(step.workDayOffset == nil)
       #expect(step.makeAheadWindow == nil)
+      #expect(step.timeOfDay == nil)
     }
     try migratedDatabase.close()
   }

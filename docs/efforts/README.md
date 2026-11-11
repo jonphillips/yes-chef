@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [Prep steps sort by approximate time](prep-plan-time-order.md) — **Ready.** An optional approximate time keeps each work day in time order; matching ignores time and window, so a restage that adds times re-sorts instead of replacing. One nullable synced column.
