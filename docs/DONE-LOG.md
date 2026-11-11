@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Grocery trips, prep time and prep completion CloudKit fields deployed
+
+- **Result:** The CloudKit schema for grocery-two-trips, prep-plan-time-order and today-prep is in Production, and the schema clause is gone from grocery-two-trips's line in `device-passes.md`. New in Production: the `groceryTripAssignments` type (`id`, `canonicalName`, `trip`: Encrypted String; `dateModified`: Encrypted Timestamp; the bare and per-column modification-time fields: Encrypted Int64), plus `prepPlanSteps.timeOfDay` (Encrypted Int64), `prepPlanSteps.completedAt` (Encrypted Timestamp) and their modification-time fields. Following jon-platform `persistence-and-sync.md` § *Adding a synced table or column*, the architect added all 13 fields to a fresh Development export, validated it, and imported it with `cktool` at Jon's request. Jon then deployed Development to Production in the Console.
+- **Verification:** After the import, Development matched the imported file and Production was unchanged. After the deploy, Production matched Development, and all 642 fields in `cloudkit-expected-fields.txt` (as of PR #496) were in Production.
+- **Owed:** The three slices' device gates, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Today's Prep checklist (`effort/today-prep`)
 
 - **Result:** Added the full-screen Prep checklist with synced completion dates, run-aware done state, recipe readers, light step editing, and done indicators in the Prep Plan column. Added the additive migration, CloudKit field expectations, and help text.

@@ -143,6 +143,44 @@ struct TodayPrepLayoutTests {
     #expect(layout.firstOpenBandID == layout.bands.last?.id)
   }
 
+  @Test
+  func betweenRunsTheUpcomingPlacementIsCurrent() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let first = calendar.date(from: DateComponents(year: 2025, month: 11, day: 24))!
+    let second = calendar.date(from: DateComponents(year: 2026, month: 11, day: 24))!
+    let today = calendar.date(from: DateComponents(year: 2026, month: 7, day: 1))!
+    let duringFirstRun = calendar.date(byAdding: .day, value: 1, to: first)!
+    let afterFirstRun = calendar.date(byAdding: .day, value: 30, to: first)!
+    let steps = [step(1, offset: 0, completedAt: duringFirstRun), step(2, offset: nil, completedAt: afterFirstRun)]
+
+    let layout = TodayPrepLayout.make(
+      steps: steps,
+      dayCount: 3,
+      placements: [placement(second, id: 2), placement(first, id: 1)],
+      today: today,
+      calendar: calendar
+    )
+    #expect(layout.mode == .manual)
+    #expect(layout.doneStepIDs == [steps[1].id])
+  }
+
+  @Test
+  func placedOneDayMenuUsesManualMode() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    let layout = TodayPrepLayout.make(
+      steps: [step(1, offset: nil), step(2, offset: 0)],
+      dayCount: 1,
+      placements: [placement(start, id: 1)],
+      today: start,
+      calendar: calendar
+    )
+    #expect(layout.mode == .manual)
+    #expect(layout.bands.isEmpty == false)
+  }
+
   private func placement(_ date: Date, id: Int) -> MenuPlacement {
     let uuid = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", id))!
     return MenuPlacement(id: uuid, menuID: uuid, startDate: date, dateCreated: date, dateModified: date)
