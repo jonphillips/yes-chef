@@ -5,7 +5,6 @@ struct ChatAccessInboxSection: View {
   let model: ChatAccessInboxModel
 
   var body: some View {
-    @Bindable var model = model
     if model.hasContent {
       Section {
         if let message = model.message {
@@ -136,24 +135,6 @@ struct ChatAccessInboxSection: View {
       } footer: {
         Text("Open a staged recipe return, menu or menu day to review it, or discard it.")
       }
-      .sheet(item: $model.review) { review in
-        switch review {
-        case let .menu(menuReview):
-          ChatMenuReviewSheet(
-            model: menuReview,
-            isCreating: model.workingIDs.contains(menuReview.row.id),
-            create: { await model.createMenu(from: menuReview) }
-          )
-        case let .menuDay(menuDayReview):
-          ChatMenuDayReviewSheet(
-            model: menuDayReview,
-            isApplying: model.workingIDs.contains(menuDayReview.row.id),
-            apply: { await model.applyMenuDay(from: menuDayReview) }
-          )
-        case let .prepPlan(prepPlanReview):
-          ChatPrepPlanReviewSheet(model: prepPlanReview, isApplying: model.workingIDs.contains(prepPlanReview.row.id), apply: { await model.applyPrepPlan(from: prepPlanReview) })
-        }
-      }
     }
   }
 
@@ -197,6 +178,7 @@ struct FromChatView: View {
   let model: ChatAccessInboxModel
 
   var body: some View {
+    @Bindable var model = model
     Form {
       ChatAccessInboxSection(model: model)
       if !model.hasContent {
@@ -205,6 +187,26 @@ struct FromChatView: View {
           systemImage: "tray.and.arrow.down",
           description: Text("Recipes, returns and menus that ChatGPT stages show up here for you to review.")
         )
+      }
+    }
+    // On the Form, not the Section: a Section's modifiers fan out to every row, so several
+    // presenters bound to one item fought and the first Open dismissed itself.
+    .sheet(item: $model.review) { review in
+      switch review {
+      case let .menu(menuReview):
+        ChatMenuReviewSheet(
+          model: menuReview,
+          isCreating: model.workingIDs.contains(menuReview.row.id),
+          create: { await model.createMenu(from: menuReview) }
+        )
+      case let .menuDay(menuDayReview):
+        ChatMenuDayReviewSheet(
+          model: menuDayReview,
+          isApplying: model.workingIDs.contains(menuDayReview.row.id),
+          apply: { await model.applyMenuDay(from: menuDayReview) }
+        )
+      case let .prepPlan(prepPlanReview):
+        ChatPrepPlanReviewSheet(model: prepPlanReview, isApplying: model.workingIDs.contains(prepPlanReview.row.id), apply: { await model.applyPrepPlan(from: prepPlanReview) })
       }
     }
     .navigationTitle(AppSection.fromChat.title)
