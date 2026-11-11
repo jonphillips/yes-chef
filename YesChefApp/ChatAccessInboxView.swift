@@ -6,7 +6,7 @@ struct ChatAccessInboxSection: View {
 
   var body: some View {
     @Bindable var model = model
-    if model.inboxCount > 0 || !model.returnRows.isEmpty || !model.recipeReturnRows.isEmpty || !model.menuDayRows.isEmpty || model.message != nil {
+    if model.hasContent {
       Section {
         if let message = model.message {
           Label(message, systemImage: "exclamationmark.icloud")
@@ -176,5 +176,23 @@ struct ChatAccessInboxSection: View {
     }
     .attentionCard()
     .accessibilityElement(children: .contain)
+  }
+}
+
+struct FromChatView: View {
+  let model: ChatAccessInboxModel
+
+  var body: some View {
+    Form {
+      ChatAccessInboxSection(model: model)
+      if !model.hasContent {
+        ContentUnavailableView(
+          "Nothing from Chat",
+          systemImage: "tray.and.arrow.down",
+          description: Text("Recipes, returns and menus that ChatGPT stages show up here for you to review.")
+        )
+      }
+    }
+    .navigationTitle(AppSection.fromChat.title)
   }
 }

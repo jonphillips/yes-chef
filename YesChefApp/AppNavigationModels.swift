@@ -49,6 +49,7 @@ struct CookSessionPresentation: Hashable, Identifiable {
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
+  case fromChat
   case createRecipe
   case groceries
   case mealCalendar
@@ -63,6 +64,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .recipes: "Recipes"
+    case .fromChat: "From Chat"
     case .createRecipe: "Create Recipe"
     case .groceries: "Groceries"
     case .mealCalendar: "Calendar"
@@ -77,6 +79,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var symbol: AppSymbol {
     switch self {
     case .recipes: .recipe
+    case .fromChat: .fromChat
     case .createRecipe: .addRecipes
     case .workbenches: .workbench
     case .powerBrowser: AppSymbol("square.grid.2x2")

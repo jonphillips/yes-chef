@@ -92,7 +92,7 @@ struct SettingsView: View {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
         .disabled(chatAccessExportModel.isRefreshing)
-        LabeledContent("Inbox", value: "\(chatAccessInboxModel.inboxCount)")
+        LabeledContent("From Chat", value: "\(chatAccessInboxModel.inboxCount)")
         if let error = chatAccessExportModel.errorMessage {
           Text(error).foregroundStyle(.red)
         }

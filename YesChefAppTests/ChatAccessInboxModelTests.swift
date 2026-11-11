@@ -10,6 +10,37 @@ import YesChefCore
 @MainActor
 struct ChatAccessInboxModelTests {
   @Test
+  func hasContentIncludesUnopenableMenuDayWithoutCountingIt() async throws {
+    let (folder, defaults, suiteName, temporary) = try fixture()
+    defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }
+    let menuID = UUID()
+    let envelope = ChatAccessStagedMenuDay(
+      menuID: menuID, menuTitle: "Missing Menu", dayOffset: 0, items: [], dayAtStage: []
+    )
+    let text = String(decoding: try JSONEncoder().encode(envelope), as: UTF8.self)
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.chatAccessInboxFileClient = .init(read: { _ in text }, openAndClaim: { _, _ in "" },
+        claim: { _, _ in }, maintain: { _, _, _ in })
+    } operation: {
+      let model = ChatAccessInboxModel(folder: folder, defaults: defaults)
+      #expect(!model.hasContent)
+
+      let url = folder.inboxURL.appending(path: "20261110T120000Z-missing-menu.ycmenuday")
+      model.receiveSnapshots([ChatInboxSnapshot(url: url, name: url.lastPathComponent, isCurrent: true)])
+      for _ in 0..<100 where model.menuDayRows.first?.hasMenuMetadata != true {
+        try await Task.sleep(for: .milliseconds(10))
+      }
+
+      #expect(model.menuDayRows.count == 1)
+      #expect(!model.menuDayRows[0].canOpen)
+      #expect(model.hasContent)
+      #expect(model.inboxCount == 0)
+    }
+  }
+
+  @Test
   func snapshotsReportDownloadErrorsAndPreserveCurrentRowErrors() async throws {
     let (folder, defaults, suiteName, temporary) = try fixture()
     defer { defaults.removePersistentDomain(forName: suiteName); try? FileManager.default.removeItem(at: temporary) }

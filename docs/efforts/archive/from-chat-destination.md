@@ -7,10 +7,10 @@ Origin: Jon, during the S6 device pass (2026-11-10): "Create Recipe is becoming 
 five inbox kinds don't end in Create Recipe, and a staged menu day sat in a list hidden inside another
 destination's screen. One dispatch, one PR. **No schema change.**
 
-Decisions: [ADR-0060 Amendment 4](../decisions/ADR-0060-chat-access-over-mcp.md#amendment-4--from-chat-is-its-own-sidebar-destination-2026-11-10)
-(D1–D3). Related: [ADR-0053](../decisions/ADR-0053-create-recipe-destination.md) (Create Recipe is compose plus
-draft; unchanged) · [ADR-0046](../decisions/ADR-0046-sidebar-adaptable-app-shell.md) (the sidebar-adaptable shell) ·
-[archived `stage-menu-day`](archive/stage-menu-day.md) (the latest kind added to the list).
+Decisions: [ADR-0060 Amendment 4](../../decisions/ADR-0060-chat-access-over-mcp.md#amendment-4--from-chat-is-its-own-sidebar-destination-2026-11-10)
+(D1–D3). Related: [ADR-0053](../../decisions/ADR-0053-create-recipe-destination.md) (Create Recipe is compose plus
+draft; unchanged) · [ADR-0046](../../decisions/ADR-0046-sidebar-adaptable-app-shell.md) (the sidebar-adaptable shell) ·
+[archived `stage-menu-day`](stage-menu-day.md) (the latest kind added to the list).
 
 ## Where things are (architect, 2026-11-10, `origin/main` 5153ee0)
 
@@ -71,7 +71,7 @@ row whose menu is missing, which is visible but not counted.
 - **From Chat** is in the sidebar on iPad and iPhone, directly above Create Recipe. It carries the badge and shows
   the empty state when nothing is staged.
 - Create Recipe shows only Source and the draft, with no badge.
-- Verification per [`verification.md`](../verification.md): `check-drift.sh` and the generic app build. Run
+- Verification per [`verification.md`](../../verification.md): `check-drift.sh` and the generic app build. Run
   `YesChefTests` only if you changed `ChatAccessInboxModel`. Then closeout (ADR-0005 D16).
 - **Jon's device gate** (iPad, then iPhone):
   - From Chat shows the badge and the staged items;

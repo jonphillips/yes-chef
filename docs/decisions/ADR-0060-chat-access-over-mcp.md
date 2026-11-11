@@ -797,7 +797,7 @@ menu's.
 
 Status: **Accepted** on the merge of its plan PR. Moves where the app lists inbox items (D3's "the app lists inbox
 items"); changes no tool, no inbox kind, no review and no write. Schema-free. Built by effort
-[`from-chat-destination`](../efforts/from-chat-destination.md).
+[`from-chat-destination`](../efforts/archive/from-chat-destination.md).
 
 ### Context
 

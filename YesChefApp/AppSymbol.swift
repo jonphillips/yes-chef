@@ -37,6 +37,7 @@ struct AppSymbol: Sendable, Hashable {
   }
 
   static let recipe = Self("richtext.page")
+  static let fromChat = Self("tray.and.arrow.down")
   static let addRecipes = Self(.customRichtextPageBadgePlus)
   static let makeRecipe = Self(.customRichtextPageArrowIn)
   static let menu = Self("menucard")

@@ -25,5 +25,4 @@ discoverable"):
 
 ## Live
 
-- [From Chat gets its own sidebar destination](from-chat-destination.md) — **Ready.** The From Chat list moves out of Create Recipe into its own badged sidebar destination with an empty state; Create Recipe goes back to compose and draft. View and navigation only, no schema.
 - [`stage_prep_plan`: a chat replaces the prep plan for the dishes it names](stage-prep-plan.md) — **Ready.** Chat sends every step for each dish it names; the app reviews per dish and Apply replaces only those dishes' steps, linked. `get_menu` shows the plan. No schema; optional export field.
