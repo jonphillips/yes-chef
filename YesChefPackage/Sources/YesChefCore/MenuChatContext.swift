@@ -227,6 +227,7 @@ public struct MenuChatContext: Equatable, Sendable {
     }
     return """
     You weave a staged prep plan for one multi-day menu from the menu context below. Compose from stored per-recipe Make-Ahead notes when present, and invent grounded sequencing, work sessions, and new prep steps from the menu's dishes. Prefer the authored Make-Ahead notes when they are available.
+    \(MenuPrepPlanClient.makeAheadAndLeftoversGuidance)
 
     \(calendarInstruction)
 
@@ -240,7 +241,7 @@ public struct MenuChatContext: Equatable, Sendable {
     \(workDayInstruction) Example:
     \(formatExample)
 
-    Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix.\(transportInstruction)\(subjectContext)
+    Put one task on each `- task → serves` bullet, using the Unicode `→` glyph (not ASCII `->`) for the optional serves suffix. If a recipe's Make-Ahead note or recipe text grounds a window, add an indented `  Keeps: <window>` line immediately below that task; omit it otherwise.\(transportInstruction)\(subjectContext)
     """
   }
 
@@ -298,6 +299,9 @@ public struct MenuChatContext: Equatable, Sendable {
         lines.append("- \(dayBand)\(step.session): \(step.task)")
         if let serves = step.serves {
           lines.append("  - Serves: \(serves)")
+        }
+        if let makeAheadWindow = step.makeAheadWindow {
+          lines.append("  - Make-ahead window: \(makeAheadWindow)")
         }
         if let sourceDish = step.sourceDish {
           lines.append("  - Source menu item ID: \(sourceDish.uuidString)")

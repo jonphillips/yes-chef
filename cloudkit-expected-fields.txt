@@ -306,6 +306,7 @@ pantryItems thresholdQuantity
 pantryItems thresholdUnit
 pantryItems title
 prepPlanSteps id
+prepPlanSteps makeAheadWindow
 prepPlanSteps menuID
 prepPlanSteps serves
 prepPlanSteps session
@@ -313,6 +314,7 @@ prepPlanSteps sortOrder
 prepPlanSteps sourceDish
 prepPlanSteps sqlitedata_icloud_userModificationTime
 prepPlanSteps sqlitedata_icloud_userModificationTime_id
+prepPlanSteps sqlitedata_icloud_userModificationTime_makeAheadWindow
 prepPlanSteps sqlitedata_icloud_userModificationTime_menuID
 prepPlanSteps sqlitedata_icloud_userModificationTime_serves
 prepPlanSteps sqlitedata_icloud_userModificationTime_session

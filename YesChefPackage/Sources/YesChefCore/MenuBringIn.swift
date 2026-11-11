@@ -197,6 +197,7 @@ extension MenuRepository {
           PrepPlanStepRecord(
             id: uuid(), menuID: menuID, sortOrder: nextStepOrder + stepIndex, session: source.session,
             task: source.task, serves: source.serves,
+            makeAheadWindow: source.makeAheadWindow,
             sourceDish: source.sourceDish.flatMap { copiedItemIDs[$0] },
             workDayOffset: workDayOffset
           )

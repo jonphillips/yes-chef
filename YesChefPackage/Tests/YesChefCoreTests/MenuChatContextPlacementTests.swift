@@ -88,5 +88,28 @@ extension RecipeCoreTests {
       #expect(prompt.contains("Two days ahead"))
       #expect(!prompt.contains("calendar dates in the menu context are authoritative"))
     }
+
+    @Test
+    func makeAheadWindowAppearsInContextAndCopyPrompt() {
+      let context = MenuChatContext(
+        title: "Thanksgiving",
+        dayCount: 1,
+        prepPlan: [
+          PrepPlanStepRecord(
+            id: SampleUUIDSequence.uuid(13_130),
+            menuID: SampleUUIDSequence.uuid(13_131),
+            sortOrder: 0,
+            session: "Monday",
+            task: "Make gravy",
+            makeAheadWindow: "Up to 3 days ahead"
+          )
+        ]
+      )
+      let serialized = context.serialized(for: .frontierPreferred)
+      let prompt = context.prepPrompt()
+      #expect(serialized.contains("Make-ahead window: Up to 3 days ahead"))
+      #expect(prompt.components(separatedBy: MenuPrepPlanClient.makeAheadAndLeftoversGuidance).count == 2)
+      #expect(prompt.contains("Keeps: <window>"))
+    }
   }
 }

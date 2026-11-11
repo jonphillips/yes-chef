@@ -42,19 +42,19 @@ struct ChatPrepPlanReviewSheet: View {
               ForEach(new, id: \.0) { index, entry in
                 if case let .new(_, step) = entry {
                   Toggle(isOn: Binding(get: { model.keptIndices.contains(index) }, set: { model.setKept($0, at: index) })) {
-                    stepRow(workDay: step.workDayOffset, session: step.session, task: step.task)
+                    stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow)
                   }
                 }
               }
             }
             let kept = dish.1.compactMap { if case let .kept(_, step, _) = $0 { step } else { nil } }
             if !kept.isEmpty { Text("Kept").font(.caption).foregroundStyle(.secondary) }
-            ForEach(kept) { step in stepRow(workDay: step.workDayOffset, session: step.session, task: step.task) }
+            ForEach(kept) { step in stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow) }
             let removed = dish.1.compactMap { if case let .removed(_, step, byName) = $0 { (step, byName) } else { nil } }
             if !removed.isEmpty { Text("Removed").font(.caption).foregroundStyle(.secondary) }
             ForEach(Array(removed.enumerated()), id: \.offset) { _, item in
               let (step, byName) = item
-              VStack(alignment: .leading) { stepRow(workDay: step.workDayOffset, session: step.session, task: step.task); if byName { Text("Matched by name").font(.caption).foregroundStyle(.secondary) } }
+              VStack(alignment: .leading) { stepRow(workDay: step.workDayOffset, session: step.session, task: step.task, makeAheadWindow: step.makeAheadWindow); if byName { Text("Matched by name").font(.caption).foregroundStyle(.secondary) } }
             }
           }
         }
@@ -70,7 +70,7 @@ struct ChatPrepPlanReviewSheet: View {
     .presentationDetents([.medium, .large])
   }
 
-  private func stepRow(workDay: Int?, session: String, task: String) -> some View {
+  private func stepRow(workDay: Int?, session: String, task: String, makeAheadWindow: String?) -> some View {
     VStack(alignment: .leading, spacing: 3) {
       let day = workDay.map { offset in
         model.plan.startDate.flatMap { Calendar.current.date(byAdding: .day, value: offset, to: $0) }
@@ -78,6 +78,7 @@ struct ChatPrepPlanReviewSheet: View {
       }
       Text(day.map { "\($0) · \(session)" } ?? session).font(.subheadline)
       Text(task).foregroundStyle(.secondary)
+      if let makeAheadWindow { Text(makeAheadWindow).font(.caption).foregroundStyle(.secondary) }
     }
   }
 }

@@ -21,6 +21,8 @@ struct ChatAccessStagedItemsTests {
       dayAtStage: [.init(kind: .reservation, title: "Market", recipeID: nil, slot: .breakfast, note: "Get herbs", scale: 1)])
     let menuDayData = try JSONEncoder().encode(menuDay)
     #expect(try JSONDecoder().decode(ChatAccessStagedMenuDay.self, from: menuDayData) == menuDay)
+    let legacyPrepStep = Data(#"{"workDayOffset":null,"session":"Friday","task":"Make sauce","serves":null,"dishIndex":null}"#.utf8)
+    #expect(try JSONDecoder().decode(ChatAccessExport.PrepStepRecord.self, from: legacyPrepStep).makeAheadWindow == nil)
     let newer = Data("{\"format\":\"yc-menu\",\"version\":2,\"title\":\"Supper\",\"dayCount\":1,\"items\":[]}".utf8)
     #expect(throws: ChatAccessStagedEnvelopeError.unsupportedVersion(found: 2, supported: 1)) {
       try JSONDecoder().decode(ChatAccessStagedMenu.self, from: newer)
@@ -65,6 +67,31 @@ struct ChatAccessStagedItemsTests {
       ], planAtStage: nil), in: db)
       try ChatPrepPlanImport.apply(droppedNew, keeping: [], in: db, now: now.addingTimeInterval(2), uuid: { UUID() })
       #expect(try PrepPlanStepRepository.steps(for: actualMenuID, in: db).map(\.task) == ["Toast spices"])
+    }
+  }
+
+  @Test func stagedPrepPlanTreatsAWindowChangeAsRemovedAndNew() throws {
+    @Dependency(\.defaultDatabase) var database
+    let now = Date(timeIntervalSinceReferenceDate: 840_100_150), recipeID = UUID()
+    try database.write { db in
+      try Recipe.insert { Recipe(id: recipeID, title: "Sauce", dateCreated: now, dateModified: now) }.execute(db)
+      let menuID = try MenuRepository.addMenu(title: "Week", notes: nil, dayCount: 2, in: db, now: now, uuid: { UUID() })
+      let dishID = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { UUID() })
+      try PrepPlanStepRepository.create(.init(
+        session: "Monday", task: "Make sauce", serves: "Sauce",
+        makeAheadWindow: "No more than 24 hours", sourceDish: dishID, workDayOffset: -1
+      ), for: menuID, in: db, now: now, uuid: { UUID() })
+      let envelope = ChatAccessStagedPrepPlan(menuID: menuID, menuTitle: "Week", dishes: [
+        .init(dayOffset: 0, recipeID: recipeID, title: "Sauce", steps: [
+          .init(workDayOffset: -1, session: "Monday", task: "Make sauce", makeAheadWindow: "Up to 3 days ahead"),
+        ]),
+      ], planAtStage: nil)
+      let plan = try ChatPrepPlanImport.plan(envelope, in: db)
+      let entries = try #require(plan.dishes.first?.1)
+      #expect(entries.contains { if case .new = $0 { true } else { false } })
+      #expect(entries.contains { if case .removed = $0 { true } else { false } })
+      try ChatPrepPlanImport.apply(plan, keeping: [0], in: db, now: now.addingTimeInterval(1), uuid: { UUID() })
+      #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).first?.makeAheadWindow == "Up to 3 days ahead")
     }
   }
 
