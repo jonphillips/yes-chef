@@ -1,14 +1,13 @@
-# Effort — Prep steps sort by approximate time, and a chat can restage the whole plan
+# Effort — Prep steps sort by approximate time
 
 Status: Ready
-Summary: Prep steps gain an optional approximate time (`timeOfDay`). One Core placement rule uses it to keep a work day in time order on chat apply, weave, paste-back and editor saves, and Move Earlier/Later still overrides. `stage_prep_plan` gains a `wholePlan` mode that also removes steps no dish owns, and every Removed step in the review gets a keep toggle. One nullable synced column, with a Production deploy.
+Summary: Prep steps gain an optional approximate time (`timeOfDay`). One Core placement rule uses it to keep a work day in time order on chat apply, weave, paste-back and editor saves, and Move Earlier/Later still overrides. Matching ignores time and window, so restaging a day to add times re-sorts its steps instead of replacing them. One nullable synced column, with a Production deploy.
 
-Origin: Thanksgiving Week, staged whole from ChatGPT on 2026-11-11. One dispatch, one PR. **Persistent model change,
+Origin: Thanksgiving Week, staged from ChatGPT on 2026-11-11. One dispatch, one PR. **Persistent model change,
 authorized by ADR-0034 Amd 3.**
 
 Decisions: [ADR-0034 Amendment 3](../decisions/ADR-0034-prep-plan-work-session-timeline.md#amendment-3--a-step-carries-an-approximate-time-and-time-sets-its-place-in-the-day-2026-11-11)
-(C1, C2) and [ADR-0060 Amendment 6](../decisions/ADR-0060-chat-access-over-mcp.md#amendment-6--a-chat-can-restage-the-whole-prep-plan-2026-11-11)
-(D1–D3). Read both first. Precedent for threading a new step field through every producer:
+(C1–C3). Read it first. Precedent for threading a new step field through every producer:
 [archived `prep-step-make-ahead-window`](archive/prep-step-make-ahead-window.md), which did exactly this for
 `makeAheadWindow` (#486). Copy its shape; every file it touched is touched again here.
 
@@ -29,8 +28,7 @@ Decisions: [ADR-0034 Amendment 3](../decisions/ADR-0034-prep-plan-work-session-t
 `ChatAccessReadTools.swift` (`get_menu`).
 
 **App:** `MenuPrepPlanEditingViews.swift` (the editor), `MenuDetailModel+PrepPlanEditing.swift`,
-`ChatMenuReviewSheet.swift` (`ChatPrepPlanReviewModel`, its `keptIndices`, and `ChatPrepPlanReviewSheet`),
-`ChatAccessInboxModel.applyPrepPlan`.
+`ChatMenuReviewSheet.swift` (`ChatPrepPlanReviewSheet`).
 
 **Repo root:** `cloudkit-expected-fields.txt`.
 
@@ -44,8 +42,17 @@ Decisions: [ADR-0034 Amendment 3](../decisions/ADR-0034-prep-plan-work-session-t
 - One Core helper converts both ways: `"HH:mm"` ⇄ minutes. Accept `H:mm` too. Reject anything else.
 - Add `prepPlanSteps timeOfDay` and its `sqlitedata_icloud_userModificationTime_timeOfDay` line to
   `cloudkit-expected-fields.txt`.
-- Carry it like the window: `create`, `update`, `replace`, `Contents`, bring-in, export (`time` as `"HH:mm"`),
-  `get_menu`, and a `  - Time: HH:mm` line in "Current prep plan".
+- Carry it like the window: `create`, `update`, `replace`, bring-in, export (`time` as `"HH:mm"`), `get_menu`, and a
+  `  - Time: HH:mm` line in "Current prep plan".
+
+### Matching (C3)
+- **`Contents`** (in `replace`) drops `makeAheadWindow` and doesn't gain `timeOfDay`. A survivor keeps its id and is
+  written with the draft's time and window (the upsert already writes the draft's values).
+- **`ChatPrepPlanImport.same`** drops the window comparison and doesn't compare time.
+- **`Entry.kept`** carries the staged step too (or its time and window), so the review and Apply see what changed.
+  Apply writes a Kept row's time and window when they differ, and re-places it (C2) when its time changed.
+- **Drift** (`multiset`) keeps comparing every field, window and time included: a change since the chat read the plan
+  should still show the banner.
 
 ### Placement (C2) — one Core function
 Add `PrepPlanPlacement.insertionIndex(of step:, into steps: [PrepPlanStepRecord], dayCount:) -> Int` (or an
@@ -56,8 +63,8 @@ equivalent pure function), where `steps` is the menu's plan in order, without `s
 - Anything else: today's behavior for that call site (append for `create`, the draft's position for `replace`).
 
 Use it in:
-- **`ChatPrepPlanImport.apply`:** replace the "same session, else same day" anchor with this rule, placing each kept
-  New step in staged order.
+- **`ChatPrepPlanImport.apply`:** replace the "same session, else same day" anchor with this rule. Place each kept
+  New step, and each Kept step whose time changed (removed from the list first), in staged order.
 - **`PrepPlanStepRepository.replace`** (the weave and paste-back): build the plan by placing each draft in turn into
   an empty list. A day's timed steps come out sorted; untimed steps keep their relative order.
 - **`create`**, and **`update` when `timeOfDay` or `workDayOffset` changes:** remove the step, place it, then
@@ -79,27 +86,12 @@ Add one shared Core sentence, used by all three like `makeAheadAndLeftoversGuida
   a problem: `"<label>, step N: time must be HH:mm"`. A `time` on a step with no `workDay` on a multi-day menu is
   dropped silently. Add the sentence to the description.
 
-### Whole-plan mode (Amd 6)
-- **Envelope:** `ChatAccessStagedPrepPlan.wholePlan: Bool?`, decoded with `decodeIfPresent`, encoded only when true.
-  Version stays 1.
-- **Helper:** optional boolean `wholePlan` in the schema; a non-boolean is a problem. One description clause
-  (Amd 6-D3): "Set `wholePlan` when you send every dish's steps; then anything not sent is removed, including steps not
-  linked to a dish."
-- **`ChatPrepPlanImport.plan`, when `wholePlan`:** after the named dishes, every owned step of a dish that wasn't
-  named becomes a Removed entry under that dish (append the dish to `dishes`, with only Removed entries). Every step
-  owned by no dish becomes a Removed entry in a new `Plan.unlinked: [PrepPlanStepRecord]`. Without `wholePlan`, both
-  stay empty and nothing changes. `Plan.isWholePlan` records the mode.
-- **Keep toggles (Amd 6-D2, both modes):** `keeping` already indexes the flattened entries. Extend the index space to
-  `dishes`' entries, then `unlinked`, in that order. A Removed entry whose index is in `keeping` is left alone by
-  `apply`. `ChatPrepPlanReviewModel` starts with New entries kept and Removed ones not.
-- **Review sheet:** a keep toggle on every Removed row ("Keep"). In whole-plan mode, a banner ("This replaces the
-  whole prep plan.") and a last section, **Not linked to a dish**, listing `unlinked` with the same toggles. Show each
-  step's time beside its session (for example "Thu, Nov 26 · About 3 hours before dinner · 15:15").
-
 ### App
 - **Editor:** an optional **Time** row: a toggle, and an hour-and-minute `DatePicker` when on. It's only offered when
   the step has a work day. Saving writes `timeOfDay`; changing it or the Day re-places the step (C2).
 - **Step row:** unchanged. The session stays the label.
+- **Chat review:** show each step's time beside its session (for example "Thu, Nov 26 · About 3 hours before dinner ·
+  15:15"). A Kept step whose time or window changes says "time updated" or "window updated".
 
 ## Tests
 
@@ -114,31 +106,28 @@ Add one shared Core sentence, used by all three like `makeAheadAndLeftoversGuida
   order, Flexible unchanged.
 - **Editor:** changing a step's time moves it; Move Earlier/Later keeps the time and moves the step.
 - **Review text:** `Time:` and `Keeps:` round-trip in either order; a plan with neither is byte-identical.
-- **Identity:** a time change is Removed plus New in a stage, and a new id in `replace`.
-- **Whole plan:** on a fixture shaped like Thanksgiving Week (a named dish, an unnamed dish with steps, and two
-  unlinked steps serving "Thanksgiving dinner"), whole-plan mode removes the unnamed dish's steps and both unlinked
-  ones; keeping one unlinked index leaves it untouched; without `wholePlan`, all of them stay.
-- **Keep toggle, per-dish mode:** a kept Removed step survives Apply with its id.
+- **Matching:** restaging Tuesday's untimed steps with times gives all Kept, no Removed or New; Apply keeps every id
+  and leaves the day in time order. A window-only change is Kept with the new window (this reverses #486's
+  Removed-plus-New test). In `replace`, a time or window change keeps the id.
+- **Drift:** a time edit after the chat read the plan still raises the banner.
 
-**Helper:** `time` and `wholePlan` validation (a bad time, a non-boolean `wholePlan`, a null `time` accepted), and
-the description carries the shared sentence and the `wholePlan` clause.
+**Helper:** `time` validation (a bad time rejected, a null `time` accepted), and the description carries the shared
+sentence.
 
-**App (`YesChefTests`):** the review model starts with Removed entries unkept, and a toggled Removed entry is passed in
-`keeping`. Saving the editor with a time writes it.
+**App (`YesChefTests`):** saving the editor with a time writes it, and changing it moves the step.
 
 ## Done when
 
 - A step stores an approximate time, and every producer fills it for work-day steps.
 - A work day stays in time order through chat apply, weave, paste-back and editor saves; Move Earlier/Later still
   works.
-- `wholePlan` restages remove unowned steps, and any Removed step can be kept in the review.
+- Restaging a day to add times re-sorts its existing steps without new ids.
 - Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
-- The PR body gives the install order: **the app on both devices before the helper.** An older app ignores
-  `wholePlan` and would apply a whole-plan file as a per-dish one.
+- The PR body gives the install order: the app on both devices, then the helper.
 - **Gate, before any TestFlight upload:** `prepPlanSteps.timeOfDay` (INT64) and its modification-time field are in
   Production. The architect imports them to Development with `cktool`; Jon deploys in the Console.
-- **Jon's device gate:** in ChatGPT, read Thanksgiving Week and restage the whole plan with `wholePlan`. In the review,
-  the old Thanksgiving steps appear under **Not linked to a dish**; keep the gluten-free stuffing ones. After Apply,
-  there's no Flexible band of old steps, and Sunday, Tuesday and Thursday each read in time order. Change one step's
-  time in the editor and see it move; Move Earlier on another and see it stay.
+- **Jon's device gate:** in ChatGPT, read Thanksgiving Week and restage Tuesday's dinner dishes with times. The review
+  shows Kept steps with "time updated", not Removed and New. After Apply, Tuesday reads in time order. Then restage
+  Thursday's dishes and check the same. Change one step's time in the editor and see it move; Move Earlier on another
+  and see it stay.

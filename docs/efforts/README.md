@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [Prep steps sort by approximate time, and a chat can restage the whole plan](prep-plan-time-order-and-whole-plan.md) — **Ready.** An optional approximate time keeps each work day in time order; `stage_prep_plan` gains a `wholePlan` mode, and Removed steps can be kept. One nullable synced column.
+- [Prep steps sort by approximate time](prep-plan-time-order.md) — **Ready.** An optional approximate time keeps each work day in time order; matching ignores time and window, so a restage that adds times re-sorts instead of replacing. One nullable synced column.

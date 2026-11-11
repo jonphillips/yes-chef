@@ -324,8 +324,8 @@ limit of a few days or less, is followed as written. The user's make-ahead prefe
 ## Amendment 3 — A step carries an approximate time, and time sets its place in the day (2026-11-11)
 
 Accepted 2026-11-11 by Jon, after staging Thanksgiving Week's whole plan from ChatGPT. Brief:
-[`prep-plan-time-order-and-whole-plan`](../efforts/prep-plan-time-order-and-whole-plan.md). Replaces
-[ADR-0060](ADR-0060-chat-access-over-mcp.md) Amd 5-D5's ordering rule.
+[`prep-plan-time-order`](../efforts/prep-plan-time-order.md). Replaces [ADR-0060](ADR-0060-chat-access-over-mcp.md)
+Amd 5-D5's ordering rule, and narrows Amd 2-B1's identity rule.
 
 **The problem.** Within a work day, steps sit in the order they arrived. A chat stages dish by dish, so a day reads by
 dish, not by time: Tuesday went 6:57 PM, 6:43 PM, 10:00 AM. The session text can't be the sort key, because most of
@@ -340,8 +340,8 @@ in the run-up, specific on the day. Nil means any time that day. Existing rows s
 
 - **Wire format:** `"HH:mm"`, 24-hour, wherever a producer or the export carries it.
 - **Producers:** the in-app weave, the Copy Prep Prompt round trip, and `stage_prep_plan` each give every step on a
-  work day an approximate time, for the meal's time when the menu doesn't state one. Flexible steps send none.
-- **Identity:** part of a step's contents wherever steps are matched, like B1's window.
+  work day an approximate time, estimated from the meal's time when the menu doesn't state one. Flexible steps send
+  none.
 - **Shown:** in the step editor (an optional time) and in the chat review. The step row shows only the session.
 - **Cost:** one nullable column on a synced table, so another CloudKit Production deploy before any TestFlight
   upload. Its consumer ships with it.
@@ -352,12 +352,32 @@ One placement rule, used wherever a step is placed on a multi-day menu: a step w
 **before the first step on that day with a later time**, or after the day's last step if none is later. A step with
 no time goes where it goes today. The rule runs when:
 
-- a chat's staged steps are applied (replacing Amd 5-D5's "after the last step with the same session");
+- a chat's staged steps are applied, for New steps and for Kept steps whose time changed (replacing Amd 5-D5's "after
+  the last step with the same session");
 - the weave or a paste-back replaces the plan (each step placed in turn, so a day comes out in time order);
 - a step is created, or saved with a changed time or work day, in the editor.
 
 Move Earlier/Later changes only `sortOrder`, never the time, so a manual order holds until that step's time or day
 changes. Nothing re-sorts on display. Flexible steps and one-day menus are unchanged.
 
-- **Rejected — parse the session text:** fails on relative labels, which are most of a dinner day.
-- **Rejected — sort on display:** it would undo Move Earlier/Later.
+### C3 — Matching ignores the time and the window; a matched step takes the new ones
+
+A step is the same step when its work day, session and task match (and, in `replace`, its serves and dish). Time and
+make-ahead window are attributes, not identity. This narrows Amd 2-B1, which made the window part of identity.
+
+- **Chat apply:** a Kept step takes the staged time and window when they differ, keeps its id, and is re-placed if its
+  time changed. The review marks it "time updated" or "window updated". This is the only other write Apply makes to a
+  Kept step, beside Amd 5-D2's dish link.
+- **`replace`:** a surviving step keeps its id and takes the draft's time and window.
+
+**Why:** today's steps have no time. If time were identity, restaging a day just to add times would show every step
+as Removed plus New and give each a new id. With C3 it shows only real changes, and the existing steps move into time
+order.
+
+### Rejected
+
+- **Parse the session text:** fails on relative labels, which are most of a dinner day.
+- **Sort on display:** it would undo Move Earlier/Later.
+- **A whole-plan restage mode** (drafted and withdrawn the same day). It would make the chat copy back every step it
+  isn't changing, which is where a long plan drifts, and one stage holds at most 20 dishes. Jon restages chosen meal
+  days, which the per-dish mode already covers, and deletes leftover steps that belong to no dish by hand.
