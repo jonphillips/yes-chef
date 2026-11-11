@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Menus get a help page and a direct Add Menu… (`effort/menu-help-and-add-menu`)
+
+- **Result:** Added Add Menu copying at a chosen day, shared the copy path with Bring In, and added a typed Menus help page shown in a sheet and supplied to menu chat.
+- **Verification:** scripts/check-drift.sh passed (lint, 816 Core tests, and app test target build); YesChefTests simulator run passed (139 tests); generic iOS device build passed.
+- **Owed:** menu-help-and-add-menu, the whole brief's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Prep steps show make-ahead windows and leave room for leftovers (`effort/prep-step-make-ahead-window`)
 
 - **Result:** Prep steps now store, display, and edit a make-ahead window. The in-app weave, Copy Prep Prompt, and stage_prep_plan share the approved leftover timing guidance.

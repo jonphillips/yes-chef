@@ -6,7 +6,7 @@
 > the page. Menus come first, with a direct **Add Menu…** that copies one menu into another without going through the
 > calendar.
 
-Status: **Accepted** — 2026-11-11. Effort: [`efforts/menu-help-and-add-menu.md`](../efforts/menu-help-and-add-menu.md).
+Status: **Accepted** — 2026-11-11. Effort: [`efforts/archive/menu-help-and-add-menu.md`](../efforts/archive/menu-help-and-add-menu.md).
 Origin: Jon, 2026-11-11, after needing the architect to explain Bring In: *"For the life of me, can't figure out how
 to put one menu into another menu."* Then: *"I'm wondering if we need a help button on the menu with some of this
 documentation. I know that's very non-iOS, but we are building a lot of capability here. Very simple bare-bones

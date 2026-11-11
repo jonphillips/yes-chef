@@ -5,9 +5,9 @@ Summary: The menu toolbar gains a `⋯` with **Add Menu…** (copy another menu'
 
 Origin: Jon, 2026-11-11, after getting stuck putting Thanksgiving into Thanksgiving Week. One dispatch, one PR.
 
-Decisions: [ADR-0066](../decisions/ADR-0066-in-app-help-pages.md) (D1–D6; read it first). The copy rules are
-[ADR-0063](../decisions/ADR-0063-menus-absorb-calendar-days.md) D1 and D3, unchanged. Related:
-[ADR-0064](../decisions/ADR-0064-menu-detail-declutter.md) (the toolbar, the `custom.menucard.arrow.in` glyph).
+Decisions: [ADR-0066](../../decisions/ADR-0066-in-app-help-pages.md) (D1–D6; read it first). The copy rules are
+[ADR-0063](../../decisions/ADR-0063-menus-absorb-calendar-days.md) D1 and D3, unchanged. Related:
+[ADR-0064](../../decisions/ADR-0064-menu-detail-declutter.md) (the toolbar, the `custom.menucard.arrow.in` glyph).
 
 ## Where things are (architect, 2026-11-11, `origin/main` 22a578b)
 
@@ -132,7 +132,7 @@ Already in this plan: `docs/standing-guards.md` carries ADR-0066 D5. This brief'
   The menu chat answers "how do I put one menu into another?" from the page.
 - Bring In's behavior is unchanged.
 - The help page matches the app as built, and any label fixes are listed in the PR body (ADR-0066 D5).
-- Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above. Verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
 - **Jon's device gate:** on an iPad, open **⋯ › How Menus Work** and read it. Then make a scratch 3-day menu and
   **⋯ › Add Menu…** Thanksgiving at Day 2: its dishes land on Day 2, its prep steps follow, and Thanksgiving itself is
