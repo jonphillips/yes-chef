@@ -1383,6 +1383,10 @@ extension DependencyValues {
         """).execute(db)
     }
 
+    migrator.registerMigration("Add prep plan completion") { db in
+      try db.execute(sql: #"ALTER TABLE "prepPlanSteps" ADD COLUMN "completedAt" TEXT"#)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

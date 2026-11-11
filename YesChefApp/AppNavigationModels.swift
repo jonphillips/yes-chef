@@ -47,6 +47,12 @@ struct CookSessionPresentation: Hashable, Identifiable {
   }
 }
 
+struct TodayPrepPresentation: Hashable, Identifiable {
+  var menuID: CoreMenu.ID
+  var title: String
+  var id: CoreMenu.ID { menuID }
+}
+
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
   case fromChat

@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [Today's Prep](today-prep.md) — **Ready.** A **Prep** button opens a full-screen checklist of the steps due now, with each step's recipe beside it; checks are a synced `completedAt` that every writer keeps or starts at nil, judged per run of the menu. One nullable synced column.

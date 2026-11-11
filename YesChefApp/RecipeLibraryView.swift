@@ -32,6 +32,7 @@ struct AppContainer: View {
   @State private var selectedSettingsPane: SettingsPane? = .categories
   @State private var presentedRecipe: RecipeDetailPresentation?
   @State private var presentedCookSession: CookSessionPresentation?
+  @State private var presentedTodayPrep: TodayPrepPresentation?
   @State private var hasNestedHandoffReviewHostClaim = false
 
   init() {
@@ -81,6 +82,7 @@ struct AppContainer: View {
       onCookSessionRequested: { presentation in
         presentedCookSession = presentation
       },
+      onTodayPrepRequested: { presentation in presentedTodayPrep = presentation },
       onRecipeCreated: recipeCreated
     )
     .onAppear {
@@ -112,9 +114,18 @@ struct AppContainer: View {
         toastCenter: toastCenter
       )
     }
+    .fullScreenCover(item: $presentedTodayPrep) { presentation in
+      TodayPrepFullScreenCover(
+        presentation: presentation,
+        recipeModel: recipeModel,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel,
+        toastCenter: toastCenter
+      )
+    }
     .mealCalendarItemEditorDestination(
       mealCalendarModel: mealCalendarModel,
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
     )
     .sheet(isPresented: $menuModel.destination.addMenu) {
       NavigationStack {
@@ -130,14 +141,14 @@ struct AppContainer: View {
     .groceryDestinations(
       groceryModel: groceryModel,
       mealCalendarModel: mealCalendarModel,
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
     )
     .recipeDetailDestinations(
       recipeModel: recipeModel,
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
     )
     .handoffReviewDestinations(
-      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil
+      isPresentationEnabled: presentedRecipe == nil && presentedCookSession == nil && presentedTodayPrep == nil
         && recipeModel.destination.workbench == nil && !hasNestedHandoffReviewHostClaim
     )
     .sheet(isPresented: $recipeModel.destination.captureRecipe) {

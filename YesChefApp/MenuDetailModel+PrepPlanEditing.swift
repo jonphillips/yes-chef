@@ -8,6 +8,50 @@ enum LearningCreationResult {
 }
 
 extension MenuDetailModel {
+  static func canMovePrepPlanStepToNextDay(
+    _ step: PrepPlanStepRecord,
+    targetOffset: Int,
+    dayCount: Int
+  ) -> Bool {
+    guard dayCount > 1, let currentOffset = step.workDayOffset,
+          targetOffset < dayCount, targetOffset != currentOffset else { return false }
+    return true
+  }
+
+  static func nextPrepPlanDayOffset(
+    layout: TodayPrepLayout,
+    selectedBand: MenuPrepPlanBand?
+  ) -> Int? {
+    switch layout.mode {
+    case let .dated(_, dayOffset): dayOffset + 1
+    case .manual: selectedBand?.steps.first?.step.workDayOffset.map { $0 + 1 }
+    }
+  }
+
+  func movePrepPlanStepToNextDay(_ step: PrepPlanStepRecord, targetOffset: Int) {
+    var draft = PrepPlanStepEditorDraft(step: step)
+    draft.workDayOffset = targetOffset
+    updatePrepPlanStep(draft.step, id: step.id)
+  }
+
+  func setPrepPlanStepCompleted(_ id: PrepPlanStepRecord.ID, at date: Date?) {
+    do {
+      try database.write { db in try PrepPlanStepRepository.setCompleted(id: id, at: date, in: db) }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
+  func uncheckAllPrepPlanSteps() {
+    do {
+      try database.write { db in try PrepPlanStepRepository.uncheckAll(menuID: menuID, in: db) }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func createLearning(_ text: String) -> LearningCreationResult {
     do {
       let inserted = try database.write { db in

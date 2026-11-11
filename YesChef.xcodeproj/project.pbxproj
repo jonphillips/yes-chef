@@ -196,6 +196,7 @@
 		ECE0E06AEF0B9DCD549F077E /* LLMClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2CA1F8E404895981FD32307C /* LLMClientKit */; };
 		ED5F7F9383D1D9C9DF8ABD70 /* RecipeListPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B04E29C6A847886ED9EB0B /* RecipeListPresetTests.swift */; };
 		EDF8C533F173768E0A3C6487 /* WorkbenchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993185593DBEA80FD058C270 /* WorkbenchModels.swift */; };
+		EECCC10C9D78BC85FCAF9E5D /* TodayPrepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88330C35BF3A67CFFBC7CDC /* TodayPrepView.swift */; };
 		F36CC6E6000F059DEC028FA2 /* RecipeLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FE4F6BA219B7819AFB1FEAE /* RecipeLibraryView.swift */; };
 		F3F3ED67EB4980A43151000F /* MealCalendarViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */; };
 		F476873699D33AE440049145 /* FormFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECE090CEFE3F26041ED2617 /* FormFields.swift */; };
@@ -370,6 +371,7 @@
 		B49D2E9B66A731DB272F063C /* MealCalendarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarModels.swift; sourceTree = "<group>"; };
 		B69D7AF49F0E848F45AE1103 /* ChatAccessExportModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccessExportModelTests.swift; sourceTree = "<group>"; };
 		B7D5D51E71889140798985EB /* WorkbenchReferenceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchReferenceViews.swift; sourceTree = "<group>"; };
+		B88330C35BF3A67CFFBC7CDC /* TodayPrepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayPrepView.swift; sourceTree = "<group>"; };
 		B9CC26315C4C3E333C66F625 /* SharePreprocessor.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = SharePreprocessor.js; sourceTree = "<group>"; };
 		BCD1FADF980D78977F069A1D /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		BCDC78D645CAEF5335FC0B7E /* MenuAddMenuModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuAddMenuModel.swift; sourceTree = "<group>"; };
@@ -700,6 +702,7 @@
 				2E6505888D849BDFAD534E36 /* SyncActivityRecorder.swift */,
 				3EA663A481CAE11E140B6830 /* SyncHealthModel.swift */,
 				D9653CACD31CEA3DBF5F722E /* SyncStatusSection.swift */,
+				B88330C35BF3A67CFFBC7CDC /* TodayPrepView.swift */,
 				4DAE8E8E7A12CF150A296B0F /* WebRecipeCaptureSummary.swift */,
 				4E98DAAE2876452488D71CD0 /* WideLayout.swift */,
 				6F811B4BCF619BB9EFC3CFFA /* WorkbenchCandidatePickerViews.swift */,
@@ -1059,6 +1062,7 @@
 				FE606BC0F88C1194E58EB940 /* SyncActivityRecorder.swift in Sources */,
 				627BE832B346246A69355F57 /* SyncHealthModel.swift in Sources */,
 				33D3721651F83CF0864328C4 /* SyncStatusSection.swift in Sources */,
+				EECCC10C9D78BC85FCAF9E5D /* TodayPrepView.swift in Sources */,
 				2787107EE2BF161CCDE64569 /* WebRecipeCaptureSummary.swift in Sources */,
 				8F57A869816A807774297561 /* WideLayout.swift in Sources */,
 				B272D3EEC8E70834165F4E67 /* WorkbenchCandidatePickerViews.swift in Sources */,

@@ -314,6 +314,7 @@ pantryItems sqlitedata_icloud_userModificationTime_title
 pantryItems thresholdQuantity
 pantryItems thresholdUnit
 pantryItems title
+prepPlanSteps completedAt
 prepPlanSteps id
 prepPlanSteps makeAheadWindow
 prepPlanSteps menuID
@@ -322,6 +323,7 @@ prepPlanSteps session
 prepPlanSteps sortOrder
 prepPlanSteps sourceDish
 prepPlanSteps sqlitedata_icloud_userModificationTime
+prepPlanSteps sqlitedata_icloud_userModificationTime_completedAt
 prepPlanSteps sqlitedata_icloud_userModificationTime_id
 prepPlanSteps sqlitedata_icloud_userModificationTime_makeAheadWindow
 prepPlanSteps sqlitedata_icloud_userModificationTime_menuID

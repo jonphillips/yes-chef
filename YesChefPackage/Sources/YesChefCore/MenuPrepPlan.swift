@@ -18,6 +18,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
   public var timeOfDay: Int?
   public var sourceDish: MenuItem.ID?
   public var workDayOffset: Int?
+  public var completedAt: Date?
 
   public init(
     id: UUID,
@@ -29,7 +30,8 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     makeAheadWindow: String? = nil,
     timeOfDay: Int? = nil,
     sourceDish: MenuItem.ID? = nil,
-    workDayOffset: Int? = nil
+    workDayOffset: Int? = nil,
+    completedAt: Date? = nil
   ) {
     self.id = id
     self.menuID = menuID
@@ -41,6 +43,7 @@ public struct PrepPlanStepRecord: Codable, Identifiable, Equatable, Sendable {
     self.timeOfDay = timeOfDay
     self.sourceDish = sourceDish
     self.workDayOffset = workDayOffset
+    self.completedAt = completedAt
   }
 
 }
@@ -623,6 +626,14 @@ public enum PrepPlanStepRepository {
     try Menu.find(existing.menuID).update { $0.dateModified = #bind(now) }.execute(db)
   }
 
+  public static func setCompleted(id: PrepPlanStepRecord.ID, at date: Date?, in db: Database) throws {
+    try PrepPlanStepRecord.find(id).update { $0.completedAt = #bind(date) }.execute(db)
+  }
+
+  public static func uncheckAll(menuID: Menu.ID, in db: Database) throws {
+    try PrepPlanStepRecord.where { $0.menuID.eq(menuID) }.update { $0.completedAt = #bind(nil as Date?) }.execute(db)
+  }
+
   @discardableResult
   public static func reorder(
     id: PrepPlanStepRecord.ID,
@@ -680,7 +691,8 @@ public enum PrepPlanStepRepository {
           makeAheadWindow: draft.makeAheadWindow,
           timeOfDay: draft.timeOfDay,
           sourceDish: draft.sourceDish,
-          workDayOffset: draft.workDayOffset
+          workDayOffset: draft.workDayOffset,
+          completedAt: existing?.completedAt
         )
       )
     }

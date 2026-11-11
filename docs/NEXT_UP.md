@@ -1,6 +1,5 @@
-# Next Up — Today's Prep
+# Next Up — nothing dispatched
 
-**Slices:** effort `today-prep`
-**Briefs:** [docs/efforts/today-prep.md](efforts/today-prep.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)
