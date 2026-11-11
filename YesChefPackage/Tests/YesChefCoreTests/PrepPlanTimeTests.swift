@@ -34,10 +34,17 @@ extension RecipeCoreTests {
       #expect(parsed.plan.steps.first?.makeAheadWindow == "3 days")
       #expect(parsed.plan.editableReviewText(dayCount: 3) == "Day 2 · Dinner:\n- Warm pie\n  Keeps: 3 days\n  Time: 15:15")
 
-      let reversed = MenuPrepPlan().parsingEditableReviewText("Dinner:\n- Warm pie\n  Keeps: 3 days\n  Time: 15:15")
+      let reversed = MenuPrepPlan().parsingEditableReviewText("Day 2 · Dinner:\n- Warm pie\n  Keeps: 3 days\n  Time: 15:15", dayCount: 3)
       #expect(reversed.plan.steps.first?.timeOfDay == 915)
       #expect(reversed.plan.steps.first?.makeAheadWindow == "3 days")
       #expect(MenuPrepPlan(steps: [.init(session: "Dinner", task: "Warm pie")]).editableReviewText() == "Dinner:\n- Warm pie")
+
+      let flexible = MenuPrepPlan().parsingEditableReviewText("Flexible:\n- Set table\n  Time: 15:15", dayCount: 3)
+      #expect(flexible.plan.steps.first?.timeOfDay == nil)
+      #expect(flexible.unparsedLines.isEmpty)
+      let oneDay = MenuPrepPlan().parsingEditableReviewText("Dinner:\n- Warm pie\n  Time: 15:15", dayCount: 1)
+      #expect(oneDay.plan.steps.first?.timeOfDay == nil)
+      #expect(oneDay.unparsedLines.isEmpty)
     }
 
     @Test
@@ -88,6 +95,50 @@ extension RecipeCoreTests {
         }.execute(db)
         try PrepPlanStepRepository.create(.init(session: "Dinner", task: "Earlier", timeOfDay: 16 * 60, workDayOffset: 1), for: menuID, in: db, now: now, uuid: { UUID() })
         #expect(try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.task) == ["Earlier", "Later", "Other day"])
+      }
+    }
+
+    @Test
+    func replaceKeepsIdentityWhenOnlyTimeChanges() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_557_000)
+      let menuID = UUID()
+      let firstID = UUID()
+      try database.write { db in
+        try Menu.insert { Menu(id: menuID, title: "Time identity", dayCount: 3, dateCreated: now, dateModified: now) }.execute(db)
+        try PrepPlanStepRepository.replace(
+          [.init(session: "Dinner", task: "Warm pie", timeOfDay: 15 * 60, workDayOffset: 1)],
+          for: menuID, in: db, now: now, uuid: { firstID }
+        )
+        try PrepPlanStepRepository.replace(
+          [.init(session: "Dinner", task: "Warm pie", timeOfDay: 16 * 60, workDayOffset: 1)],
+          for: menuID, in: db, now: now, uuid: { Issue.record("A time change must keep the matched step ID"); return UUID() }
+        )
+        let step = try #require(PrepPlanStepRepository.steps(for: menuID, in: db).first)
+        #expect(step.id == firstID)
+        #expect(step.timeOfDay == 16 * 60)
+      }
+    }
+
+    @Test
+    func moveEarlierAndLaterKeepsTimeAndMovesTheStep() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_558_000)
+      let menuID = UUID()
+      let earlierID = UUID()
+      let laterID = UUID()
+      try database.write { db in
+        try Menu.insert { Menu(id: menuID, title: "Manual order", dayCount: 3, dateCreated: now, dateModified: now) }.execute(db)
+        try PrepPlanStepRecord.insert {
+          [
+            PrepPlanStepRecord(id: earlierID, menuID: menuID, sortOrder: 0, session: "Dinner", task: "Earlier time", timeOfDay: 15 * 60, workDayOffset: 1),
+            PrepPlanStepRecord(id: laterID, menuID: menuID, sortOrder: 1, session: "Dinner", task: "Later time", timeOfDay: 16 * 60, workDayOffset: 1),
+          ]
+        }.execute(db)
+        #expect(try PrepPlanStepRepository.reorder(id: earlierID, direction: .later, in: db, now: now))
+        let steps = try PrepPlanStepRepository.steps(for: menuID, in: db)
+        #expect(steps.map(\.id) == [laterID, earlierID])
+        #expect(steps.map(\.timeOfDay) == [16 * 60, 15 * 60])
       }
     }
   }

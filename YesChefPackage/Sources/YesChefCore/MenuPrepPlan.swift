@@ -270,7 +270,9 @@ public struct MenuPrepPlan: Equatable, Sendable {
         if previousLineWasStep, line.hasPrefix("Time:"), !revisedSteps.isEmpty {
           let rawTime = String(line.dropFirst("Time:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
           if let time = PrepPlanTime.minutes(from: rawTime) {
-            revisedSteps[revisedSteps.count - 1].timeOfDay = time
+            if revisedSteps[revisedSteps.count - 1].workDayOffset != nil {
+              revisedSteps[revisedSteps.count - 1].timeOfDay = time
+            }
             previousLineWasStep = true
             continue
           }

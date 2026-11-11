@@ -342,8 +342,7 @@ public enum YesChefMCPServer {
         let timeString = rawTime?.stringValue
         let timeOfDay: Int?
         if rawTime != nil {
-          if let timeString, timeString.range(of: #"^\d{2}:\d{2}$"#, options: .regularExpression) != nil,
-            let parsed = PrepPlanTime.minutes(from: timeString) {
+          if let timeString, let parsed = PrepPlanTime.minutes(from: timeString) {
             timeOfDay = workDay == nil ? nil : parsed
           } else {
             problems.append("\(label), step \(j + 1): time must be HH:mm")

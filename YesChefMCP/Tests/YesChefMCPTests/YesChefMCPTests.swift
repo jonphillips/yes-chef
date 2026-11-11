@@ -384,7 +384,7 @@ struct YesChefMCPTests {
     let recipeSearch = try #require(await server.handle(line: genericToolCall("search_recipes", args: ["query": .string("Souvlaki")])))
     let recipeRef = try #require(object(toolText(recipeSearch))["recipes"]?.arrayValue?.first?.objectValue?["ref"]?.stringValue)
     let staged = try #require(await server.handle(line: genericToolCall("stage_prep_plan", args: [
-      "menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .integer(1), "time": .string("15:15"), "session": .string("Monday evening"), "task": .string("Salt the chicken"), "makeAheadWindow": .string("Up to 3 days ahead")])])])]),
+      "menu": .string(menuRef), "dishes": .array([.object(["day": .integer(2), "ref": .string(recipeRef), "steps": .array([.object(["workDay": .integer(1), "time": .string("7:05"), "session": .string("Monday evening"), "task": .string("Salt the chicken"), "makeAheadWindow": .string("Up to 3 days ahead")])])])]),
     ])))
     let resultText = try toolText(staged)
     #expect(!containsUUID(resultText))
@@ -394,7 +394,7 @@ struct YesChefMCPTests {
     let envelope = try JSONDecoder().decode(ChatAccessStagedPrepPlan.self, from: Data(try HandoffInbox(root: folder.inboxURL, fileExtension: "ycprepplan").read(file).utf8))
     #expect(envelope.planAtStage?.first?.task == "Salt the chicken")
     #expect(envelope.dishes.first?.steps.first?.makeAheadWindow == "Up to 3 days ahead")
-    #expect(envelope.dishes.first?.steps.first?.timeOfDay == 15 * 60 + 15)
+    #expect(envelope.dishes.first?.steps.first?.timeOfDay == 7 * 60 + 5)
     #expect(envelope.planAtStage?.contains { $0.task == "Other menu only" } == false)
 
     let step = MCPValue.object(["workDay": .integer(1), "session": .string("Monday evening"), "task": .string("Salt the chicken")])
