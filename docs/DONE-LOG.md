@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Make-ahead window CloudKit fields deployed (`effort/prep-step-make-ahead-window`)
+
+- **Result:** The CloudKit gate for prep-step-make-ahead-window is done, and its line is gone from `device-passes.md`. `prepPlanSteps.makeAheadWindow` (Encrypted String) and `sqlitedata_icloud_userModificationTime_makeAheadWindow` (Encrypted Int64) are in Production. Following jon-platform `persistence-and-sync.md` § *Adding a synced table or column*, the architect added both fields to a fresh Development export, validated it, and imported it with `cktool` at Jon's request. Jon then deployed Development to Production in the Console.
+- **Verification:** After the import, Development matched the imported file and Production was unchanged. After the deploy, Production matched Development, its only change was the two fields, and all 629 fields in `cloudkit-expected-fields.txt` were in Production.
+- **Owed:** The prep-step-make-ahead-window device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Menus get a help page and a direct Add Menu… (`effort/menu-help-and-add-menu`)
 
 - **Result:** Added Add Menu copying at a chosen day, shared the copy path with Bring In, and added a typed Menus help page shown in a sheet and supplied to menu chat.
