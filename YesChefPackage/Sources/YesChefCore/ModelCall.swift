@@ -107,6 +107,7 @@ public enum ModelCallContextLayer: String, CaseIterable, Hashable, Sendable {
   case currentNote
   case ingredientNames
   case intelligence
+  case help
   case learnings
   case mealPlan
   case menu

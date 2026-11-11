@@ -55,7 +55,7 @@ struct CreateRecipeView: View {
           }
 
           if model.foundNoRecipe {
-            Label("No complete recipe found in this text.", systemImage: "questionmark.circle")
+            Label("No complete recipe found in this text.", symbol: .help)
               .foregroundStyle(.secondary)
           }
 

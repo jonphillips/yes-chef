@@ -24,6 +24,125 @@ private struct MenuPlacementItemKey: Hashable {
 }
 
 extension MenuRepository {
+  static func copyMenuContents(
+    sourceMenu: Menu,
+    into targetMenuID: Menu.ID,
+    dayShift: Int,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws -> [MenuItem.ID: MenuItem.ID] {
+    let sourceItems = try MenuItem.where { $0.menuID.eq(sourceMenu.id) }.fetchAll(db)
+      .sorted(by: areMenuItemsInBringInOrder)
+    let sourceSteps = try PrepPlanStepRepository.steps(for: sourceMenu.id, in: db)
+    var copiedItemIDs: [MenuItem.ID: MenuItem.ID] = [:]
+    for source in sourceItems {
+      let dayOffset = source.dayOffset + dayShift
+      let item = MenuItem(
+        id: uuid(), menuID: targetMenuID, kind: source.kind, recipeID: source.recipeID, title: source.title,
+        dayOffset: dayOffset, mealSlot: source.mealSlot, notes: source.notes,
+        sortOrder: try nextSortOrder(menuID: targetMenuID, dayOffset: dayOffset, mealSlot: source.mealSlot, in: db),
+        dateCreated: source.dateCreated, dateModified: now, scale: source.scale
+      )
+      try MenuItem.insert { item }.execute(db)
+      copiedItemIDs[source.id] = item.id
+    }
+    let nextStepOrder = (try PrepPlanStepRepository.steps(for: targetMenuID, in: db).map(\.sortOrder).max() ?? -1) + 1
+    for (stepIndex, source) in sourceSteps.enumerated() {
+      let workDayOffset: Int?
+      if let sourceOffset = source.workDayOffset {
+        workDayOffset = sourceOffset + dayShift
+      } else if sourceMenu.dayCount == 1 {
+        switch PrepPlanSessionBand(matching: source.session) {
+        case .dayOf, .atService: workDayOffset = dayShift
+        case .dayBefore: workDayOffset = dayShift - 1
+        default: workDayOffset = nil
+        }
+      } else {
+        workDayOffset = nil
+      }
+      try PrepPlanStepRecord.insert {
+        PrepPlanStepRecord(
+          id: uuid(), menuID: targetMenuID, sortOrder: nextStepOrder + stepIndex, session: source.session,
+          task: source.task, serves: source.serves, makeAheadWindow: source.makeAheadWindow,
+          sourceDish: source.sourceDish.flatMap { copiedItemIDs[$0] }, workDayOffset: workDayOffset
+        )
+      }.execute(db)
+    }
+    return copiedItemIDs
+  }
+
+  public static func addMenuOffer(targetMenuID: Menu.ID, in db: Database) throws -> MenuAddMenuOffer {
+    guard let targetMenu = try Menu.find(targetMenuID).fetchOne(db) else {
+      throw MenuRepositoryError.menuNotFound(targetMenuID)
+    }
+    let sourceMenus = try Menu.where { $0.id.neq(targetMenuID) }.fetchAll(db)
+    let itemsByMenuID = Dictionary(grouping: try MenuItem.fetchAll(db), by: \.menuID)
+    let stepsByMenuID = Dictionary(grouping: try PrepPlanStepRecord.fetchAll(db), by: \.menuID)
+    let targetPlacements = try MenuPlacement.where { $0.menuID.eq(targetMenuID) }.fetchAll(db)
+    let targetPlacement = targetPlacements.count == 1 ? targetPlacements.first : nil
+    let targetRangeEnd = targetPlacement.flatMap { MenuPlacementDay.date(for: targetMenu.dayCount, from: $0) }
+    let calendar = Calendar(identifier: .gregorian)
+
+    let sources = try sourceMenus.compactMap { source -> MenuAddMenuSourceOffer? in
+      let dishCount = itemsByMenuID[source.id]?.count ?? 0
+      let stepCount = stepsByMenuID[source.id]?.count ?? 0
+      guard dishCount > 0 || stepCount > 0 else { return nil }
+      var overlapStartDate: Date?
+      if let targetPlacement, let targetRangeEnd {
+        let targetStart = calendar.startOfDay(for: targetPlacement.startDate)
+        let targetEnd = calendar.startOfDay(for: targetRangeEnd)
+        overlapStartDate = try MenuPlacement.where { $0.menuID.eq(source.id) }
+          .fetchAll(db)
+          .first { placement in
+            guard let sourceEnd = MenuPlacementDay.date(for: source.dayCount, from: placement) else { return false }
+            return calendar.startOfDay(for: placement.startDate) >= targetStart
+              && calendar.startOfDay(for: sourceEnd) <= targetEnd
+          }?.startDate
+      }
+      return MenuAddMenuSourceOffer(
+        menuID: source.id, title: source.title, dayCount: source.dayCount, dishCount: dishCount,
+        fits: source.dayCount <= targetMenu.dayCount, overlappingPlacementStartDate: overlapStartDate
+      )
+    }
+    .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+
+    return MenuAddMenuOffer(
+      targetMenuID: targetMenuID, targetDayCount: targetMenu.dayCount,
+      targetPlacementStartDate: targetPlacement?.startDate, sources: sources
+    )
+  }
+
+  public static func addMenu(
+    sourceMenuID: Menu.ID,
+    into targetMenuID: Menu.ID,
+    startDayOffset: Int,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID
+  ) throws {
+    guard sourceMenuID != targetMenuID else { throw MenuRepositoryError.cannotAddMenuToItself }
+    guard let targetMenu = try Menu.find(targetMenuID).fetchOne(db) else {
+      throw MenuRepositoryError.menuNotFound(targetMenuID)
+    }
+    guard let sourceMenu = try Menu.find(sourceMenuID).fetchOne(db) else {
+      throw MenuRepositoryError.menuNotFound(sourceMenuID)
+    }
+    let sourceItems = try MenuItem.where { $0.menuID.eq(sourceMenuID) }.fetchAll(db)
+    let sourceSteps = try PrepPlanStepRepository.steps(for: sourceMenuID, in: db)
+    guard !sourceItems.isEmpty || !sourceSteps.isEmpty else {
+      throw MenuRepositoryError.emptySourceMenu(sourceMenuID)
+    }
+    guard startDayOffset >= 0, sourceMenu.dayCount <= targetMenu.dayCount,
+      startDayOffset <= targetMenu.dayCount - sourceMenu.dayCount
+    else {
+      throw MenuRepositoryError.sourceMenuDoesNotFit(sourceMenuID)
+    }
+    _ = try copyMenuContents(
+      sourceMenu: sourceMenu, into: targetMenuID, dayShift: startDayOffset, in: db, now: now, uuid: uuid
+    )
+  }
+
   static func bringInCandidates(menuID: Menu.ID, in db: Database) throws -> MenuBringInCandidates? {
     guard let targetMenu = try Menu.find(menuID).fetchOne(db) else {
       throw MenuRepositoryError.menuNotFound(menuID)
@@ -165,43 +284,12 @@ extension MenuRepository {
 
     for candidate in candidates.containedPlacements {
       let sourcePlacement = candidate.placement
-      var copiedItemIDs: [MenuItem.ID: MenuItem.ID] = [:]
       let shift = MenuPlacementDay.offset(of: sourcePlacement.startDate, from: targetPlacement) ?? 0
-      for source in candidate.items {
-        let dayOffset = source.dayOffset + shift
-        let item = MenuItem(
-          id: uuid(), menuID: menuID, kind: source.kind, recipeID: source.recipeID, title: source.title,
-          dayOffset: dayOffset, mealSlot: source.mealSlot, notes: source.notes,
-          sortOrder: try nextSortOrder(menuID: menuID, dayOffset: dayOffset, mealSlot: source.mealSlot, in: db),
-          dateCreated: source.dateCreated, dateModified: now, scale: source.scale
-        )
-        try MenuItem.insert { item }.execute(db)
-        copiedItemIDs[source.id] = item.id
-        newItemIDsByPlacementItem[MenuPlacementItemKey(placementID: sourcePlacement.id, itemID: source.id)] = item.id
-      }
-      let nextStepOrder = (try PrepPlanStepRepository.steps(for: menuID, in: db).map(\.sortOrder).max() ?? -1) + 1
-      for (stepIndex, source) in candidate.prepSteps.enumerated() {
-        let workDayOffset: Int?
-        if let sourceOffset = source.workDayOffset {
-          workDayOffset = sourceOffset + shift
-        } else if candidate.menu.dayCount == 1 {
-          switch PrepPlanSessionBand(matching: source.session) {
-          case .dayOf, .atService: workDayOffset = shift
-          case .dayBefore: workDayOffset = shift - 1
-          default: workDayOffset = nil
-          }
-        } else {
-          workDayOffset = nil
-        }
-        try PrepPlanStepRecord.insert {
-          PrepPlanStepRecord(
-            id: uuid(), menuID: menuID, sortOrder: nextStepOrder + stepIndex, session: source.session,
-            task: source.task, serves: source.serves,
-            makeAheadWindow: source.makeAheadWindow,
-            sourceDish: source.sourceDish.flatMap { copiedItemIDs[$0] },
-            workDayOffset: workDayOffset
-          )
-        }.execute(db)
+      let copiedItemIDs = try copyMenuContents(
+        sourceMenu: candidate.menu, into: menuID, dayShift: shift, in: db, now: now, uuid: uuid
+      )
+      for (sourceID, copiedID) in copiedItemIDs {
+        newItemIDsByPlacementItem[MenuPlacementItemKey(placementID: sourcePlacement.id, itemID: sourceID)] = copiedID
       }
       deletedPlacementIDs.insert(sourcePlacement.id)
     }

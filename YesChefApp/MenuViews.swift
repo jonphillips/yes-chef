@@ -124,6 +124,7 @@ struct MenuDetailView: View {
   }
 
   var body: some View {
+    @Bindable var menuModel = model
     @Bindable var detailModel = detailModel
 
     Group {
@@ -204,6 +205,10 @@ struct MenuDetailView: View {
             }
             Button("Recipe capture request") { handoffTransport.copyRecipeCaptureRequest() }
           }
+          MenuMoreMenu(
+            addMenu: { model.addMenuToMenuButtonTapped(targetMenuID: detailModel.menuID) },
+            showHelp: { model.destination = .help }
+          )
         }
       }
     }
@@ -216,6 +221,16 @@ struct MenuDetailView: View {
             onRecipeSelected?(presentation)
           }
         )
+      }
+    }
+    .sheet(item: $menuModel.destination.addMenuToMenu) { presentation in
+      NavigationStack {
+        MenuAddMenuSheet(model: model, presentation: presentation)
+      }
+    }
+    .sheet(isPresented: $menuModel.destination.help) {
+      NavigationStack {
+        AppHelpSheet(page: .menus)
       }
     }
     .sheet(item: $detailModel.noteRecipeReview) { review in
@@ -321,6 +336,25 @@ struct MenuDetailView: View {
         detailModel.tool = tool
       }
     )
+  }
+}
+
+private struct MenuMoreMenu: View {
+  var addMenu: () -> Void
+  var showHelp: () -> Void
+
+  var body: some View {
+    Menu {
+      Button(action: addMenu) {
+        Label("Add Menu…", symbol: .bringIntoMenu)
+      }
+      Divider()
+      Button(action: showHelp) {
+        Label("How Menus Work", symbol: .help)
+      }
+    } label: {
+      Label("More", systemImage: "ellipsis.circle")
+    }
   }
 }
 

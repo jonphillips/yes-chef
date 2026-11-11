@@ -58,6 +58,24 @@ public struct MenuBringInResult: Equatable, Sendable {
   public var copiedPlacementCount: Int
 }
 
+public struct MenuAddMenuSourceOffer: Equatable, Sendable, Identifiable {
+  public var menuID: Menu.ID
+  public var title: String
+  public var dayCount: Int
+  public var dishCount: Int
+  public var fits: Bool
+  public var overlappingPlacementStartDate: Date?
+
+  public var id: Menu.ID { menuID }
+}
+
+public struct MenuAddMenuOffer: Equatable, Sendable {
+  public var targetMenuID: Menu.ID
+  public var targetDayCount: Int
+  public var targetPlacementStartDate: Date?
+  public var sources: [MenuAddMenuSourceOffer]
+}
+
 public enum MenuServiceDate {
   public static func hasArrived(
     placements: [MenuPlacement],
@@ -834,6 +852,9 @@ public enum MenuRepositoryError: Error, Equatable, Sendable {
   case placementNotFound(MenuPlacement.ID)
   case recipeNotFound(Recipe.ID)
   case menuMustHaveOnePlacement
+  case cannotAddMenuToItself
+  case emptySourceMenu(Menu.ID)
+  case sourceMenuDoesNotFit(Menu.ID)
 }
 
 

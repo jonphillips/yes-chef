@@ -57,6 +57,7 @@ struct AppSymbol: Sendable, Hashable {
   static let addToGroceries = Self("cart.badge.plus")
   static let workbench = Self("hammer")
   static let chatTarget = Self("target")
+  static let help = Self("questionmark.circle")
 }
 
 extension Image {
