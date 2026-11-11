@@ -522,8 +522,7 @@ private struct MenuPrepPlanSessionBandView: View {
           ForEach(band.steps, id: \.step.id) { presentation in
             if let sessionLabel = presentation.sessionLabel {
               Text(sessionLabel)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .font(.subheadline.weight(.semibold))
                 .padding(.top, 8)
             }
             MenuPrepPlanStepView(

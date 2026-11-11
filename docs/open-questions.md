@@ -28,9 +28,8 @@ and everything downstream move forward without waiting on it.
 `sortOrder`; the time lives only in free-text `session` ("Tuesday, Nov 24 — about 6:43 PM").
 `ChatPrepPlanImport.apply` puts a new step after the last same-session step, else after the day's last step,
 so a dish staged later sinks below earlier dishes' evening steps and its morning steps. Manual Move Earlier/Later
-is the escape hatch and must survive, so don't sort on display. Jon also finds the clock times precious: off the
-day of the meal, "afternoon"/"evening" reads better. Decide together: coarser session vocabulary (the
-`PrepPlanSessionBand` picker is a start) and placement by that order on apply. Not now.
+is the escape hatch and must survive, so don't sort on display. The labels already run coarse in the run-up and
+specific on the day, which Jon likes (2026-11-11). The fix is placing new steps by that order on apply. Not now.
 
 **A staged menu opened on both devices at once can be created twice (found 2026-11-10, reviewing #473).**
 Create Menu writes the menu and then claims the `.ycmenu` file, as the brief specified. Claiming first would lose the

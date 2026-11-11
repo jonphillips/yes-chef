@@ -280,7 +280,7 @@ public enum YesChefMCPServer {
       },
       MCPTool(
         name: "stage_prep_plan",
-        description: "Replace the whole prep plan for each named dish; anything not sent for a named dish is removed, while unnamed dishes stay untouched. Read the menu with `get_menu` first. Send every separable task for each dish, not cooking instructions woven across recipes. Don't put the schedule in dish notes. A step serving several dishes goes under the dish it mostly serves and its task can name the others. Nothing is saved until Jon reviews it.",
+        description: "Replace the whole prep plan for each named dish; anything not sent for a named dish is removed, while unnamed dishes stay untouched. Read the menu with `get_menu` first. Send every separable task for each dish, not cooking instructions woven across recipes. Don't put the schedule in dish notes. A step serving several dishes goes under the dish it mostly serves and its task can name the others. `workDay` carries the day, so `session` is only the time within it (\"Afternoon\", \"About 6:45 PM\"); don't repeat the date. Nothing is saved until Jon reviews it.",
         inputSchema: .object(["type": .string("object"), "properties": .object([
           "menu": string,
           "dishes": .object(["type": .string("array"), "minItems": .integer(1), "maxItems": .integer(20), "items": .object([
