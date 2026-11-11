@@ -41,7 +41,7 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0031](ADR-0031-llmclientkit-responses-api-migration.md) — Migrate the OpenAI backend of LLMClientKit to the Responses API *(Proposed, 2026-07-12)*
 - [ADR-0032](ADR-0032-workbench-reference-material-fetch.md) — Workbench reference material (app-side fetch, provider-agnostic context) *(Accepted, 2026-07-23)*
 - [ADR-0033](ADR-0033-recipe-detail-polish.md) — Recipe-detail polish: metadata chips + servings-attached scaler *(Accepted, 2026-07-12)*
-- [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) — The prep plan is one weaveable, work-session timeline *(Accepted, 2026-07-12)*
+- [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) — The prep plan is one weaveable, work-session timeline *(Accepted, 2026-07-12; Amd 2 2026-11-11)*
 - [ADR-0035](ADR-0035-grocery-store-area-grouping.md) — Group the grocery list by store area, categorized on-device *(Accepted, 2026-07-12)*
 - [ADR-0036](ADR-0036-promote-note-to-recipe.md) — Promote a recipe-shaped note into a real recipe *(Accepted, 2026-07-12)*
 - [ADR-0037](ADR-0037-grocery-seed-coverage-diagnostic.md) — Seed-coverage diagnostic: a review queue for grocery store-area misses *(Accepted, 2026-07-13)*

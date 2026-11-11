@@ -283,3 +283,40 @@ data pass for little value. Jon can delete any he doesn't want.
   how Menu's plan behaves before copying it.
 - **Check-off.** Steps have no completion state, in Menu either. Try bands alone first. If Jon still loses his place while
   cooking, a check-off is the next step, and it should cover both plans. This doesn't change the cook-mode deferral above.
+
+## Amendment 2 — A step shows its make-ahead window, and plans leave room for leftovers (2026-11-11)
+
+Accepted 2026-11-11 by Jon, while dogfooding Thanksgiving Week. Brief:
+[`prep-step-make-ahead-window`](../efforts/prep-step-make-ahead-window.md).
+
+**The problem.** A step says when to do the work but not how far ahead the recipe allows it. Jon wants the step itself
+to say "No more than 24 hours ahead", "8–18 hours" or "Up to 3 days ahead". Placement also ignores leftovers. A sauce
+that keeps a week shouldn't be made 7 days ahead when the family eats the leftovers for 3 days after the meal; 4 days
+ahead is right.
+
+### B1 — A step stores its make-ahead window
+
+`prepPlanSteps` gains `makeAheadWindow TEXT`, nullable: the recipe's own limit, in short words. It's a separate field
+and not folded into `task`, so it can be shown, edited and copied on its own
+([ADR-0040](ADR-0040-editable-at-the-grain-it-is-stored.md)). Existing rows stay nil, with no backfill. The step
+editor edits it, and the step shows it on its own line above the task. A nil window shows nothing.
+
+- **Source.** Each producer fills it from the dish's Make-Ahead note when one exists, else from what the recipe says.
+  The producers are the in-app weave, the Copy Prep Prompt round trip, and `stage_prep_plan`
+  ([ADR-0060](ADR-0060-chat-access-over-mcp.md) Amd 5). When nothing grounds it, it's left out, never guessed.
+- **Identity.** The window is part of a step's contents wherever steps are matched: `replace` keeps an id only when the
+  window matches too, and `stage_prep_plan` shows a changed window as Removed plus New. That needs no new review state.
+- **Cost.** One nullable column on a synced table, so a CloudKit Production deploy before any TestFlight upload. Its
+  consumer ships with it.
+
+### B2 — Plans leave about 3 days for leftovers, as a rule and not a calculation
+
+Every producer's instructions carry the same rule: when a dish keeps for days, schedule it so about 3 days of keeping
+remain after the meal it feeds. A sauce that keeps a week is made no more than 4 days before. A window in hours, or a
+limit of a few days or less, is followed as written. The user's make-ahead preferences can override the allowance.
+
+- **Why a rule:** windows are free text from notes, so calculating from them would need the text turned into exact
+  durations, which would break easily. The plan is advisory and Jon reviews it, so an instruction to the producer is
+  enough (the [[llm-vs-determinism-surface-boundary]] line D1 already holds).
+- **Not built:** a setting for the allowance. Add one only if a dinner party and a week of family meals need different
+  numbers.
