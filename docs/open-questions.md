@@ -24,6 +24,14 @@ and everything downstream move forward without waiting on it.
 - **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
   Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
 
+**Chat-applied prep steps land out of time order (found 2026-11-10, dogfooding #483).** Steps sort by
+`sortOrder`; the time lives only in free-text `session` ("Tuesday, Nov 24 — about 6:43 PM").
+`ChatPrepPlanImport.apply` puts a new step after the last same-session step, else after the day's last step,
+so a dish staged later sinks below earlier dishes' evening steps and its morning steps. Manual Move Earlier/Later
+is the escape hatch and must survive, so don't sort on display. Jon also finds the clock times precious: off the
+day of the meal, "afternoon"/"evening" reads better. Decide together: coarser session vocabulary (the
+`PrepPlanSessionBand` picker is a start) and placement by that order on apply. Not now.
+
 **A staged menu opened on both devices at once can be created twice (found 2026-11-10, reviewing #473).**
 Create Menu writes the menu and then claims the `.ycmenu` file, as the brief specified. Claiming first would lose the
 staged menu if the write then failed. If the iPhone and iPad both open the review before either claims, both can
