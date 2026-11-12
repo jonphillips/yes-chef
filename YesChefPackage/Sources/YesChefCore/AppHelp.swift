@@ -65,6 +65,7 @@ public struct AppHelpPage: Equatable, Sendable {
       ]),
       Section(heading: "Merging", bullets: [
         "The same ingredient from different recipes becomes one item with the amounts added up, when the units can be added (cups with cups, grams with grams). Otherwise it stays a separate item.",
+        "Use **Same As…** when two names mean one ingredient. The fix applies to future lists, and you can review or remove it from **List Actions › Name Fixes**.",
         "Long-press an item to see where it came from, or remove one recipe's share."
       ]),
       Section(heading: "Pantry", bullets: [

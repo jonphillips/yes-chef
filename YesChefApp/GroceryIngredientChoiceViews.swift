@@ -12,6 +12,7 @@ struct GroceryIngredientChoiceSection: View {
   var scale: Double
   var tripByCanonicalName: [String: GroceryTrip]? = nil
   var switchTrip: ((String) -> Void)? = nil
+  var fixedName: (String) -> String? = { $0 }
 
   init(
     title: String,
@@ -20,7 +21,8 @@ struct GroceryIngredientChoiceSection: View {
     showsRecipeTitle: Bool,
     scale: Double,
     tripByCanonicalName: [String: GroceryTrip]? = nil,
-    switchTrip: ((String) -> Void)? = nil
+    switchTrip: ((String) -> Void)? = nil,
+    fixedName: @escaping (String) -> String? = { $0 }
   ) {
     self.title = title
     self.choices = choices
@@ -29,6 +31,7 @@ struct GroceryIngredientChoiceSection: View {
     self.scale = scale
     self.tripByCanonicalName = tripByCanonicalName
     self.switchTrip = switchTrip
+    self.fixedName = fixedName
   }
 
   var body: some View {
@@ -47,7 +50,7 @@ struct GroceryIngredientChoiceSection: View {
           }
           .buttonStyle(.plain)
           Spacer(minLength: 8)
-          if let name = choice.line.canonicalIngredientName,
+          if let name = choice.line.canonicalIngredientName.flatMap(fixedName),
              let trip = tripByCanonicalName?[name],
              let switchTrip {
             Button {

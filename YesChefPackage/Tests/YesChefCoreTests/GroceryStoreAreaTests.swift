@@ -154,7 +154,7 @@ extension RecipeCoreTests {
       ]
 
       for (title, expectedArea) in expectedAreas {
-        let canonicalName = try #require(CanonicalIngredient.canonicalName(title))
+        let canonicalName = try #require(CanonicalIngredient.baseName(title))
         expectNoDifference(GroceryStoreArea.seed(for: canonicalName), expectedArea)
       }
     }
@@ -172,7 +172,7 @@ extension RecipeCoreTests {
     @Test
     func everySeedKeyIsCanonical() {
       for key in GroceryStoreArea.seedAreas.keys {
-        expectNoDifference(CanonicalIngredient.canonicalName(key), key)
+        expectNoDifference(CanonicalIngredient.baseName(key), key)
       }
     }
 

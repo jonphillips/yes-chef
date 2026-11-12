@@ -29,6 +29,8 @@ public enum CanonicalIngredient {
     "white pepper",
   ]
 
+  // Built-in aliases are promoted from ingredient name fixes; don't add misses here by hand.
+  // See ADR-0069 and ADR-0070.
   private static let aliases: [String: String] = [
     "anchovy filet": "anchovies",
     "anchovy filets": "anchovies",
@@ -91,7 +93,7 @@ public enum CanonicalIngredient {
     "whole",
   ]
 
-  public static func canonicalName(_ text: String?) -> String? {
+  public static func baseName(_ text: String?) -> String? {
     guard let text else { return nil }
     let base = baseText(text)
     let normalized = normalize(base)
@@ -116,10 +118,13 @@ public enum CanonicalIngredient {
   /// The canonical keys of each side of an `X and Y` name (`salt and freshly cracked black pepper` →
   /// `["salt", "black pepper"]`), or `nil` when the name isn't a compound. Pantry matching uses it so a
   /// compound line is assumed when every part is — without enumerating every spelling of the pair.
-  public static func compoundParts(_ canonicalName: String) -> [String]? {
+  public static func compoundParts(
+    _ canonicalName: String,
+    fixes: IngredientNameFixes = .empty
+  ) -> [String]? {
     let parts = canonicalName.components(separatedBy: " and ")
     guard parts.count > 1 else { return nil }
-    let keys = parts.compactMap(Self.canonicalName)
+    let keys = parts.compactMap(fixes.canonicalName)
     return keys.count == parts.count ? keys : nil
   }
 

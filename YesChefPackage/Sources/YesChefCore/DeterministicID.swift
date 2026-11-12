@@ -21,6 +21,10 @@ public enum DeterministicID {
     uuidV5(namespace: oidNamespace, name: "groceryTrip:\(canonicalName)")
   }
 
+  public static func ingredientNameFix(fromName: String) -> UUID {
+    uuidV5(namespace: oidNamespace, name: "ingredientNameFix:\(fromName)")
+  }
+
   private static let oidNamespace = UUID(uuidString: "6ba7b812-9dad-11d1-80b4-00c04fd430c8")!
 
   private static func uuidV5(namespace: UUID, name: String) -> UUID {

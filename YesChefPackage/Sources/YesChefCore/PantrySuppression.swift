@@ -23,11 +23,12 @@ public enum PantrySuppression {
 
   public static func evaluate(
     list: [GroceryItemRowData],
-    policies: [PantryItem]
+    policies: [PantryItem],
+    fixes: IngredientNameFixes = .empty
   ) -> Evaluation {
     let policiesByCanonicalName: [String: PantryItem] = Dictionary(
       grouping: policies.compactMap { item -> (String, PantryItem)? in
-        guard let canonicalName = CanonicalIngredient.canonicalName(item.title) else { return nil }
+        guard let canonicalName = fixes.canonicalName(item.title) else { return nil }
         return (canonicalName, item)
       },
       by: \.0
@@ -38,13 +39,13 @@ public enum PantrySuppression {
 
     var evaluation = Evaluation()
     for row in list {
-      guard let canonicalName = row.item.canonicalIngredientName else {
+      guard let canonicalName = fixes.canonicalName(row.item.canonicalIngredientName) else {
         evaluation.shown.append(row)
         continue
       }
       guard let pantryItem = policiesByCanonicalName[canonicalName] else {
         // `salt and cracked pepper`: assumed only when every part is an always-have-it staple.
-        let parts = CanonicalIngredient.compoundParts(canonicalName)
+        let parts = CanonicalIngredient.compoundParts(canonicalName, fixes: fixes)
         if let parts, parts.allSatisfy({ policiesByCanonicalName[$0]?.policy == .unlimited }) {
           evaluation.assumedInPantry.append(row)
         } else {

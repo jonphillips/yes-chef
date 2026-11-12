@@ -8,6 +8,7 @@ struct RecipeAdjustmentReviewView: View {
   let saveVariation: ((RecipeAdjustmentReviewState) -> Result<Void, any Error>)?
 
   @Environment(\.dismiss) private var dismiss
+  @Fetch(IngredientNameFixListRequest(), animation: .default) private var nameFixRows: [IngredientNameFix] = []
   @State private var segment = Segment.ingredients
   @State private var variationName: String
   @State private var isOverwriting = false
@@ -37,7 +38,8 @@ struct RecipeAdjustmentReviewView: View {
   private var comparison: IngredientComparison {
     WorkbenchCompare.ingredientComparison(
       working: review.currentDetail,
-      candidates: [review.proposedDetail]
+      candidates: [review.proposedDetail],
+      fixes: IngredientNameFixes(rows: nameFixRows)
     )
   }
 

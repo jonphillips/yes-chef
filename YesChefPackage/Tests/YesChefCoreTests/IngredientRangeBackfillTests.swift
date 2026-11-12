@@ -102,7 +102,7 @@ extension RecipeCoreTests {
         expectNoDifference(repairedSize.quantityText, nil)
         expectNoDifference(repairedSize.unit, nil)
         expectNoDifference(repairedSize.item, "1 1/2-inch piece fresh ginger")
-        expectNoDifference(repairedSize.canonicalName, CanonicalIngredient.canonicalName("1 1/2-inch piece fresh ginger"))
+        expectNoDifference(repairedSize.canonicalName, CanonicalIngredient.baseName("1 1/2-inch piece fresh ginger"))
         expectNoDifference(repairedSize.preparation, "peeled")
         expectNoDifference(repairedSize.confidence, .low)
         expectNoDifference(repairedSize.isOptional, true)

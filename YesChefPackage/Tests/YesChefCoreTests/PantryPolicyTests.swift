@@ -22,9 +22,9 @@ extension RecipeCoreTests {
       expectNoDifference(firstRows, secondRows)
 
       let canonicalNames = GroceryPantryAssumptions.defaultStaples
-        .compactMap(CanonicalIngredient.canonicalName)
+        .compactMap(CanonicalIngredient.baseName)
       expectNoDifference(firstRows.count, Set(canonicalNames).count)
-      let rowCanonicalNames = firstRows.values.compactMap(CanonicalIngredient.canonicalName)
+      let rowCanonicalNames = firstRows.values.compactMap(CanonicalIngredient.baseName)
       expectNoDifference(rowCanonicalNames.count, Set(rowCanonicalNames).count)
     }
 

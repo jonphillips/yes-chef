@@ -257,6 +257,12 @@ private struct GroceryListActionsMenu: View {
       } label: {
         Label("How Groceries Work", symbol: .help)
       }
+
+      Button {
+        model.nameFixesButtonTapped()
+      } label: {
+        Label("Name Fixes", systemImage: "arrow.left.arrow.right")
+      }
     } label: {
       Label("List Actions", systemImage: "ellipsis.circle")
     }
@@ -291,6 +297,9 @@ private struct GroceryItemsSection: View {
             },
             addToPantry: {
               model.addToPantryButtonTapped(itemID: row.id)
+            },
+            sameAs: {
+              model.sameAsButtonTapped(itemID: row.id)
             }
           )
           .swipeActions(edge: .leading) {
@@ -346,6 +355,7 @@ struct GroceryItemRowView: View {
   var deleteSource: (GroceryItemSource.ID) -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
   var addToPantry: () -> Void
+  var sameAs: () -> Void
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
@@ -393,6 +403,7 @@ struct GroceryItemRowView: View {
       GroceryItemActions(
         row: row,
         addToPantry: addToPantry,
+        sameAs: sameAs,
         editItem: editItem,
         deleteItem: deleteItem,
         deleteContribution: deleteContribution
@@ -427,11 +438,18 @@ private func groceryQuantityText(for item: GroceryItem) -> String? {
 private struct GroceryItemActions {
   let row: GroceryItemRowData
   var addToPantry: () -> Void
+  var sameAs: () -> Void
   var editItem: () -> Void
   var deleteItem: () -> Void
   var deleteContribution: (GroceryItemSource.ID) -> Void
 
   @ViewBuilder var actions: some View {
+      Button {
+        sameAs()
+      } label: {
+        Label("Same As…", systemImage: "arrow.left.arrow.right")
+      }
+
       Button {
         editItem()
       } label: {
@@ -900,8 +918,8 @@ struct GroceryIngredientSelectionView: View {
     self.pantryStaples = pantryStaples
     _selectedIngredientLineIDs = State(
       initialValue: Set(
-        choices
-          .filter { !$0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
+            choices
+          .filter { !$0.isAssumedPantryStaple(pantryStaples: pantryStaples, fixes: model.ingredientFixes) }
           .map(\.line.id)
       )
     )
@@ -1006,16 +1024,17 @@ struct GroceryIngredientSelectionView: View {
       showsRecipeTitle: showsRecipeTitle,
       scale: context.displayScale,
       tripByCanonicalName: tripAssignments,
-      switchTrip: tripSwitcher
+      switchTrip: tripSwitcher,
+      fixedName: { model.ingredientFixes.canonicalName($0) }
     )
   }
 
   private var regularChoices: [GroceryIngredientChoice] {
-    choices.filter { !$0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
+      choices.filter { !$0.isAssumedPantryStaple(pantryStaples: pantryStaples, fixes: model.ingredientFixes) }
   }
 
   private var pantryStapleChoices: [GroceryIngredientChoice] {
-    choices.filter { $0.isAssumedPantryStaple(pantryStaples: pantryStaples) }
+      choices.filter { $0.isAssumedPantryStaple(pantryStaples: pantryStaples, fixes: model.ingredientFixes) }
   }
 
   private var canSplitIntoTrips: Bool {
@@ -1027,7 +1046,7 @@ struct GroceryIngredientSelectionView: View {
 
   private func tripChoices(for trip: GroceryTrip) -> [GroceryIngredientChoice] {
     regularChoices.filter { choice in
-      guard let name = choice.line.canonicalIngredientName else { return trip == .fresh }
+      guard let name = model.ingredientFixes.canonicalName(choice.line.canonicalIngredientName) else { return trip == .fresh }
       return tripByCanonicalName[name] == trip
     }
   }

@@ -288,6 +288,7 @@ private let persistedTableModels = [
   persistedTableModel(Facet.self),
   persistedTableModel(GroceryAreaAssignment.self),
   persistedTableModel(GroceryTripAssignment.self),
+  persistedTableModel(IngredientNameFix.self),
   persistedTableModel(PrepPlanStepRecord.self),
   persistedTableModel(ChatThreadRecord.self),
   persistedTableModel(RecipeDeliberationLogEntry.self),

@@ -1387,6 +1387,17 @@ extension DependencyValues {
       try db.execute(sql: #"ALTER TABLE "prepPlanSteps" ADD COLUMN "completedAt" TEXT"#)
     }
 
+    migrator.registerMigration("Add ingredient name fixes") { db in
+      try #sql("""
+        CREATE TABLE "ingredientNameFixes" (
+          "id" TEXT PRIMARY KEY NOT NULL ON CONFLICT REPLACE DEFAULT (uuid()),
+          "fromName" TEXT NOT NULL,
+          "toName" TEXT NOT NULL,
+          "dateModified" TEXT NOT NULL
+        ) STRICT
+        """).execute(db)
+    }
+
     try migrator.migrate(database)
     try database.write { db in
       try RecipeChatStore.pruneMessages(olderThan: RecipeChatStore.cutoff(now: Date()), in: db)

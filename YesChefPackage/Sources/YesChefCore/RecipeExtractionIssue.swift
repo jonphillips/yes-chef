@@ -218,7 +218,7 @@ public enum RecipeExtractionIssueDetector {
     guard let first = remainder.first else { return nil }
 
     let names = remainder.indices.compactMap { end in
-      CanonicalIngredient.canonicalName(remainder[...end].joined(separator: " "))
+      CanonicalIngredient.baseName(remainder[...end].joined(separator: " "))
     }
     // A listed multiword ingredient ("olive oil") wins over the first word ("olive"). When no listed
     // phrase exists, retain only the first noun-like token rather than falsely claiming an entire sentence
@@ -226,14 +226,14 @@ public enum RecipeExtractionIssueDetector {
     if names.contains(where: listedNames.contains) {
       return nil
     }
-    return CanonicalIngredient.canonicalName(first)
+    return CanonicalIngredient.baseName(first)
   }
 
   private static func canonicalIngredientPhrases(_ words: [String]) -> [String] {
     var names = Set<String>()
     for start in words.indices {
       for end in start..<words.count {
-        if let name = CanonicalIngredient.canonicalName(words[start...end].joined(separator: " ")) {
+        if let name = CanonicalIngredient.baseName(words[start...end].joined(separator: " ")) {
           names.insert(name)
         }
       }
@@ -279,7 +279,7 @@ public enum RecipeExtractionIssueDetector {
 
     init?(_ line: String) {
       let parsed = IngredientParser.parse(line)
-      guard let canonicalName = CanonicalIngredient.canonicalName(parsed.item ?? parsed.parsingText) else {
+      guard let canonicalName = CanonicalIngredient.baseName(parsed.item ?? parsed.parsingText) else {
         return nil
       }
       self.line = line

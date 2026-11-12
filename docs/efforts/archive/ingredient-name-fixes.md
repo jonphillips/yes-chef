@@ -6,7 +6,7 @@ Summary: A synced `ingredientNameFixes` table maps one ingredient key to another
 Origin: Jon, 2026-11-12, graduating the Tandoor harvest after #499 added parsley spellings in code. One dispatch, one
 PR. **Persistent model change, authorized by ADR-0069 D1.**
 
-Decisions: [ADR-0069](../decisions/ADR-0069-ingredient-name-fixes.md) (D1–D9). Read it first. Patterns to copy:
+Decisions: [ADR-0069](../../decisions/ADR-0069-ingredient-name-fixes.md) (D1–D9). Read it first. Patterns to copy:
 `GroceryTripAssignment` (ADR-0068 D3: fixed-UUID row, no `source`) and the ADR-0052 area resolver (load the table once
 per pass).
 

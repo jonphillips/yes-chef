@@ -25,7 +25,7 @@ extension RecipeCoreTests {
     func savedSwitchWinsAndAreaCorrectionSetsTheDefault() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 900_100_000)
-      let name = try #require(CanonicalIngredient.canonicalName("canned tomatoes"))
+      let name = try #require(CanonicalIngredient.baseName("canned tomatoes"))
       try database.write { db in
         try GroceryAreaAssignment.insert {
           GroceryAreaAssignment(

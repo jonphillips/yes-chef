@@ -28,14 +28,16 @@ final class GroceryLibraryModel {
     case editItem(GroceryItemEditorDraft)
     case editList(GroceryListEditorDraft)
     case help
+    case nameFixes
+    case sameAs(GroceryItem.ID)
     case editPantryItem(PantryItem.ID)
     case selectIngredients(GroceryIngredientSelectionPresentation)
   }
 
   @ObservationIgnored
-  @Dependency(\.date.now) private var now
+  @Dependency(\.date.now) var now
   @ObservationIgnored
-  @Dependency(\.defaultDatabase) private var database
+  @Dependency(\.defaultDatabase) var database
   @ObservationIgnored
   @Dependency(\.uuid) private var uuid
   @ObservationIgnored
@@ -46,6 +48,8 @@ final class GroceryLibraryModel {
   @Fetch(GroceryItemListRequest(), animation: .default) var itemRows: [GroceryItemRowData] = []
   @ObservationIgnored
   @Fetch(PantryItemListRequest(), animation: .default) var pantryItems: [PantryItem] = []
+  @ObservationIgnored
+  @Fetch(IngredientNameFixListRequest(), animation: .default) var ingredientNameFixes: [IngredientNameFix] = []
   @ObservationIgnored
   @Fetch(MenuListRequest(), animation: .default) var menuRows: [MenuRowData] = []
 
@@ -87,31 +91,20 @@ final class GroceryLibraryModel {
     GroceryPantryAssumptions.skippedStapleTitles(from: pantryItems)
   }
 
+  var ingredientFixes: IngredientNameFixes {
+    IngredientNameFixes(rows: ingredientNameFixes)
+  }
+
   func helpButtonTapped() {
     destination = .help
   }
 
   func groceryTrips(for choices: [GroceryIngredientChoice]) async throws -> [String: GroceryTrip] {
-    let names = choices.compactMap { $0.line.canonicalIngredientName }
+    let fixes = ingredientFixes
+    let names = choices.compactMap { fixes.canonicalName($0.line.canonicalIngredientName) }
     return try await database.read { db in
       try GroceryTripRepository.trips(forCanonicalNames: names, in: db)
     }
-  }
-
-  var selectedDisplaySections: GroceryDisplaySections {
-    guard let selectedListID = selectedListRow?.id else {
-      return GroceryDisplaySections()
-    }
-    let evaluation = PantrySuppression.evaluate(
-      list: selectedItemRows,
-      policies: pantryItems
-    )
-    return GroceryDisplaySections(
-      suppression: PantrySuppression.addBack(
-        itemIDs: pantryAddBackItemIDsByListID[selectedListID] ?? [],
-        to: evaluation
-      )
-    )
   }
 
   var availableMenuRows: [MenuRowData] {
@@ -511,7 +504,7 @@ final class GroceryLibraryModel {
           var lineIDsByTrip: [GroceryTrip: Set<IngredientLine.ID>] = [:]
           for choice in choices {
             guard selectedIngredientLineIDs.contains(choice.line.id) else { continue }
-            let name = choice.line.canonicalIngredientName
+            let name = ingredientFixes.canonicalName(choice.line.canonicalIngredientName)
             let trip = name.flatMap { tripByCanonicalName[$0] } ?? .fresh
             lineIDsByTrip[trip, default: []].insert(choice.line.id)
           }
@@ -777,7 +770,7 @@ extension GroceryLibraryModel {
     do {
       try Task.checkCancellation()
       try await database.write { db in
-        try GroceryStoreAreaCache.backfill(in: db)
+        try GroceryStoreAreaCache.backfill(in: db, fixes: IngredientNameFixes.load(in: db))
       }
       try? await $itemRows.load()
 

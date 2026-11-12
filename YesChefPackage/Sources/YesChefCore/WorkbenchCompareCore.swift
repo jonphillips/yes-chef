@@ -27,7 +27,7 @@ public struct IngredientMatrixColumn: Identifiable, Equatable, Codable, Sendable
 /// One canonical-ingredient row spanning every column. `cells` is parallel to the matrix `columns`;
 /// a `nil` cell means the ingredient is absent from that recipe — an honest blank, not a guess.
 public struct IngredientMatrixRow: Identifiable, Equatable, Codable, Sendable {
-  /// The canonical alignment key (`CanonicalIngredient.canonicalName`).
+  /// The canonical alignment key (`CanonicalIngredient.baseName`).
   public let id: String
   public var label: String
   public var cells: [String?]
@@ -57,12 +57,13 @@ public struct IngredientComparison: Equatable, Codable, Sendable {
 public enum WorkbenchCompare {
   /// Build the aligned ingredient matrix. Rows are canonical ingredients (working-recipe order first,
   /// then candidates left-to-right); each cell is that recipe's ingredient line as authored, or blank.
-  /// Alignment is *only* on exact `CanonicalIngredient.canonicalName` match; anything that doesn't
+  /// Alignment is *only* on exact `CanonicalIngredient.baseName` match; anything that doesn't
   /// canonicalize — or collides ambiguously within a single recipe — drops to that column's "other"
   /// tail instead of being force-merged.
   public static func ingredientComparison(
     working: RecipeDetailData?,
-    candidates: [RecipeDetailData]
+    candidates: [RecipeDetailData],
+    fixes: IngredientNameFixes = .empty
   ) -> IngredientComparison {
     var sources: [(role: IngredientMatrixColumn.Role, detail: RecipeDetailData)] = []
     if let working {
@@ -72,7 +73,7 @@ public enum WorkbenchCompare {
 
     guard !sources.isEmpty else { return IngredientComparison() }
 
-    var builds = sources.map { source in buildColumn(role: source.role, detail: source.detail) }
+    var builds = sources.map { source in buildColumn(role: source.role, detail: source.detail, fixes: fixes) }
 
     // Ordered union of aligned keys: working recipe's order first, then each candidate's, appending
     // keys not seen yet. Preserves the reading order the cook expects while covering every recipe.
@@ -108,7 +109,8 @@ public enum WorkbenchCompare {
 
   private static func buildColumn(
     role: IngredientMatrixColumn.Role,
-    detail: RecipeDetailData
+    detail: RecipeDetailData,
+    fixes: IngredientNameFixes
   ) -> ColumnBuild {
     let lines = detail.ingredientLines.filter { !$0.isHeader }
 
@@ -116,7 +118,7 @@ public enum WorkbenchCompare {
     // canonical key (e.g. "2 tomatoes" + "1 can crushed tomatoes") are ambiguous and both go to other.
     var keyCounts: [String: Int] = [:]
     for line in lines {
-      if let key = line.comparisonAlignmentKey {
+      if let key = line.comparisonAlignmentKey(fixes: fixes) {
         keyCounts[key, default: 0] += 1
       }
     }
@@ -127,7 +129,7 @@ public enum WorkbenchCompare {
 
     for line in lines {
       guard let text = line.comparisonCellText else { continue }
-      if let key = line.comparisonAlignmentKey, keyCounts[key] == 1 {
+      if let key = line.comparisonAlignmentKey(fixes: fixes), keyCounts[key] == 1 {
         cellsByKey[key] = text
         orderedKeys.append(key)
       } else {
@@ -156,8 +158,8 @@ private extension IngredientLine {
 
   /// The row-alignment key for the matrix — the **coarse** compare key (drops form/state words), not
   /// the cached grocery `canonicalName`. Computed on read; no schema, no cache.
-  var comparisonAlignmentKey: String? {
-    CanonicalIngredient.comparisonKey(item ?? originalText)
+  func comparisonAlignmentKey(fixes: IngredientNameFixes) -> String? {
+    fixes.comparisonKey(item ?? originalText)
   }
 }
 

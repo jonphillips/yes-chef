@@ -1,6 +1,5 @@
-# Next Up — Ingredient name fixes
+# Next Up — nothing dispatched
 
-**Slices:** effort `ingredient-name-fixes`
-**Briefs:** [docs/efforts/ingredient-name-fixes.md](efforts/ingredient-name-fixes.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

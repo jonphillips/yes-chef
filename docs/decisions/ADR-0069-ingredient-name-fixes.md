@@ -6,7 +6,7 @@
 > promoted into the built-in list on a schedule ([ADR-0070](ADR-0070-what-you-teach-reaches-everyone.md)), so
 > everyone who uses the app gets them. You add a fix from a grocery item (**Same As…**) or from **Groceries › ⋯ › Name Fixes**, and you edit or delete it there.
 
-Status: **Accepted** — 2026-11-12 (Jon). Effort: [`efforts/ingredient-name-fixes.md`](../efforts/ingredient-name-fixes.md).
+Status: **Accepted** — 2026-11-12 (Jon). Effort: [`efforts/archive/ingredient-name-fixes.md`](../efforts/archive/ingredient-name-fixes.md).
 Origin: Jon, 2026-11-12, graduating the [Tandoor idea harvest](../efforts/archive/tandoor-idea-harvest.md): *"this is
 the 'same misses over and over' trigger: a table of editable name fixes using the ADR-0052 shape. You'd add
 'flat-leaf parsley → parsley' once and it would apply everywhere, instead of relying on a growing hardcoded list. The

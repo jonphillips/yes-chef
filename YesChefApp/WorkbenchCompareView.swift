@@ -27,6 +27,7 @@ struct WorkbenchCompareView: View {
   @State private var chatModel: RecipeChatModel?
   @State private var toastCenter = AppToastCenter()
   @State private var handoffTransport = HandoffInAppTransport()
+  @Fetch(IngredientNameFixListRequest(), animation: .default) private var nameFixRows: [IngredientNameFix] = []
 
   private var workingDetail: RecipeDetailData? {
     detail.draftRecipeDetail
@@ -41,7 +42,11 @@ struct WorkbenchCompareView: View {
   }
 
   private var deterministicComparison: IngredientComparison {
-    WorkbenchCompare.ingredientComparison(working: workingDetail, candidates: candidateDetails)
+    WorkbenchCompare.ingredientComparison(
+      working: workingDetail,
+      candidates: candidateDetails,
+      fixes: IngredientNameFixes(rows: nameFixRows)
+    )
   }
 
   private var cachedOutcome: WorkbenchAlignedComparison? {
