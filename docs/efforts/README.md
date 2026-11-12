@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [Consolidate List](grocery-consolidate-list.md) — **Ready.** Grocery items merge on the fixed key and units alone (notes and store area no longer block). **List Actions › Consolidate List** re-runs that merge on the current list. Items sort by name within each store area. No schema change.

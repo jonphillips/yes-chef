@@ -5,6 +5,17 @@ extension GroceryLibraryModel {
     destination = .nameFixes
   }
 
+  func consolidateListButtonTapped(listID: GroceryList.ID) {
+    do {
+      _ = try database.write { db in
+        try GroceryRepository.consolidate(listID: listID, in: db, now: now)
+      }
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
+  }
+
   func sameAsButtonTapped(itemID: GroceryItem.ID) {
     destination = .sameAs(itemID)
   }

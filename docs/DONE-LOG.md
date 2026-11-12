@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-12 — Consolidate List (`effort/grocery-consolidate-list`)
+
+- **Result:** Shared grocery merge rules across recipe generation, Same As, and Consolidate List. Added the list action, alphabetical item sorting, and updated grocery help.
+- **Verification:** check-drift passed with 860 package tests and 3 known issues; generic iOS build passed; 145 YesChefTests passed.
+- **Owed:** grocery-consolidate-list's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-12 — Kitchen knowledge promotion (`effort/kitchen-knowledge-promotion`)
 
 - **Result:** Moved built-in kitchen knowledge to a bundled versioned file, added export, promotion, cleanup, and status flows, and wired the TestFlight warning hook; no persistent model change.

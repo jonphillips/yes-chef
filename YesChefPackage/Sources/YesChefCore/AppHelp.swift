@@ -59,13 +59,14 @@ public struct AppHelpPage: Equatable, Sendable {
     title: "How Groceries Work",
     sections: [
       Section(heading: "Adding ingredients", bullets: [
-        "**Add Ingredients** adds a calendar day or a menu to this list. You pick which lines to add first. **Add Day to Groceries**, on a menu day or a Calendar day, opens the same choices for one day.",
+        "**Add Ingredients** adds a calendar day or a menu to this list. You pick which lines to add first. **Add Day to Groceries** on a menu or Calendar day does the same for one day.",
         "Lines matching a pantry item set to **Always have it** start unchecked under **Skipped Pantry Staples**. Check one to buy it anyway.",
-        "Turn on **Split into two trips** to send each line to an **Advance** list or a **Fresh** list. Tap a line's **Advance** or **Fresh** tag to switch it. The app remembers your switch next time."
+        "Turn on **Split into two trips** to send each line to an **Advance** list or a **Fresh** list. Tap a line's **Advance** or **Fresh** tag to switch it. The app remembers your switch."
       ]),
       Section(heading: "Merging", bullets: [
-        "The same ingredient from different recipes becomes one item with the amounts added up, when the units can be added. Otherwise it stays a separate item.",
-        "Use **Same As…** when two names mean one ingredient. The fix applies to future lists, and you can review or remove it from **List Actions › Name Fixes**.",
+        "The same ingredient from different recipes becomes one item with the amounts added up, when the units can be added. Notes and areas don't keep items apart.",
+        "Use **Same As…** when two names mean one ingredient; fixes are in **List Actions › Name Fixes**.",
+        "**List Actions › Consolidate List** merges this list again, such as after a new fix.",
         "Long-press an item to see where it came from, or remove one recipe's share."
       ]),
       Section(heading: "Pantry", bullets: [

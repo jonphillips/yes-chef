@@ -194,6 +194,7 @@ extension RecipeCoreTests {
               quantityText: "2",
               unit: "cups",
               item: "milk",
+              preparation: "cold",
               sortOrder: 0,
               confidence: .medium
             )
@@ -215,6 +216,7 @@ extension RecipeCoreTests {
               quantityText: "1.5",
               unit: "cups",
               item: "Milk",
+              preparation: "melted",
               sortOrder: 0,
               confidence: .medium
             )
@@ -230,6 +232,9 @@ extension RecipeCoreTests {
           now: now,
           uuid: { uuids.next() }
         )
+        var firstItem = try #require(GroceryItem.fetchAll(db).first)
+        firstItem.aisle = "Bakery"
+        try GroceryItem.upsert { firstItem }.execute(db)
         _ = try GroceryRepository.addRecipe(
           recipeID: secondRecipeID,
           groceryListID: listID,
@@ -246,7 +251,8 @@ extension RecipeCoreTests {
         expectNoDifference(row.item.quantity, 3.5)
         expectNoDifference(row.item.quantityText, "3.5")
         expectNoDifference(row.item.unit, "cups")
-        expectNoDifference(row.item.aisle, "Dairy")
+        expectNoDifference(row.item.aisle, "Bakery")
+        expectNoDifference(row.item.notes, nil)
         expectNoDifference(row.sources.map(\.origin), [.recipe, .recipe])
         expectNoDifference(row.sources.map(\.recipeID), [firstRecipeID, secondRecipeID].map(Optional.some))
         expectNoDifference(
@@ -258,7 +264,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func keepsPurchasedAndPrepSensitiveItemsSeparateWhenGeneratingGroceries() throws {
+    func keepsPurchasedItemsSeparateAndDropsMismatchedRecipeNotesWhenGeneratingGroceries() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_275_000)
       let purchasedAt = Date(timeIntervalSinceReferenceDate: 805_276_000)
@@ -378,9 +384,9 @@ extension RecipeCoreTests {
         let milkRows = try GroceryItemListRequest().fetch(db)
           .filter { $0.item.title == "milk" }
 
-        expectNoDifference(milkRows.count, 3)
+        expectNoDifference(milkRows.count, 2)
         expectNoDifference(milkRows.filter(\.item.isPurchased).map(\.item.id), [purchasedItemID])
-        expectNoDifference(milkRows.filter { !$0.item.isPurchased }.map(\.item.notes), [nil, "warmed"])
+        expectNoDifference(milkRows.filter { !$0.item.isPurchased }.map(\.item.notes), [nil])
         expectNoDifference(
           milkRows.flatMap(\.sources).map(\.ingredientLineID),
           [secondMilkLineID, warmedMilkLineID, firstMilkLineID].map(Optional.some)
@@ -641,10 +647,10 @@ extension RecipeCoreTests {
         let rows = try GroceryItemListRequest().fetch(db)
           .filter { itemIDs.contains($0.id) }
 
-        expectNoDifference(rows.map(\.item.title), ["flour", "butter"])
+        expectNoDifference(rows.map(\.item.title), ["butter", "flour"])
         expectNoDifference(
           rows.flatMap(\.sources).map(\.ingredientLineID),
-          [flourLineID, butterLineID].map(Optional.some)
+          [butterLineID, flourLineID].map(Optional.some)
         )
         expectNoDifference(rows.flatMap(\.sources).contains { $0.ingredientLineID == sugarLineID }, false)
       }
@@ -949,7 +955,7 @@ extension RecipeCoreTests {
         let rows = try GroceryItemListRequest().fetch(db)
         expectNoDifference(rows.filter { $0.item.groceryListID == firstListID }, [])
         let remainingRows = rows.filter { $0.item.groceryListID == secondListID }
-        expectNoDifference(remainingRows.map(\.item.title), ["milk", "eggs"])
+        expectNoDifference(remainingRows.map(\.item.title), ["eggs", "milk"])
         expectNoDifference(
           remainingRows.map { $0.sources.map(\.recipeID) },
           [[recipeID].map(Optional.some), [recipeID].map(Optional.some)]

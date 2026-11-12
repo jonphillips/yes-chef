@@ -131,7 +131,7 @@ extension RecipeCoreTests {
     }
 
     @Test
-    func sameAsKeepsIncompatibleItemsAndAdoptsTargetDisplayFields() throws {
+    func sameAsMergesAcrossAreasAndPreservesTypedNotes() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 900_900_000)
       var uuids = SampleUUIDSequence(start: 90_900)
@@ -156,12 +156,14 @@ extension RecipeCoreTests {
         try GroceryRepository.sameAs(itemID: fromID, targetItemID: toID, in: db, now: now)
 
         let items = try GroceryItem.where { $0.groceryListID.eq(listID) }.fetchAll(db)
-        let from = try #require(items.first { $0.id == fromID })
-        #expect(items.count == 2)
-        #expect(from.title == "parsley")
-        #expect(from.canonicalName == "parsley")
-        #expect(from.aisle == "Produce")
-        #expect(from.notes == "chopped")
+        let survivor = try #require(items.first { $0.id == toID })
+        #expect(items.count == 1)
+        #expect(survivor.title == "parsley")
+        #expect(survivor.canonicalName == "parsley")
+        #expect(survivor.aisle == "Produce")
+        #expect(survivor.notes == "chopped")
+        #expect(try GroceryItemSource.where { $0.groceryItemID.eq(toID) }.fetchCount(db) == 2)
+        #expect(try GroceryItem.find(fromID).fetchOne(db) == nil)
         #expect(try GroceryItem.find(otherListItemID).fetchOne(db)?.title == "curly-leaf parsley")
       }
     }

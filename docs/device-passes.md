@@ -37,6 +37,7 @@ Dev, on CloudKit Development.
 - **prep-times-and-day-groceries:** On iPad, follow the prep-times-and-day-groceries device gate in the effort brief. ([brief](efforts/archive/prep-times-and-day-groceries.md))
 - **ingredient-name-fixes:** (Production schema deployed 2026-11-12.) On iPad, put “fresh mint leaves” and “mint” on a list from two recipes (a real Thanksgiving miss), use Same As… and confirm one item; rebuild and confirm one item without a new fix; verify the fix appears in Name Fixes on iPhone after sync; delete it there and rebuild to confirm two items. ([brief](efforts/archive/ingredient-name-fixes.md))
 - **kitchen-knowledge-promotion:** On the iPad, run Export What I've Taught; on the Mac, run `scripts/promote-knowledge -n` and check the summary includes the mint fix, then run it for real and open its data diff as a PR; install a build with that promotion and confirm the fix is gone from Name Fixes while fresh mint leaves and mint still merge into one item. ([brief](efforts/archive/kitchen-knowledge-promotion.md))
+- **grocery-consolidate-list:** On the iPad Thanksgiving Advance list, tap List Actions › Consolidate List and confirm the three unsalted butters become one 14-tablespoon item showing all three recipes on long-press. Add one more recipe with butter and confirm it merges straight in. ([brief](efforts/archive/grocery-consolidate-list.md))
 
 ## Held
 
