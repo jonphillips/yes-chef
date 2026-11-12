@@ -5,7 +5,7 @@
 > store area something is in, which trip it goes on) is promoted on a schedule into a data file that ships with the
 > app, so every user gets what any user taught it. Each person's own corrections still win on their devices.
 
-Status: **Accepted** — 2026-11-12 (Jon). Effort: [`efforts/kitchen-knowledge-promotion.md`](../efforts/kitchen-knowledge-promotion.md).
+Status: **Accepted** — 2026-11-12 (Jon). Effort: [`efforts/archive/kitchen-knowledge-promotion.md`](../efforts/archive/kitchen-knowledge-promotion.md).
 Origin: Jon, 2026-11-12, as Wendy starts using the app: *"1) We would not share household state. We each control
 our own lives in that way 2) Wendy at some point could view my recipe list and copy a recipe to hers (this is
 bigger, I know; we don't need to scope now.) 3) The work I patiently do to improve pantry/grocery list item

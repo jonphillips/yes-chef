@@ -7,9 +7,9 @@ Origin: Jon, 2026-11-12, as Wendy starts using the app. One dispatch, two PRs: t
 `jon-platform` change for the TestFlight warning (step 8). **No persistent model change:** the data file is a bundled
 resource, not a database table.
 
-Decisions: [ADR-0070](../decisions/ADR-0070-what-you-teach-reaches-everyone.md) (D1–D7). Read it first, then
-[ADR-0069](../decisions/ADR-0069-ingredient-name-fixes.md) D2–D3 (base keys vs fixed keys) and
-[ADR-0052](../decisions/ADR-0052-grocery-learned-area-table.md) D2–D3 (the area ladder).
+Decisions: [ADR-0070](../../decisions/ADR-0070-what-you-teach-reaches-everyone.md) (D1–D7). Read it first, then
+[ADR-0069](../../decisions/ADR-0069-ingredient-name-fixes.md) D2–D3 (base keys vs fixed keys) and
+[ADR-0052](../../decisions/ADR-0052-grocery-learned-area-table.md) D2–D3 (the area ladder).
 
 ## Where things are (architect, 2026-11-12, `origin/main` 91882c3)
 

@@ -25,4 +25,3 @@ discoverable"):
 
 ## Live
 
-- [Kitchen knowledge reaches everyone](kitchen-knowledge-promotion.md) — **Ready.** Built-in grocery knowledge moves to a bundled JSON file; an export and `scripts/promote-knowledge` promote taught rows into it; a data pass drops rows it makes redundant. No schema.
