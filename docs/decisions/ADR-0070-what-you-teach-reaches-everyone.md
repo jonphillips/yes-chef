@@ -5,7 +5,7 @@
 > store area something is in, which trip it goes on) is promoted on a schedule into a data file that ships with the
 > app, so every user gets what any user taught it. Each person's own corrections still win on their devices.
 
-Status: **Accepted** — 2026-11-12 (Jon). Brief to follow once ADR-0069 ships.
+Status: **Accepted** — 2026-11-12 (Jon). Effort: [`efforts/kitchen-knowledge-promotion.md`](../efforts/kitchen-knowledge-promotion.md).
 Origin: Jon, 2026-11-12, as Wendy starts using the app: *"1) We would not share household state. We each control
 our own lives in that way 2) Wendy at some point could view my recipe list and copy a recipe to hers (this is
 bigger, I know; we don't need to scope now.) 3) The work I patiently do to improve pantry/grocery list item
@@ -64,8 +64,9 @@ wins on her devices without touching anyone else's.
 ### D5 — Promotion: export what you've taught, merge it into the file, ship it
 
 - **Export.** Settings › Developer gets **Export What I've Taught**. It writes the promotable rows (D6) as JSON into
-  the iCloud Drive folder ADR-0060 already uses to reach the Mac. Anyone can run it, so Wendy's corrections can come
-  back the same way.
+  the app's iCloud container (`Documents/Knowledge/`, next to Backups), which reaches the Mac the way ADR-0060's
+  folder does, and offers the same file in a share sheet. Anyone can run it. Wendy's iCloud isn't Jon's, so she sends
+  hers through the share sheet.
 - **Merge.** A repo script reads the export, merges it into the data file, and prints what changed and any conflicts
   with existing built-in entries. The diff goes in a normal PR, and the architect reviews it like any other.
 - **Cadence.** Promotion runs before each TestFlight build, so the knowledge never trails a release by more than one
@@ -104,8 +105,8 @@ most. Revisit if that lag starts to show.
 
 ## Order
 
-ADR-0069 ships first, since name fixes are the knowledge that piles up fastest. A brief for this ADR follows: S1
-moves the built-in lists into the data file (no behavior change); S2 adds export, merge, cleanup and the TestFlight
+ADR-0069 shipped first (#502), since name fixes are the knowledge that piles up fastest. This ADR is one dispatch:
+moving the built-in lists into the data file with no behavior change, then export, merge, cleanup and the TestFlight
 warning.
 
 ## Open questions
