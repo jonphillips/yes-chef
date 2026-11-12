@@ -31,7 +31,7 @@ extension RecipeRepository {
       guard needsReparse else { continue }
 
       let parsed = IngredientParser.parse(line.originalText)
-      let canonicalName = CanonicalIngredient.canonicalName(parsed.item ?? parsed.parsingText)
+      let canonicalName = CanonicalIngredient.baseName(parsed.item ?? parsed.parsingText)
       let confidence: ParseConfidence = parsed.quantity == nil ? .low : .medium
       guard
         line.quantity != parsed.quantity

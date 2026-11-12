@@ -77,12 +77,12 @@ public enum GroceryStoreArea: Hashable, Sendable {
     return .custom(titleCased(normalizedValue))
   }
 
-  public static func seed(for canonicalName: String?) -> Self? {
-    guard let canonicalName = CanonicalIngredient.canonicalName(canonicalName) else { return nil }
+  public static func seed(for canonicalName: String?, fixes: IngredientNameFixes = .empty) -> Self? {
+    guard let canonicalName = fixes.canonicalName(canonicalName) else { return nil }
     if let area = seedAreas[canonicalName] {
       return area
     }
-    if let comparisonName = CanonicalIngredient.comparisonKey(canonicalName),
+    if let comparisonName = fixes.comparisonKey(canonicalName),
        let area = seedAreas[comparisonName] {
       return area
     }
@@ -360,19 +360,29 @@ public enum GroceryStoreAreaCache {
     for canonicalNames: [String],
     in db: Database
   ) throws -> [String: GroceryStoreArea] {
-    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db))
+    let fixes = try IngredientNameFixes.load(in: db)
+    return try resolvedAreas(for: canonicalNames, in: db, fixes: fixes)
+  }
+
+  static func resolvedAreas(
+    for canonicalNames: [String],
+    in db: Database,
+    fixes: IngredientNameFixes
+  ) throws -> [String: GroceryStoreArea] {
+    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db), fixes: fixes)
     return Dictionary(uniqueKeysWithValues: canonicalNames.compactMap { name in
       resolver.resolve(name).map { (name, $0) }
     })
   }
 
   public static func uncategorizedCanonicalNames(in db: Database) throws -> [String] {
-    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db))
+    let fixes = try IngredientNameFixes.load(in: db)
+    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db), fixes: fixes)
     let names: [String] = try GroceryItem.fetchAll(db).compactMap { item in
       guard item.aisle == nil, let canonicalName = item.canonicalName,
             resolver.resolve(canonicalName) == nil
       else { return nil }
-      return canonicalName
+      return fixes.canonicalName(canonicalName)
     }
     return Array(Set(names)).sorted()
   }
@@ -383,11 +393,13 @@ public enum GroceryStoreAreaCache {
     now: Date,
     uuid: () -> UUID
   ) throws {
-    var resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db))
+    let fixes = try IngredientNameFixes.load(in: db)
+    var resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db), fixes: fixes)
     for var item in try GroceryItem.fetchAll(db) where item.aisle == nil {
       guard
-        let canonicalName = CanonicalIngredient.canonicalName(item.canonicalName),
-        let classifiedArea = classified[canonicalName]
+        let canonicalName = CanonicalIngredient.baseName(item.canonicalName),
+        let fixedName = fixes.canonicalName(canonicalName),
+        let classifiedArea = classified[fixedName]
       else { continue }
 
       let area: GroceryStoreArea
@@ -396,7 +408,7 @@ public enum GroceryStoreAreaCache {
       } else {
         let assignment = GroceryAreaAssignment(
           id: uuid(),
-          canonicalName: canonicalName,
+          canonicalName: fixedName,
           area: classifiedArea.title,
           source: .model,
           dateModified: now
@@ -411,7 +423,8 @@ public enum GroceryStoreAreaCache {
   }
 
   public static func backfill(in db: Database) throws {
-    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db))
+    // This also runs in an older migration, before the name-fixes table exists.
+    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db), fixes: .empty)
     for var item in try GroceryItem.fetchAll(db) where item.aisle == nil {
       guard let area = resolver.resolve(item.canonicalName) else { continue }
       item.aisle = area.title
@@ -426,12 +439,13 @@ public enum GroceryStoreAreaCache {
     now: Date,
     uuid: () -> UUID
   ) throws {
+    let fixes = try IngredientNameFixes.load(in: db)
     guard
-      let canonicalName = CanonicalIngredient.canonicalName(canonicalName),
+      let canonicalName = fixes.canonicalName(canonicalName),
       let normalizedArea = GroceryStoreArea.normalized(area)
     else { return }
     let assignments = try assignmentRows(in: db)
-    let resolver = GroceryAreaResolver(assignments: assignments)
+    let resolver = GroceryAreaResolver(assignments: assignments, fixes: fixes)
     guard resolver.resolve(canonicalName) != normalizedArea else { return }
     let storedArea: String
     switch normalizedArea {
@@ -442,7 +456,7 @@ public enum GroceryStoreAreaCache {
     }
 
     let matchingAssignments = assignments.filter { $0.canonicalName == canonicalName }
-    if GroceryStoreArea.seed(for: canonicalName) == normalizedArea {
+    if GroceryStoreArea.seed(for: canonicalName, fixes: fixes) == normalizedArea {
       for assignment in matchingAssignments {
         try GroceryAreaAssignment.find(assignment.id).delete().execute(db)
       }
@@ -516,8 +530,10 @@ public enum GroceryStoreAreaCache {
 
   private struct GroceryAreaResolver {
     private var assignmentsByCanonicalName: [String: GroceryAreaAssignment] = [:]
+    private let fixes: IngredientNameFixes
 
-    init(assignments: [GroceryAreaAssignment]) {
+    init(assignments: [GroceryAreaAssignment], fixes: IngredientNameFixes) {
+      self.fixes = fixes
       for assignment in assignments {
         insert(assignment)
       }
@@ -541,12 +557,12 @@ public enum GroceryStoreAreaCache {
     }
 
     func resolve(_ canonicalName: String?) -> GroceryStoreArea? {
-      guard let canonicalName = CanonicalIngredient.canonicalName(canonicalName) else { return nil }
+      guard let canonicalName = fixes.canonicalName(canonicalName) else { return nil }
       if let assignment = assignmentsByCanonicalName[canonicalName], assignment.source == .user,
          let area = GroceryStoreArea.normalized(assignment.area) {
         return area
       }
-      if let seedArea = GroceryStoreArea.seed(for: canonicalName) {
+      if let seedArea = GroceryStoreArea.seed(for: canonicalName, fixes: fixes) {
         return seedArea
       }
       if let assignment = assignmentsByCanonicalName[canonicalName], assignment.source == .model,

@@ -9,25 +9,25 @@ extension RecipeCoreTests {
   struct CanonicalIngredientTests {
     @Test
     func canonicalizesAliasesAndLightPlurals() {
-      expectNoDifference(CanonicalIngredient.canonicalName("anchovy fillets"), "anchovies")
-      expectNoDifference(CanonicalIngredient.canonicalName("anchovy filets"), "anchovies")
-      expectNoDifference(CanonicalIngredient.canonicalName("scallions"), "green onions")
-      expectNoDifference(CanonicalIngredient.canonicalName("green onion"), "green onions")
-      expectNoDifference(CanonicalIngredient.canonicalName("tomatoes"), "tomatoes")
-      expectNoDifference(CanonicalIngredient.canonicalName("tomato"), "tomatoes")
+      expectNoDifference(CanonicalIngredient.baseName("anchovy fillets"), "anchovies")
+      expectNoDifference(CanonicalIngredient.baseName("anchovy filets"), "anchovies")
+      expectNoDifference(CanonicalIngredient.baseName("scallions"), "green onions")
+      expectNoDifference(CanonicalIngredient.baseName("green onion"), "green onions")
+      expectNoDifference(CanonicalIngredient.baseName("tomatoes"), "tomatoes")
+      expectNoDifference(CanonicalIngredient.baseName("tomato"), "tomatoes")
     }
 
     @Test
     func prepAdverbsAndParsleyVarietiesShareAKey() {
-      expectNoDifference(CanonicalIngredient.canonicalName("finely chopped fresh mint"), "mint")
-      expectNoDifference(CanonicalIngredient.canonicalName("minced fresh mint"), "mint")
-      expectNoDifference(CanonicalIngredient.canonicalName("very thinly sliced shallots"), "shallot")
-      expectNoDifference(CanonicalIngredient.canonicalName("freshly cracked black pepper"), "black pepper")
-      expectNoDifference(CanonicalIngredient.canonicalName("chopped flat-leaf parsley"), "parsley")
-      expectNoDifference(CanonicalIngredient.canonicalName("minced fresh parsley"), "parsley")
-      expectNoDifference(CanonicalIngredient.canonicalName("Italian parsley"), "parsley")
+      expectNoDifference(CanonicalIngredient.baseName("finely chopped fresh mint"), "mint")
+      expectNoDifference(CanonicalIngredient.baseName("minced fresh mint"), "mint")
+      expectNoDifference(CanonicalIngredient.baseName("very thinly sliced shallots"), "shallot")
+      expectNoDifference(CanonicalIngredient.baseName("freshly cracked black pepper"), "black pepper")
+      expectNoDifference(CanonicalIngredient.baseName("chopped flat-leaf parsley"), "parsley")
+      expectNoDifference(CanonicalIngredient.baseName("minced fresh parsley"), "parsley")
+      expectNoDifference(CanonicalIngredient.baseName("Italian parsley"), "parsley")
       // Form words stay on the grocery key.
-      expectNoDifference(CanonicalIngredient.canonicalName("finely chopped frozen spinach"), "frozen spinach")
+      expectNoDifference(CanonicalIngredient.baseName("finely chopped frozen spinach"), "frozen spinach")
     }
 
     @Test
@@ -44,15 +44,15 @@ extension RecipeCoreTests {
       // chile / chiles / chilies all reduce to `chile` — the naive `-ies → y` rule turned
       // `chilies → chily`, splitting it off from `chiles → chile` onto a separate matrix row.
       for spelling in ["ancho chile", "ancho chiles", "ancho chilies", "ancho chilis"] {
-        expectNoDifference(CanonicalIngredient.canonicalName(spelling), "ancho chile")
+        expectNoDifference(CanonicalIngredient.baseName(spelling), "ancho chile")
         expectNoDifference(CanonicalIngredient.comparisonKey(spelling), "ancho chile")
       }
 
       // The targeted exception does not disturb the generic `-ies → y` / `-oes → o` plurals.
-      expectNoDifference(CanonicalIngredient.canonicalName("berries"), "berry")
-      expectNoDifference(CanonicalIngredient.canonicalName("cherries"), "cherry")
-      expectNoDifference(CanonicalIngredient.canonicalName("tomatoes"), "tomatoes")
-      expectNoDifference(CanonicalIngredient.canonicalName("potatoes"), "potato")
+      expectNoDifference(CanonicalIngredient.baseName("berries"), "berry")
+      expectNoDifference(CanonicalIngredient.baseName("cherries"), "cherry")
+      expectNoDifference(CanonicalIngredient.baseName("tomatoes"), "tomatoes")
+      expectNoDifference(CanonicalIngredient.baseName("potatoes"), "potato")
     }
 
     @Test
@@ -77,12 +77,12 @@ extension RecipeCoreTests {
 
       // But the grocery key deliberately keeps state distinct — a wrong SKU on the shop is expensive.
       #expect(
-        CanonicalIngredient.canonicalName("frozen spinach")
-          != CanonicalIngredient.canonicalName("fresh spinach")
+        CanonicalIngredient.baseName("frozen spinach")
+          != CanonicalIngredient.baseName("fresh spinach")
       )
       #expect(
-        CanonicalIngredient.canonicalName("dried ancho chiles")
-          != CanonicalIngredient.canonicalName("ancho chiles")
+        CanonicalIngredient.baseName("dried ancho chiles")
+          != CanonicalIngredient.baseName("ancho chiles")
       )
     }
 

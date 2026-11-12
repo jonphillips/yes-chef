@@ -1020,7 +1020,7 @@ func reconcileIngredientLines(
       // ingredient fields, but cannot silently replace a classification a cook has already kept.
       canonicalName: existingLine.canonicalName
         ?? parsedLine.canonicalName
-        ?? CanonicalIngredient.canonicalName((parsedLine.item ?? existingLine.item) ?? parsedLine.originalText),
+        ?? CanonicalIngredient.baseName((parsedLine.item ?? existingLine.item) ?? parsedLine.originalText),
       preparation: parsedLine.preparation ?? existingLine.preparation,
       comment: parsedLine.comment ?? existingLine.comment,
       isOptional: parsedLine.isOptional,

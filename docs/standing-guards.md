@@ -98,6 +98,10 @@ section is work.**
   `ChatWorkspaceSplit` detent/divider and the `.column`/`DetentIdentity` contract are **deleted; do not resurrect
   them.**
 
+- **Built-in ingredient aliases aren't added by hand** ([ADR-0069](decisions/ADR-0069-ingredient-name-fixes.md) D7).
+  A recurring spelling miss becomes a Name Fix in the app; ADR-0070 promotes fixes into the built-in aliases.
+  A genuinely global prep word remains a code rule.
+
 ## The backup export stays re-extractable without the app
 
 Moved from `open-questions.md` on 2026-10-30, where it was already called a standing design constraint.

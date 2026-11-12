@@ -24,9 +24,18 @@ extension PantryRepository {
     matching title: String,
     in db: Database
   ) throws -> PantryItem? {
-    let key = CanonicalIngredient.canonicalName(title)
+    let fixes = try IngredientNameFixes.load(in: db)
+    return try canonicalPantryItem(matching: title, fixes: fixes, in: db)
+  }
+
+  static func canonicalPantryItem(
+    matching title: String,
+    fixes: IngredientNameFixes,
+    in db: Database
+  ) throws -> PantryItem? {
+    let key = fixes.canonicalName(title)
     let items = try PantryItem.fetchAll(db)
-      .filter { CanonicalIngredient.canonicalName($0.title) == key }
+      .filter { fixes.canonicalName($0.title) == key }
       .sorted(by: arePantryItemsInCanonicalOrder)
     guard var canonicalItem = items.first else { return nil }
 

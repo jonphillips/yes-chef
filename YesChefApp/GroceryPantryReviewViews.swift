@@ -30,6 +30,9 @@ struct GroceryPantryReviewSection: View {
             },
             addToPantry: {
               model.addToPantryButtonTapped(itemID: row.id)
+            },
+            sameAs: {
+              model.sameAsButtonTapped(itemID: row.id)
             }
           )
           .swipeActions(edge: .leading) {

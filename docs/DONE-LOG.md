@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-12 — Ingredient name fixes (`effort/ingredient-name-fixes`)
+
+- **Result:** Added synced, chain-safe ingredient name fixes across grocery matching, pantry, store areas, trips, compare, and Same As…; added Name Fixes management and regression coverage. The device gate uses “curly-leaf parsley” as the miss because “flat-leaf parsley” is already a built-in alias and would not create a persisted fix.
+- **Verification:** scripts/check-drift.sh passed (851 package tests, 20 suite tests, app test target build-for-testing); generic iOS build passed; YesChefTests passed (145 tests in 31 suites).
+- **Owed:** ingredient-name-fixes's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Prep times, day-sized grocery adds, and one recipe toolbar (`effort/prep-times-and-day-groceries`)
 
 - **Result:** Today's Prep and menu prep plans can show step times, menu and calendar day grocery actions open the ingredient selection sheet, and the duplicated recipe toolbar buttons are fixed.

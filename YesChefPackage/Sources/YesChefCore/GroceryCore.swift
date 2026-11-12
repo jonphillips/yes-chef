@@ -244,7 +244,8 @@ public enum GroceryRepository {
       throw GroceryRepositoryError.emptyItemTitle
     }
 
-    let canonicalName = CanonicalIngredient.canonicalName(title)
+    let fixes = try IngredientNameFixes.load(in: db)
+    let canonicalName = CanonicalIngredient.baseName(title)
     let item = GroceryItem(
       id: uuid(),
       groceryListID: groceryListID,
@@ -252,7 +253,7 @@ public enum GroceryRepository {
       canonicalName: canonicalName,
       quantityText: quantityText?.nonEmptyGroceryText,
       unit: unit?.nonEmptyGroceryText,
-      aisle: aisle?.nonEmptyGroceryText ?? GroceryStoreArea.seed(for: canonicalName)?.title,
+      aisle: aisle?.nonEmptyGroceryText ?? GroceryStoreArea.seed(for: fixes.canonicalName(canonicalName))?.title,
       notes: notes?.nonEmptyGroceryText,
       sortOrder: try nextItemSortOrder(groceryListID: groceryListID, in: db),
       dateCreated: now,
@@ -379,6 +380,7 @@ public enum GroceryRepository {
     uuid: () -> UUID,
     includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
   ) throws -> [GroceryItem.ID] {
+    let fixes = try IngredientNameFixes.load(in: db)
     let folded = try RecipeRepository.fetchDetailApplyingActiveVariation(recipeID: recipe.id, in: db)
     let detail = folded?.detail
     let sections: [IngredientSection]
@@ -434,7 +436,7 @@ public enum GroceryRepository {
     var sortOrder = try nextItemSortOrder(groceryListID: groceryListID, in: db)
     for line in lines {
       let itemID = try addOrConsolidateGeneratedItem(
-        GroceryGeneratedItemDraft(line: line, scale: scale),
+        GroceryGeneratedItemDraft(line: line, scale: scale, fixes: fixes),
         groceryListID: groceryListID,
         source: PendingGroceryItemSource(
           id: uuid(),
@@ -455,7 +457,8 @@ public enum GroceryRepository {
         sortOrder: &sortOrder,
         in: db,
         now: now,
-        uuid: uuid
+        uuid: uuid,
+        fixes: fixes
       )
       itemIDs.append(itemID)
     }
@@ -470,11 +473,13 @@ public enum GroceryRepository {
     sortOrder: inout Int,
     in db: Database,
     now: Date,
-    uuid: () -> UUID
+    uuid: () -> UUID,
+    fixes: IngredientNameFixes
   ) throws -> GroceryItem.ID {
     if var item = try existingItemCompatibleWithGeneratedDraft(
       draft,
       groceryListID: groceryListID,
+      fixes: fixes,
       in: db
     ) {
       if let itemMeasure = item.measure,
@@ -540,6 +545,7 @@ public enum GroceryRepository {
   private static func existingItemCompatibleWithGeneratedDraft(
     _ draft: GroceryGeneratedItemDraft,
     groceryListID: GroceryList.ID,
+    fixes: IngredientNameFixes,
     in db: Database
   ) throws -> GroceryItem? {
     try GroceryItem
@@ -553,7 +559,7 @@ public enum GroceryRepository {
         return $0.id.uuidString < $1.id.uuidString
       }
       .first { item in
-        item.canConsolidate(with: draft)
+        item.canConsolidate(with: draft, fixes: fixes)
       }
   }
 
@@ -630,9 +636,10 @@ public enum PantryRepository {
     in db: Database,
     now: Date
   ) throws -> [PantryItem.ID] {
-    let stapleTitles = uniquePantryTitles(GroceryPantryAssumptions.defaultStaples)
+    let fixes = try IngredientNameFixes.load(in: db)
+    let stapleTitles = uniquePantryTitles(GroceryPantryAssumptions.defaultStaples, fixes: fixes)
     let stapleRows = try stapleTitles.enumerated().compactMap { sortOrder, title -> PantryItem? in
-      guard let canonicalName = CanonicalIngredient.canonicalName(title) else { return nil }
+      guard let canonicalName = fixes.canonicalName(title) else { return nil }
       let id = DeterministicID.pantryStaple(canonicalName: canonicalName)
       let existingItem = try PantryItem.find(id).fetchOne(db)
       return PantryItem(
@@ -671,11 +678,31 @@ public enum PantryRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> PantryItem.ID {
+    try addItem(
+      title: title,
+      notes: notes,
+      policy: policy,
+      in: db,
+      now: now,
+      uuid: uuid,
+      fixes: IngredientNameFixes.load(in: db)
+    )
+  }
+
+  static func addItem(
+    title: String,
+    notes: String? = nil,
+    policy: PantryPolicy? = nil,
+    in db: Database,
+    now: Date,
+    uuid: () -> UUID,
+    fixes: IngredientNameFixes
+  ) throws -> PantryItem.ID {
     guard let title = title.nonEmptyGroceryText else {
       throw GroceryRepositoryError.emptyPantryItemTitle
     }
 
-    if var existingItem = try pantryItem(matching: title, in: db) {
+    if var existingItem = try pantryItem(matching: title, fixes: fixes, in: db) {
       let notes = notes?.nonEmptyGroceryText
       var didChange = false
       if let notes, existingItem.notes != notes {
@@ -722,6 +749,7 @@ public enum PantryRepository {
     in db: Database,
     now: Date
   ) throws {
+    let fixes = try IngredientNameFixes.load(in: db)
     guard var item = try PantryItem.find(itemID).fetchOne(db) else {
       throw GroceryRepositoryError.pantryItemNotFound(itemID)
     }
@@ -729,7 +757,7 @@ public enum PantryRepository {
       throw GroceryRepositoryError.emptyPantryItemTitle
     }
 
-    if let existingItem = try pantryItem(matching: title, in: db),
+    if let existingItem = try pantryItem(matching: title, fixes: fixes, in: db),
        existingItem.id != itemID {
       try PantryItem.find(itemID).delete().execute(db)
       return
@@ -762,14 +790,16 @@ public enum PantryRepository {
     now: Date,
     uuid: () -> UUID
   ) throws -> [PantryItem.ID] {
+    let fixes = try IngredientNameFixes.load(in: db)
     var itemIDs: [PantryItem.ID] = []
-    for title in uniquePantryTitles(titles) {
+    for title in uniquePantryTitles(titles, fixes: fixes) {
       itemIDs.append(
         try addItem(
           title: title,
           in: db,
           now: now,
-          uuid: uuid
+          uuid: uuid,
+          fixes: fixes
         )
       )
     }
@@ -778,21 +808,22 @@ public enum PantryRepository {
 
   private static func pantryItem(
     matching title: String,
+    fixes: IngredientNameFixes,
     in db: Database
   ) throws -> PantryItem? {
-    try canonicalPantryItem(matching: title, in: db)
+    try canonicalPantryItem(matching: title, fixes: fixes, in: db)
   }
 
   private static func nextPantrySortOrder(in db: Database) throws -> Int {
     (try PantryItem.fetchAll(db).map(\.sortOrder).max() ?? -1) + 1
   }
 
-  private static func uniquePantryTitles(_ titles: [String]) -> [String] {
+  private static func uniquePantryTitles(_ titles: [String], fixes: IngredientNameFixes) -> [String] {
     var seen: Set<String> = []
     var uniqueTitles: [String] = []
     for title in titles {
       guard let title = title.nonEmptyGroceryText,
-            let key = CanonicalIngredient.canonicalName(title),
+            let key = fixes.canonicalName(title),
             !seen.contains(key)
       else { continue }
       seen.insert(key)
@@ -866,41 +897,6 @@ struct GroceryItemSourceDraft {
   var mealSlot: MealPlanItemSlot? = nil
   var sourceTitle: String? = nil
   var sourceSubtitle: String? = nil
-}
-
-private struct GroceryGeneratedItemDraft {
-  var title: String
-  var canonicalName: String?
-  var quantity: Double?
-  var quantityText: String?
-  var unit: String?
-  var aisle: String?
-  var notes: String?
-
-  init(line: IngredientLine, scale: Double = 1.0) {
-    self.title = line.groceryItemTitle
-    self.canonicalName = line.canonicalIngredientName ?? CanonicalIngredient.canonicalName(line.groceryItemTitle)
-    if let range = QuantityParser.leadingIngredientRange(in: line.originalText),
-       let upperBound = range.upperBound {
-      let scaledQuantity = upperBound * scale
-      self.quantity = scaledQuantity
-      self.quantityText = formatGroceryQuantity(scaledQuantity)
-    } else if let quantity = line.quantity {
-      let scaledQuantity = quantity * scale
-      self.quantity = scaledQuantity
-      self.quantityText = scale == 1 ? line.groceryQuantityText : formatGroceryQuantity(scaledQuantity)
-    } else {
-      self.quantity = nil
-      self.quantityText = line.groceryQuantityText
-    }
-    self.unit = line.unit?.nonEmptyGroceryText
-    self.aisle = GroceryStoreArea.seed(for: canonicalName)?.title
-    self.notes = line.groceryNotes
-  }
-
-  var measure: Measure? {
-    quantity.map { Measure(quantity: $0, unit: unit) }
-  }
 }
 
 private struct PendingGroceryItemSource {
@@ -989,8 +985,8 @@ func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
 }
 
 private extension GroceryItem {
-  func canConsolidate(with draft: GroceryGeneratedItemDraft) -> Bool {
-    canonicalIngredientName == draft.canonicalName
+  func canConsolidate(with draft: GroceryGeneratedItemDraft, fixes: IngredientNameFixes) -> Bool {
+    fixes.canonicalName(canonicalIngredientName) == draft.fixedName
       && CanonicalIngredient.canonicalText(aisle) == CanonicalIngredient.canonicalText(draft.aisle)
       && CanonicalIngredient.canonicalText(notes) == CanonicalIngredient.canonicalText(draft.notes)
       && canMergeMeasure(with: draft)
@@ -1017,23 +1013,6 @@ private extension GroceryItem {
 public extension IngredientLine {
   var isShoppableForGroceries: Bool {
     !doNotShop && !isHeader && !originalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-}
-
-private extension IngredientLine {
-  var groceryItemTitle: String {
-    CanonicalIngredient.displayName(item?.nonEmptyGroceryText ?? originalText)
-  }
-
-  var groceryQuantityText: String? {
-    quantityText?.nonEmptyGroceryText ?? quantity.map(formatGroceryQuantity)
-  }
-
-  var groceryNotes: String? {
-    [preparation, comment]
-      .compactMap { $0?.nonEmptyGroceryText }
-      .joined(separator: "; ")
-      .nonEmptyGroceryText
   }
 }
 
@@ -1085,18 +1064,4 @@ private func groceryScale(
     return scale
   }
   return 1.0
-}
-
-private func formatGroceryQuantity(_ quantity: Double) -> String {
-  if quantity.rounded() == quantity {
-    return String(Int(quantity))
-  }
-  return String(format: "%g", quantity)
-}
-
-extension String {
-  var nonEmptyGroceryText: String? {
-    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-  }
 }

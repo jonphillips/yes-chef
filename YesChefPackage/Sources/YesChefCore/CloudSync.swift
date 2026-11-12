@@ -37,7 +37,7 @@ public enum YesChefCloudSync {
     preRestoreFilenamePrefix: "YesChef-PreRestore-",
     restoreStagingFilenamePrefix: "YesChef-Restore-",
     identifyingTableNames: ["recipes"],
-    declaredSchemaVersion: 62,
+    declaredSchemaVersion: 63,
     lastPreRestoreDefaultsKey: "YesChefDatabaseBackupLastPreRestorePath",
     cloudSync: configuration,
     variant: backupVariant,
@@ -73,7 +73,7 @@ public enum YesChefCloudSync {
     Menu.self, MenuItem.self, MenuPlacement.self, PrepPlanStepRecord.self, Workbench.self,
     WorkbenchCandidate.self, WorkbenchLogEntry.self, WorkbenchReference.self,
     RecipeVariation.self, RecipeRelatedRecipe.self, RecipeDeliberationLogEntry.self,
-    GroceryList.self, GroceryAreaAssignment.self, GroceryTripAssignment.self, GroceryItem.self, GroceryItemSource.self,
+    GroceryList.self, GroceryAreaAssignment.self, GroceryTripAssignment.self, IngredientNameFix.self, GroceryItem.self, GroceryItemSource.self,
     PantryItem.self, AISettingsRecord.self, Learning.self, RecipeLens.self, RecipeLensShelf.self
   )
 
@@ -361,6 +361,7 @@ public enum YesChefCloudSync {
         GroceryList.self,
         GroceryAreaAssignment.self,
         GroceryTripAssignment.self,
+        IngredientNameFix.self,
         GroceryItem.self,
         GroceryItemSource.self,
         PantryItem.self,

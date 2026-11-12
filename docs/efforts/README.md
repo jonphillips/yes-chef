@@ -25,4 +25,3 @@ discoverable"):
 
 ## Live
 
-- [Ingredient name fixes](ingredient-name-fixes.md) — **Ready.** A synced table says two ingredient names are one, applied wherever keys are compared. **Same As…** on a grocery item adds a fix; **Groceries › ⋯ › Name Fixes** manages them. Production schema deploy.

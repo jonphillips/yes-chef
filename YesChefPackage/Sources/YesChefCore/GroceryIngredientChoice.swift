@@ -18,8 +18,11 @@ public struct GroceryIngredientChoice: Identifiable, Equatable, Sendable {
     GroceryPantryAssumptions.isPantryStaple(line)
   }
 
-  public func isAssumedPantryStaple(pantryStaples: [String]) -> Bool {
-    GroceryPantryAssumptions.isPantryStaple(line, pantryStaples: pantryStaples)
+  public func isAssumedPantryStaple(
+    pantryStaples: [String],
+    fixes: IngredientNameFixes = .empty
+  ) -> Bool {
+    GroceryPantryAssumptions.isPantryStaple(line, pantryStaples: pantryStaples, fixes: fixes)
   }
 }
 

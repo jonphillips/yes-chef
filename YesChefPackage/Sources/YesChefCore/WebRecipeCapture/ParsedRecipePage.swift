@@ -275,7 +275,7 @@ public struct ParsedRecipePage: Equatable, Sendable {
             quantityText: parsed.quantityText,
             unit: parsed.unit,
             item: parsed.item,
-            canonicalName: CanonicalIngredient.canonicalName(parsed.item ?? parsed.parsingText),
+            canonicalName: CanonicalIngredient.baseName(parsed.item ?? parsed.parsingText),
             preparation: parsed.preparation,
             comment: parsed.comment,
             isOptional: text.localizedCaseInsensitiveContains("optional"),

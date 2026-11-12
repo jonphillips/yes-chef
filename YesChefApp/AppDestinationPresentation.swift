@@ -130,6 +130,18 @@ private struct GroceryDestinationsModifier: ViewModifier {
           AppHelpSheet(page: .groceries)
         }
       }
+      .sheet(isPresented: gatedBinding($groceryModel.destination.nameFixes, enabled: isPresentationEnabled)) {
+        NavigationStack {
+          IngredientNameFixesSheet(model: groceryModel)
+        }
+      }
+      .sheet(item: gatedBinding($groceryModel.destination.sameAs, enabled: isPresentationEnabled), id: \.self) { itemID in
+        NavigationStack {
+          SameAsPickerSheet(itemID: itemID, rows: groceryModel.selectedItemRows) { targetID in
+            groceryModel.confirmSameAsButtonTapped(itemID: itemID, targetItemID: targetID)
+          }
+        }
+      }
       .confirmationDialog(
         "Clear Purchased?",
         item: gatedBinding($groceryModel.destination.clearPurchased, enabled: isPresentationEnabled),

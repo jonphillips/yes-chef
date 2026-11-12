@@ -83,7 +83,7 @@ extension GroceryCategorizationClient: DependencyKey {
 
     return object.reduce(into: [:]) { result, entry in
       guard
-        let name = CanonicalIngredient.canonicalName(entry.key),
+        let name = CanonicalIngredient.baseName(entry.key),
         let area = GroceryStoreArea.normalized(entry.value as? String)
       else { return }
       result[name] = area
