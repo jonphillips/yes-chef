@@ -1479,7 +1479,7 @@ private func recipeSyncMetadataStates(
 
 public enum YesChefDataPasses {
   // Raise this when a pass changes or a new pass is added.
-  public static let currentVersion = 1
+  public static let currentVersion = 2
 
   public static func runIfNeeded(in database: any DatabaseWriter) async {
     await runIfNeeded(in: database, beforePass: { _ in })
@@ -1518,6 +1518,10 @@ public enum YesChefDataPasses {
       ("ingredient ranges", { db in
         let audit = try RecipeRepository.reparseIngredientRanges(in: db)
         if audit.hasFindings { AppLog.dataIntegrity.warning("\(audit.logSummary, privacy: .public)") }
+      }),
+      ("canonical names", { db in
+        let updated = try GroceryCanonicalNameCache.refreshStale(in: db)
+        if updated > 0 { AppLog.dataIntegrity.notice("canonical-name-refresh updatedCount=\(updated, privacy: .public)") }
       }),
       ("cuisine and course", { db in
         let audit = try RecipeRepository.backfillCuisineCourseFacets(in: db)

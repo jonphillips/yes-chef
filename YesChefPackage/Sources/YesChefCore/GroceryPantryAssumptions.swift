@@ -32,8 +32,10 @@ public enum GroceryPantryAssumptions {
   }
 
   private static func isPantryStapleName(_ canonicalName: String, pantryStaples: Set<String>) -> Bool {
-    return pantryStaples.contains(canonicalName)
-      || canonicalName.hasPrefix("salt and pepper")
+    if pantryStaples.contains(canonicalName) || canonicalName.hasPrefix("salt and pepper") {
+      return true
+    }
+    return CanonicalIngredient.compoundParts(canonicalName)?.allSatisfy(pantryStaples.contains) ?? false
   }
 }
 

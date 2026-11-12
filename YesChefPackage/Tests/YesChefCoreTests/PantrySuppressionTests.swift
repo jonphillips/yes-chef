@@ -30,6 +30,35 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func compoundLineIsAssumedOnlyWhenEveryPartIsUnlimited() {
+      let saltAndPepper = groceryRow(
+        id: SampleUUIDSequence.uuid(52_003),
+        title: "salt and freshly cracked black pepper",
+        canonicalName: "salt and freshly cracked black pepper",
+        quantity: nil,
+        quantityText: nil,
+        unit: nil
+      )
+      let saltAndSaffron = groceryRow(
+        id: SampleUUIDSequence.uuid(52_004),
+        title: "salt and saffron",
+        canonicalName: "salt and saffron",
+        quantity: nil,
+        quantityText: nil,
+        unit: nil
+      )
+      let policies = [
+        pantryItem(id: SampleUUIDSequence.uuid(52_102), title: "salt", policy: .unlimited),
+        pantryItem(id: SampleUUIDSequence.uuid(52_103), title: "black pepper", policy: .unlimited),
+      ]
+
+      let evaluation = PantrySuppression.evaluate(list: [saltAndPepper, saltAndSaffron], policies: policies)
+
+      expectNoDifference(evaluation.assumedInPantry.map(\.id), [saltAndPepper.id])
+      expectNoDifference(evaluation.shown.map(\.id), [saltAndSaffron.id])
+    }
+
+    @Test
     func thresholdUnderIsAssumedAndThresholdOverNeedsReview() {
       let under = groceryRow(
         id: SampleUUIDSequence.uuid(52_002),
