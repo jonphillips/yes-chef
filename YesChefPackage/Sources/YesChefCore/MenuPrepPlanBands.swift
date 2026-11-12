@@ -127,8 +127,7 @@ public enum PrepPlanProgress {
     dayCount: Int,
     placements: [MenuPlacement],
     today: Date,
-    calendar: Calendar = .autoupdatingCurrent,
-    showsTimes: Bool = false
+    calendar: Calendar = .autoupdatingCurrent
   ) -> Set<PrepPlanStepRecord.ID> {
     guard !placements.isEmpty else {
       return Set(steps.filter { $0.completedAt != nil }.map(\.id))

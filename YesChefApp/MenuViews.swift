@@ -541,9 +541,8 @@ struct MenuPrepPlanHeading: View {
 
   var body: some View {
     if let session = step.sessionLabel {
-      if let minutes = step.headingTime {
-        let startOfDay = Calendar.current.startOfDay(for: .now)
-        let date = startOfDay.addingTimeInterval(TimeInterval(minutes * 60))
+      if let minutes = step.headingTime,
+         let date = Calendar.autoupdatingCurrent.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: .now) {
         Text("\(date.formatted(.dateTime.hour().minute())) · \(session)")
       } else {
         Text(session)
