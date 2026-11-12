@@ -38,10 +38,18 @@ public enum PantrySuppression {
 
     var evaluation = Evaluation()
     for row in list {
-      guard let canonicalName = row.item.canonicalIngredientName,
-            let pantryItem = policiesByCanonicalName[canonicalName]
-      else {
+      guard let canonicalName = row.item.canonicalIngredientName else {
         evaluation.shown.append(row)
+        continue
+      }
+      guard let pantryItem = policiesByCanonicalName[canonicalName] else {
+        // `salt and cracked pepper`: assumed only when every part is an always-have-it staple.
+        let parts = CanonicalIngredient.compoundParts(canonicalName)
+        if let parts, parts.allSatisfy({ policiesByCanonicalName[$0]?.policy == .unlimited }) {
+          evaluation.assumedInPantry.append(row)
+        } else {
+          evaluation.shown.append(row)
+        }
         continue
       }
 

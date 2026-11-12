@@ -18,6 +18,28 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func prepAdverbsAndParsleyVarietiesShareAKey() {
+      expectNoDifference(CanonicalIngredient.canonicalName("finely chopped fresh mint"), "mint")
+      expectNoDifference(CanonicalIngredient.canonicalName("minced fresh mint"), "mint")
+      expectNoDifference(CanonicalIngredient.canonicalName("very thinly sliced shallots"), "shallot")
+      expectNoDifference(CanonicalIngredient.canonicalName("freshly cracked black pepper"), "black pepper")
+      expectNoDifference(CanonicalIngredient.canonicalName("chopped flat-leaf parsley"), "parsley")
+      expectNoDifference(CanonicalIngredient.canonicalName("minced fresh parsley"), "parsley")
+      expectNoDifference(CanonicalIngredient.canonicalName("Italian parsley"), "parsley")
+      // Form words stay on the grocery key.
+      expectNoDifference(CanonicalIngredient.canonicalName("finely chopped frozen spinach"), "frozen spinach")
+    }
+
+    @Test
+    func compoundPartsSplitOnAnd() {
+      expectNoDifference(
+        CanonicalIngredient.compoundParts("salt and freshly cracked black pepper"),
+        ["salt", "black pepper"]
+      )
+      expectNoDifference(CanonicalIngredient.compoundParts("black pepper"), nil)
+    }
+
+    @Test
     func chilePepperSpellingsCollapseToOneKey() {
       // chile / chiles / chilies all reduce to `chile` — the naive `-ies → y` rule turned
       // `chilies → chily`, splitting it off from `chiles → chile` onto a separate matrix row.

@@ -35,6 +35,9 @@ public enum CanonicalIngredient {
     "anchovy fillet": "anchovies",
     "anchovy fillets": "anchovies",
     "anchovies": "anchovies",
+    "curly parsley": "parsley",
+    "flat leaf parsley": "parsley",
+    "italian parsley": "parsley",
     "green onion": "green onions",
     "green onions": "green onions",
     "scallion": "green onions",
@@ -45,8 +48,11 @@ public enum CanonicalIngredient {
 
   private static let leadingDescriptors: Set<String> = [
     "chopped",
+    "coarsely",
+    "cracked",
     "crushed",
     "diced",
+    "finely",
     "fresh",
     "freshly",
     "grated",
@@ -54,8 +60,11 @@ public enum CanonicalIngredient {
     "large",
     "medium",
     "minced",
+    "roughly",
     "small",
     "sliced",
+    "thinly",
+    "very",
   ]
 
   /// State/form words the **grocery** key deliberately keeps (`fresh` vs `frozen` are different SKUs)
@@ -102,6 +111,16 @@ public enum CanonicalIngredient {
       return alias
     }
     return singular
+  }
+
+  /// The canonical keys of each side of an `X and Y` name (`salt and freshly cracked black pepper` →
+  /// `["salt", "black pepper"]`), or `nil` when the name isn't a compound. Pantry matching uses it so a
+  /// compound line is assumed when every part is — without enumerating every spelling of the pair.
+  public static func compoundParts(_ canonicalName: String) -> [String]? {
+    let parts = canonicalName.components(separatedBy: " and ")
+    guard parts.count > 1 else { return nil }
+    let keys = parts.compactMap(Self.canonicalName)
+    return keys.count == parts.count ? keys : nil
   }
 
   /// A **coarser** key than `canonicalName`, used only by the Workbench Compare matrix to align rows.
