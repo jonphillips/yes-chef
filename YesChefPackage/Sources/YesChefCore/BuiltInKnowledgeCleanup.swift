@@ -2,6 +2,10 @@ import Foundation
 import SQLiteData
 
 /// Removes only learned rows whose answers are now supplied by the bundled knowledge file.
+///
+/// `knowledge` drives the area and trip checks. Name fixes are judged by `CanonicalIngredient.baseName`,
+/// which always reads the shipped aliases (`BuiltInKnowledge.current`), so injecting other aliases here
+/// changes nothing for them.
 public enum BuiltInKnowledgeCleanup {
   @discardableResult
   public static func run(in db: Database, knowledge: BuiltInKnowledge) throws -> Int {

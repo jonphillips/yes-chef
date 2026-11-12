@@ -18,8 +18,18 @@ ICLOUD = Path.home() / "Library/Mobile Documents/iCloud~com~jonphillips~yeschef/
 
 
 def normalize(value):
+    """Match CanonicalIngredient.normalize: fold case and diacritics, hyphens to spaces, collapse whitespace."""
     value = unicodedata.normalize("NFD", str(value).lower())
-    return "".join(char for char in value if unicodedata.category(char) != "Mn")
+    value = "".join(char for char in value if unicodedata.category(char) != "Mn")
+    return " ".join(value.replace("-", " ").split())
+
+
+def validate_aliases(aliases):
+    """Refuse what BuiltInKnowledge.validate() rejects: an alias whose value is another alias's key."""
+    resolved = {normalize(key): normalize(value) for key, value in aliases.items()}
+    for key, target in resolved.items():
+        if target != key and resolved.get(target, target) != target:
+            raise ValueError(f"refusing alias chain: {key} → {target} → {resolved[target]}")
 
 
 def timestamp(value):
@@ -46,8 +56,14 @@ def main():
     knowledge = json.loads(KNOWLEDGE.read_text())
     incoming = {kind: {} for kind in ("aliases", "areas", "trips")}
     conflicts, skipped = 0, 0
+    dev_paths = []
     for path in paths:
         exported_at, export = load_export(path)
+        if export.get("variant") == "dev":
+            # Dev builds hold CloudKit Development test data; their knowledge never ships.
+            print(f"Skipped dev export: {path.name}")
+            dev_paths.append(path)
+            continue
         entries = {
             "aliases": [(row["from"], row["to"]) for row in export.get("nameFixes", [])],
             "areas": [(row["name"], row["area"]) for row in export.get("areas", [])],
@@ -77,25 +93,7 @@ def main():
                 continue
             if normalized_key in existing:
                 conflicts += 1
-            if kind == "aliases" and normalize(value) != normalized_key:
-                target = normalize(value)
-                if target in existing and normalize(existing[target]) != target:
-                    raise ValueError(f"refusing alias chain: {key} → {value}")
-                if target in incoming[kind] and normalize(incoming[kind][target][2]) != target:
-                    raise ValueError(f"refusing alias chain: {key} → {value}")
-                seen = {normalized_key}
-                cursor = target
-                while cursor in incoming[kind]:
-                    if cursor in seen:
-                        if cursor == normalized_key:
-                            break
-                        raise ValueError(f"refusing alias cycle at {key}")
-                    seen.add(cursor)
-                    next_value = normalize(incoming[kind][cursor][2])
-                    if next_value == cursor:
-                        break
-                    cursor = next_value
-            changes[kind][key] = value
+            changes[kind][normalized_key] = normalize(value) if kind == "aliases" else value
 
     counts = {"Added": 0, "Changed": 0}
     for kind, rows in changes.items():
@@ -107,6 +105,7 @@ def main():
                 counts["Changed"] += 1
                 del knowledge[kind][existing_key]
             knowledge[kind][key] = value
+    validate_aliases(knowledge["aliases"])
     print(f"Added: {counts['Added']}  Changed: {counts['Changed']}  Conflicts: {conflicts}  Skipped: {skipped}")
     if args.dry_run:
         return 0
@@ -116,6 +115,8 @@ def main():
     merged = ICLOUD / "Merged"
     merged.mkdir(parents=True, exist_ok=True)
     for path in paths:
+        if path in dev_paths:
+            continue
         destination = merged / path.name
         if destination.exists():
             destination = merged / f"{path.stem}-{uuid.uuid4().hex}{path.suffix}"

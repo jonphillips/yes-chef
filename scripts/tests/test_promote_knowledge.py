@@ -35,11 +35,11 @@ class PromoteKnowledgeTests(unittest.TestCase):
     def write_knowledge(self, data):
         self.knowledge_path.write_text(json.dumps(data))
 
-    def export(self, name, date, *, fixes=None, areas=None, trips=None):
+    def export(self, name, date, *, fixes=None, areas=None, trips=None, variant="production"):
         path = self.icloud / name
         path.write_text(json.dumps({
             "exportedAt": date,
-            "variant": "production",
+            "variant": variant,
             "nameFixes": fixes or [],
             "areas": areas or [],
             "trips": trips or [],
@@ -66,7 +66,8 @@ class PromoteKnowledgeTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("Added: 1  Changed: 2  Conflicts: 2  Skipped: 1", output)
         data = json.loads(self.knowledge_path.read_text())
-        self.assertEqual(data["aliases"]["New Name"], "new name")
+        self.assertEqual(data["aliases"]["new name"], "new name")
+        self.assertNotIn("New Name", data["aliases"])
         self.assertEqual(data["aliases"]["old name"], "changed")
         self.assertEqual(data["areas"]["lemon"], "Deli")
         self.assertEqual(data["version"], 2)
@@ -85,6 +86,24 @@ class PromoteKnowledgeTests(unittest.TestCase):
         path = self.export("chain.json", "2026-11-12T10:00:00Z", fixes=[{"from": "mint", "to": "alias"}])
         with self.assertRaises(ValueError):
             self.run_script(path)
+
+    def test_refuses_chain_through_an_existing_alias(self):
+        self.original["aliases"].update({"scallion": "green onions", "green onions": "green onions"})
+        self.write_knowledge(self.original)
+        path = self.export("chain.json", "2026-11-12T10:00:00Z", fixes=[{"from": "green onions", "to": "spring onions"}])
+        before = self.knowledge_path.read_text()
+        with self.assertRaises(ValueError):
+            self.run_script(path)
+        self.assertEqual(self.knowledge_path.read_text(), before)
+        self.assertTrue(path.exists())
+
+    def test_skips_dev_exports(self):
+        dev = self.export("dev.json", "2026-11-12T10:00:00Z", fixes=[{"from": "mint", "to": "mint"}], variant="dev")
+        result, output = self.run_script(dev)
+        self.assertEqual(result, 0)
+        self.assertIn("Skipped dev export: dev.json", output)
+        self.assertNotIn("mint", json.loads(self.knowledge_path.read_text())["aliases"])
+        self.assertTrue(dev.exists())
 
     def test_dry_run_changes_nothing(self):
         path = self.export("dry.json", "2026-11-12T10:00:00Z", fixes=[{"from": "mint", "to": "mint"}])
