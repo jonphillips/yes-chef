@@ -35,9 +35,16 @@ public struct IngredientNameFixes: Equatable, Sendable {
     return resolve(baseName)
   }
 
+  /// Fixes are keyed by base names, so a fixed name is coarsened from its target. Otherwise the coarse key
+  /// can drop a word the fix's "from" name needs (`smoked paprika` → `paprika`) and miss the fix.
   public func comparisonKey(_ text: String?) -> String? {
-    guard let key = CanonicalIngredient.comparisonKey(text) else { return nil }
-    return resolve(key)
+    if let baseName = CanonicalIngredient.baseName(text) {
+      let fixedName = resolve(baseName)
+      if fixedName != baseName {
+        return CanonicalIngredient.comparisonKey(fixedName).map(resolve) ?? fixedName
+      }
+    }
+    return CanonicalIngredient.comparisonKey(text).map(resolve)
   }
 
   public func displayName(_ text: String) -> String {

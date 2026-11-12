@@ -25,6 +25,15 @@ and everything downstream move forward without waiting on it.
 - **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
   Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
 
+**Name-fix parameters still default to `.empty` (found 2026-11-12, reviewing #502).** ADR-0069 D6 renamed
+`canonicalName` so the compiler would find every key comparison. But `PantrySuppression.evaluate`,
+`WorkbenchCompare.ingredientComparison`, `GroceryPantryAssumptions.isPantryStaple`,
+`GroceryIngredientChoice.isAssumedPantryStaple(pantryStaples:)`, `GroceryStoreArea.seed(for:)`,
+`CanonicalIngredient.compoundParts` and `GroceryGeneratedItemDraft.init` take `fixes: IngredientNameFixes = .empty`.
+So a new caller that forgets the argument compiles and silently skips your fixes. Every caller in #502 was checked and
+is correct; the `seed(for:)` callers pass names that are already fixed. Fix: drop the defaults and have tests pass
+`.empty` explicitly. Do it the next time a dispatch touches these files.
+
 **A junk pantry item came from Add to Pantry on a misparsed grocery line (found 2026-11-12).** The pantry has
 "red wine vinegar and 1 tablespoon warm water for ten minutes or so". Pantry items have two writers: the pantry
 editor and **Add to Pantry** on a grocery item (`GroceryLibraryModel.addToPantryButtonTapped`), which copies the

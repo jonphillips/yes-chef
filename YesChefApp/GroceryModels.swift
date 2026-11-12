@@ -770,7 +770,7 @@ extension GroceryLibraryModel {
     do {
       try Task.checkCancellation()
       try await database.write { db in
-        try GroceryStoreAreaCache.backfill(in: db)
+        try GroceryStoreAreaCache.backfill(in: db, fixes: IngredientNameFixes.load(in: db))
       }
       try? await $itemRows.load()
 

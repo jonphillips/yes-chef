@@ -63,6 +63,48 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func compareKeyAppliesAFixWhoseFromNameHasAFormWord() {
+      let fixes = IngredientNameFixes(rows: [
+        IngredientNameFix(
+          id: DeterministicID.ingredientNameFix(fromName: "smoked paprika"),
+          fromName: "smoked paprika",
+          toName: "pimenton",
+          dateModified: .distantPast
+        ),
+      ])
+
+      #expect(CanonicalIngredient.comparisonKey("smoked paprika") == "paprika")
+      #expect(fixes.comparisonKey("smoked paprika") == "pimenton")
+      #expect(fixes.comparisonKey("pimentón") == "pimenton")
+      #expect(fixes.comparisonKey("sweet paprika") == CanonicalIngredient.comparisonKey("sweet paprika"))
+    }
+
+    @Test
+    func runtimeAreaBackfillResolvesThroughFixes() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 901_100_000)
+      var uuids = SampleUUIDSequence(start: 91_100)
+
+      try database.write { db in
+        try GroceryStoreAreaCache.applyUserCorrection(
+          canonicalName: "parsley", area: "Bakery", in: db, now: now, uuid: { uuids.next() }
+        )
+        #expect(try IngredientNameFixRepository.save(from: "curly leaf parsley", to: "parsley", in: db, now: now))
+        let listID = try GroceryRepository.ensureDefaultList(in: db, now: now, uuid: { uuids.next() })
+        let item = GroceryItem(
+          id: uuids.next(), groceryListID: listID,
+          title: "curly leaf parsley", canonicalName: "curly leaf parsley", sortOrder: 0,
+          dateCreated: now, dateModified: now
+        )
+        try GroceryItem.insert { item }.execute(db)
+
+        try GroceryStoreAreaCache.backfill(in: db, fixes: IngredientNameFixes.load(in: db))
+
+        #expect(try GroceryItem.find(item.id).fetchOne(db)?.aisle == GroceryStoreArea.bakery.title)
+      }
+    }
+
+    @Test
     func sameAsMergesCompatibleItemsAndMovesTheirSources() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 900_800_000)

@@ -422,9 +422,14 @@ public enum GroceryStoreAreaCache {
     }
   }
 
+  /// The "Backfill grocery store areas" migration's entry point. It runs before the name-fixes table exists,
+  /// so it resolves without fixes. Runtime callers pass the loaded fixes.
   public static func backfill(in db: Database) throws {
-    // This also runs in an older migration, before the name-fixes table exists.
-    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db), fixes: .empty)
+    try backfill(in: db, fixes: .empty)
+  }
+
+  public static func backfill(in db: Database, fixes: IngredientNameFixes) throws {
+    let resolver = GroceryAreaResolver(assignments: try assignmentRows(in: db), fixes: fixes)
     for var item in try GroceryItem.fetchAll(db) where item.aisle == nil {
       guard let area = resolver.resolve(item.canonicalName) else { continue }
       item.aisle = area.title
