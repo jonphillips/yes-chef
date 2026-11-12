@@ -9,6 +9,46 @@ import YesChefCore
 @MainActor
 struct GroceryTripModelTests {
   @Test
+  func calendarDaySelectionPresentsIngredientSheetWithoutWritingGroceries() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 900_650_000)
+    let recipeID = SampleUUIDSequence.uuid(90_650)
+    let sectionID = SampleUUIDSequence.uuid(90_651)
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert { Recipe(id: recipeID, title: "Calendar dinner", dateCreated: now, dateModified: now) }.execute(db)
+        try IngredientSection.insert { IngredientSection(id: sectionID, recipeID: recipeID, sortOrder: 0) }.execute(db)
+        try IngredientLine.insert {
+          IngredientLine(id: SampleUUIDSequence.uuid(90_652), recipeID: recipeID, sectionID: sectionID,
+            originalText: "1 onion", item: "onion", sortOrder: 0)
+        }.execute(db)
+        _ = try MealCalendarRepository.addRecipeItem(
+          recipeID: recipeID,
+          on: now,
+          mealSlot: .dinner,
+          notes: nil,
+          in: db,
+          now: now,
+          uuid: { SampleUUIDSequence.uuid(90_653) }
+        )
+      }
+      let rows = try await database.read { db in try MealCalendarRequest().fetch(db) }
+      let model = GroceryLibraryModel()
+      await model.selectMealRowsButtonTapped(rows)
+      if case .selectIngredients = model.destination {
+        #expect(true)
+      } else {
+        Issue.record("Calendar day selection should present the ingredient sheet")
+      }
+      #expect(try await database.read { db in try GroceryItem.fetchAll(db).isEmpty })
+    }
+  }
+
+  @Test
   func splitMenuAddWritesBothListsAndOnlySwitchedNames() throws {
     let now = Date(timeIntervalSinceReferenceDate: 900_700_000)
     let menuID = SampleUUIDSequence.uuid(90_701)
@@ -29,7 +69,7 @@ struct GroceryTripModelTests {
     } operation: {
       @Dependency(\.defaultDatabase) var database
       try database.write { db in
-        try Menu.insert { Menu(id: menuID, title: "Thanksgiving", dayCount: 1, dateCreated: now, dateModified: now) }.execute(db)
+        try Menu.insert { Menu(id: menuID, title: "Thanksgiving", dayCount: 2, dateCreated: now, dateModified: now) }.execute(db)
         try Recipe.insert { Recipe(id: onionRecipeID, title: "Onion side", dateCreated: now, dateModified: now) }.execute(db)
         try Recipe.insert { Recipe(id: otherRecipeID, title: "Turkey dinner", dateCreated: now, dateModified: now) }.execute(db)
         try IngredientSection.insert { IngredientSection(id: onionSectionID, recipeID: onionRecipeID, sortOrder: 0) }.execute(db)
@@ -57,7 +97,7 @@ struct GroceryTripModelTests {
         }.execute(db)
         try MenuItem.insert {
           MenuItem(id: SampleUUIDSequence.uuid(90_710), menuID: menuID, kind: .recipe, recipeID: otherRecipeID,
-            title: "Turkey dinner", dayOffset: 0, mealSlot: .dinner, sortOrder: 1, dateCreated: now, dateModified: now)
+            title: "Turkey dinner", dayOffset: 1, mealSlot: .dinner, sortOrder: 1, dateCreated: now, dateModified: now)
         }.execute(db)
       }
 
@@ -95,6 +135,22 @@ struct GroceryTripModelTests {
       let listsAfterUnsplitAdd = try database.read { db in try GroceryList.fetchAll(db) }
       #expect(listsAfterUnsplitAdd.map(\.title).sorted() == ["Thanksgiving — Advance", "Thanksgiving — Fresh"])
       #expect(model.selectedListID == lists.first(where: { $0.title.hasSuffix("Advance") })?.id)
+
+      let dayOneChoices = choices.filter { $0.recipe.id == otherRecipeID }
+      #expect(model.confirmIngredientSelectionButtonTapped(
+        context: GroceryIngredientSelectionContext(
+          source: .menuDay(menuID, dayOffset: 1),
+          title: "Day 2",
+          subtitle: "Thanksgiving",
+          tripListTitle: "Thanksgiving"
+        ),
+        selectedIngredientLineIDs: Set(dayOneChoices.map(\.line.id)),
+        mealRows: [],
+        choices: dayOneChoices,
+        tripByCanonicalName: ["onion": .advance, "cilantro": .advance, "turkey": .fresh]
+      ))
+      #expect(try database.read { db in try GroceryList.fetchAll(db).map(\.title).sorted() }
+        == ["Thanksgiving — Advance", "Thanksgiving — Fresh"])
     }
   }
 

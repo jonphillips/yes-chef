@@ -172,7 +172,8 @@ extension GroceryRepository {
     in db: Database,
     now: Date,
     uuid: () -> UUID,
-    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil
+    includedIngredientLineIDs: Set<IngredientLine.ID>? = nil,
+    dayOffset: Int? = nil
   ) throws -> [GroceryItem.ID] {
     _ = try requireList(groceryListID, in: db)
     let menu = try requireMenu(menuID, in: db)
@@ -180,7 +181,7 @@ extension GroceryRepository {
       .where { $0.menuID.eq(menuID) }
       .fetchAll(db)
     let items = menuItems
-      .filter { $0.kind == .recipe && $0.recipeID != nil }
+      .filter { $0.kind == .recipe && $0.recipeID != nil && (dayOffset == nil || $0.dayOffset == dayOffset) }
       .sorted(by: areMenuItemsInIncreasingOrder)
 
     var itemIDs: [GroceryItem.ID] = []

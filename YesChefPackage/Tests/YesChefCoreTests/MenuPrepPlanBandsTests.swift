@@ -5,6 +5,25 @@ import YesChefCore
 @Suite
 struct MenuPrepPlanBandsTests {
   @Test
+  func headingsOptionallyIncludeTimeAndChangeWhenTimeChanges() {
+    let steps = [
+      step(1, session: "A", workDayOffset: 1, timeOfDay: 1_020),
+      step(2, session: "B", workDayOffset: 1, timeOfDay: 1_050),
+      step(3, session: "B", workDayOffset: 1, timeOfDay: 1_050),
+      step(4, session: "B", workDayOffset: 1, timeOfDay: 1_065),
+      step(5, session: "B", workDayOffset: 1)
+    ]
+
+    let withTimes = MenuPrepPlanBanding.bands(steps: steps, dayCount: 2, showsTimes: true).flatMap(\.steps)
+    #expect(withTimes.map(\.sessionLabel) == ["A", "B", nil, "B", "B"])
+    #expect(withTimes.map(\.headingTime) == [1_020, 1_050, nil, 1_065, nil])
+
+    let withoutTimes = MenuPrepPlanBanding.bands(steps: steps, dayCount: 2).flatMap(\.steps)
+    #expect(withoutTimes.map(\.sessionLabel) == ["A", "B", nil, nil, nil])
+    #expect(withoutTimes.allSatisfy { $0.headingTime == nil })
+  }
+
+  @Test
   func multidayBandsPutFlexibleFirstAndKeepSessionsInsideWorkDays() {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
     var calendar = Calendar(identifier: .gregorian)
@@ -73,13 +92,14 @@ struct MenuPrepPlanBandsTests {
     #expect(bands.allSatisfy { !$0.isToday })
   }
 
-  private func step(_ order: Int, session: String, workDayOffset: Int?) -> PrepPlanStepRecord {
+  private func step(_ order: Int, session: String, workDayOffset: Int?, timeOfDay: Int? = nil) -> PrepPlanStepRecord {
     PrepPlanStepRecord(
       id: SampleUUIDSequence.uuid(75_000 + order),
       menuID: SampleUUIDSequence.uuid(75_100),
       sortOrder: order,
       session: session,
       task: "Task \(order)",
+      timeOfDay: timeOfDay,
       workDayOffset: workDayOffset
     )
   }

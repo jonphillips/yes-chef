@@ -386,7 +386,7 @@ order.
 
 ## Amendment 4 — Times show in Today's Prep, and in the plan when you ask (2026-11-11)
 
-Accepted 2026-11-11 by Jon. Brief: [`prep-times-and-day-groceries`](../efforts/prep-times-and-day-groceries.md).
+Accepted 2026-11-11 by Jon. Brief: [`prep-times-and-day-groceries`](../efforts/archive/prep-times-and-day-groceries.md).
 Revises Amd 3-C1's **Shown** bullet. The time stays a sort key and the session stays the label. This only changes
 where the time is shown.
 

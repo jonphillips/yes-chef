@@ -105,7 +105,8 @@ struct CookSessionView: View {
             scaleContext: item.scaleContext,
             libraryModel: recipeModel,
             mealCalendarModel: mealCalendarModel,
-            groceryModel: groceryModel
+            groceryModel: groceryModel,
+            showsToolbar: item.id == model.selectedItemID
           )
           .tag(Optional(item.id))
         }

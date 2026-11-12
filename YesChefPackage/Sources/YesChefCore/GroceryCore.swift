@@ -75,16 +75,18 @@ public struct PantryItemListRequest: FetchKeyRequest {
 
 public struct GroceryMenuRecipeIDsRequest: Sendable {
   public let menuID: Menu.ID
+  public let dayOffset: Int?
 
-  public init(menuID: Menu.ID) {
+  public init(menuID: Menu.ID, dayOffset: Int? = nil) {
     self.menuID = menuID
+    self.dayOffset = dayOffset
   }
 
   public func fetch(_ db: Database) throws -> Set<Recipe.ID> {
     Set(
       try MenuItem.where { $0.menuID.eq(menuID) }
         .fetchAll(db)
-        .filter { $0.kind == .recipe }
+        .filter { $0.kind == .recipe && (dayOffset == nil || $0.dayOffset == dayOffset) }
         .compactMap(\.recipeID)
     )
   }

@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-11 — Prep times, day-sized grocery adds, and one recipe toolbar (`effort/prep-times-and-day-groceries`)
+
+- **Result:** Today's Prep and menu prep plans can show step times, menu and calendar day grocery actions open the ingredient selection sheet, and the duplicated recipe toolbar buttons are fixed.
+- **Verification:** scripts/check-drift.sh passed (842 package tests; app test target compiled), YesChefTests simulator passed (145 tests), and the generic iOS build succeeded.
+- **Owed:** prep-times-and-day-groceries's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-11 — Grocery trips, prep time and prep completion CloudKit fields deployed
 
 - **Result:** The CloudKit schema for grocery-two-trips, prep-plan-time-order and today-prep is in Production, and the schema clause is gone from grocery-two-trips's line in `device-passes.md`. New in Production: the `groceryTripAssignments` type (`id`, `canonicalName`, `trip`: Encrypted String; `dateModified`: Encrypted Timestamp; the bare and per-column modification-time fields: Encrypted Int64), plus `prepPlanSteps.timeOfDay` (Encrypted Int64), `prepPlanSteps.completedAt` (Encrypted Timestamp) and their modification-time fields. Following jon-platform `persistence-and-sync.md` § *Adding a synced table or column*, the architect added all 13 fields to a fresh Development export, validated it, and imported it with `cktool` at Jon's request. Jon then deployed Development to Production in the Console.

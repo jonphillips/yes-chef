@@ -87,7 +87,7 @@ extension RecipeCoreTests {
         let menuID = try MenuRepository.addMenu(
           title: "Pasta Week",
           notes: nil,
-          dayCount: 1,
+          dayCount: 2,
           in: db,
           now: now,
           uuid: { uuids.next() }
@@ -112,10 +112,28 @@ extension RecipeCoreTests {
           now: now,
           uuid: { uuids.next() }
         )
+        _ = try MenuRepository.addRecipeItem(
+          menuID: menuID,
+          recipeID: otherRecipeID,
+          dayOffset: 1,
+          mealSlot: .dinner,
+          notes: nil,
+          in: db,
+          now: now,
+          uuid: { uuids.next() }
+        )
 
         expectNoDifference(
           try GroceryMenuRecipeIDsRequest(menuID: menuID).fetch(db),
+          [recipeID, otherRecipeID]
+        )
+        expectNoDifference(
+          try GroceryMenuRecipeIDsRequest(menuID: menuID, dayOffset: 0).fetch(db),
           [recipeID]
+        )
+        expectNoDifference(
+          try GroceryMenuRecipeIDsRequest(menuID: menuID, dayOffset: 1).fetch(db),
+          [otherRecipeID]
         )
       }
     }

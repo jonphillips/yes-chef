@@ -74,7 +74,8 @@ struct TodayPrepView: View {
       steps: detail.prepPlanSteps,
       dayCount: detail.menu.dayCount,
       placements: detail.placements,
-      today: detailModel.now
+      today: detailModel.now,
+      showsTimes: true
     )
   }
 
@@ -208,7 +209,11 @@ struct TodayPrepView: View {
         MenuDetailModel.canMovePrepPlanStepToNextDay(row.step, targetOffset: $0, dayCount: detail.menu.dayCount)
       } ?? false
       VStack(alignment: .leading, spacing: 5) {
-        if let session = row.sessionLabel { Text(session).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary) }
+        if row.sessionLabel != nil {
+          MenuPrepPlanHeading(step: row)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+        }
         HStack(alignment: .top, spacing: 12) {
           Button {
             detailModel.setPrepPlanStepCompleted(row.step.id, at: isDone ? nil : detailModel.now)
@@ -312,7 +317,8 @@ struct TodayPrepView: View {
               scaleContext: dish.scaleContext,
               libraryModel: recipeModel,
               mealCalendarModel: mealCalendarModel,
-              groceryModel: groceryModel
+              groceryModel: groceryModel,
+              showsToolbar: dish.id == selectedReader?.id
             )
             .tag(Optional(dish.id))
           }

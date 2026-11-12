@@ -41,15 +41,18 @@ struct AppContainer: View {
     inboxModel.toastCenter = toastCenter
     let mealCalendarModel = MealCalendarModel(toastCenter: toastCenter)
     let groceryModel = GroceryLibraryModel(toastCenter: toastCenter)
-    // Push a day's recipes into the grocery list from the Meal Calendar without either model
-    // holding the other (item 2). The immediate add toasts on its own.
+    let menuModel = MenuLibraryModel(toastCenter: toastCenter)
+    // Both surfaces route into the root-owned grocery sheet without either feature model holding the other.
     mealCalendarModel.onAddDayToGroceries = { [weak groceryModel] rows in
-      groceryModel?.addMealRowsImmediately(rows)
+      Task { await groceryModel?.selectMealRowsButtonTapped(rows) }
+    }
+    menuModel.onAddMenuDayToGroceries = { [weak groceryModel] menuID, dayOffset in
+      groceryModel?.selectMenuDayButtonTapped(menuID: menuID, dayOffset: dayOffset)
     }
     _toastCenter = State(wrappedValue: toastCenter)
     _chatAccessInboxModel = State(wrappedValue: inboxModel)
     _mealCalendarModel = State(wrappedValue: mealCalendarModel)
-    _menuModel = State(wrappedValue: MenuLibraryModel(toastCenter: toastCenter))
+    _menuModel = State(wrappedValue: menuModel)
     _groceryModel = State(wrappedValue: groceryModel)
   }
 

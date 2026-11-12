@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [Prep times, day-sized grocery adds, and one recipe toolbar](prep-times-and-day-groceries.md) — **Ready.** Prep shows step times (the plan on request); menu and Calendar days open the grocery sheet with the split; one recipe toolbar in paged readers; new Prep glyph.

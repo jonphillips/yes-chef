@@ -191,7 +191,7 @@ struct MenuDetailView: View {
             Button {
               onTodayPrepRequested?(TodayPrepPresentation(menuID: detail.menu.id, title: detail.menu.title))
             } label: {
-              Label("Prep", systemImage: "checklist")
+              Label("Prep", systemImage: "flame.gauge.open")
             }
           }
           Button {
@@ -396,6 +396,7 @@ private extension CookSessionItem {
 }
 
 struct MenuPrepPlanSection: View {
+  @AppStorage("menuPrepPlanShowsTimes") private var showsTimes = false
   let steps: [PrepPlanStepRecord]
   let doneStepIDs: Set<PrepPlanStepRecord.ID>
   let dayCount: Int
@@ -420,7 +421,8 @@ struct MenuPrepPlanSection: View {
       steps: steps,
       dayCount: dayCount,
       placementStartDate: placementStartDate,
-      today: today
+      today: today,
+      showsTimes: showsTimes
     )
   }
 
@@ -457,6 +459,9 @@ struct MenuPrepPlanSection: View {
         Spacer()
 
         Menu {
+          if steps.contains(where: { $0.timeOfDay != nil }) {
+            Toggle("Show Times", isOn: $showsTimes)
+          }
           Button("Rebuild with Yes Chef…", systemImage: "arrow.clockwise", action: regeneratePrepPlan)
             .disabled(steps.isEmpty)
           Divider()
@@ -531,6 +536,21 @@ struct MenuPrepPlanSection: View {
 
 }
 
+struct MenuPrepPlanHeading: View {
+  let step: MenuPrepPlanBandStep
+
+  var body: some View {
+    if let session = step.sessionLabel {
+      if let minutes = step.headingTime,
+         let date = Calendar.autoupdatingCurrent.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: .now) {
+        Text("\(date.formatted(.dateTime.hour().minute())) · \(session)")
+      } else {
+        Text(session)
+      }
+    }
+  }
+}
+
 private struct MenuPrepPlanSessionBandView: View {
   let band: MenuPrepPlanBand
   let doneStepIDs: Set<PrepPlanStepRecord.ID>
@@ -569,8 +589,8 @@ private struct MenuPrepPlanSessionBandView: View {
       if isExpanded {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(band.steps, id: \.step.id) { presentation in
-            if let sessionLabel = presentation.sessionLabel {
-              Text(sessionLabel)
+            if presentation.sessionLabel != nil {
+              MenuPrepPlanHeading(step: presentation)
                 .font(.subheadline.weight(.semibold))
                 .padding(.top, 8)
             }
