@@ -1,52 +1,11 @@
 import Foundation
 
 public enum CanonicalIngredient {
-  public static let defaultPantryStaples: [String] = [
-    "avocado oil",
-    "black pepper",
-    "canola oil",
-    "cooking oil",
-    "cooking spray",
-    "extra virgin olive oil",
-    "fine sea salt",
-    "freshly ground pepper",
-    "freshly ground black pepper",
-    "ground black pepper",
-    "ice",
-    "ice cubes",
-    "kosher salt",
-    "neutral oil",
-    "nonstick cooking spray",
-    "olive oil",
-    "pepper",
-    "salt",
-    "salt and pepper",
-    "salt and freshly ground black pepper",
-    "sea salt",
-    "table salt",
-    "vegetable oil",
-    "water",
-    "white pepper",
-  ]
+  public static let defaultPantryStaples: [String] = BuiltInKnowledge.current.pantryStaples
 
   // Built-in aliases are promoted from ingredient name fixes; don't add misses here by hand.
   // See ADR-0069 and ADR-0070.
-  private static let aliases: [String: String] = [
-    "anchovy filet": "anchovies",
-    "anchovy filets": "anchovies",
-    "anchovy fillet": "anchovies",
-    "anchovy fillets": "anchovies",
-    "anchovies": "anchovies",
-    "curly parsley": "parsley",
-    "flat leaf parsley": "parsley",
-    "italian parsley": "parsley",
-    "green onion": "green onions",
-    "green onions": "green onions",
-    "scallion": "green onions",
-    "scallions": "green onions",
-    "tomato": "tomatoes",
-    "tomatoes": "tomatoes",
-  ]
+  private static let aliases: [String: String] = BuiltInKnowledge.current.aliases
 
   private static let leadingDescriptors: Set<String> = [
     "chopped",

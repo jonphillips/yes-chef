@@ -104,6 +104,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   case pantry
   case archivedRecipes
   case seedCoverage
+  case kitchenKnowledgeExport
   case facetCoverage
 #if DEBUG
   case modelCallInventory
@@ -118,6 +119,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .pantry: "Pantry"
     case .archivedRecipes: "Archived Recipes"
     case .seedCoverage: "Learned Areas"
+    case .kitchenKnowledgeExport: "Export What I've Taught"
     case .facetCoverage: "Label Recipes"
 #if DEBUG
     case .modelCallInventory: "Model Calls"
@@ -132,6 +134,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .pantry: AppSymbol("list.bullet")
     case .archivedRecipes: AppSymbol("archivebox")
     case .seedCoverage: AppSymbol("checklist")
+    case .kitchenKnowledgeExport: AppSymbol("square.and.arrow.up")
     case .facetCoverage: .tag
 #if DEBUG
     case .modelCallInventory: AppSymbol("sparkles")

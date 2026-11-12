@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-12 — Kitchen knowledge promotion (`effort/kitchen-knowledge-promotion`)
+
+- **Result:** Moved built-in kitchen knowledge to a bundled versioned file, added export, promotion, cleanup, and status flows, and wired the TestFlight warning hook; no persistent model change.
+- **Verification:** scripts/check-drift.sh (857 package tests, SwiftLint, and app test-target build), YesChefTests simulator (145 tests), generic iOS build, python3 -m unittest scripts/tests/test_promote_knowledge.py, and jon-platform scripts/test-testflight; the temporary equality test passed before removal.
+- **Owed:** kitchen-knowledge-promotion's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-12 — Ingredient name fixes (`effort/ingredient-name-fixes`)
 
 - **Result:** Added synced, chain-safe ingredient name fixes across grocery matching, pantry, store areas, trips, compare, and Same As…; added Name Fixes management and regression coverage. The device gate uses “fresh mint leaves” / “mint”, a real miss; the brief's “flat-leaf parsley” is already a built-in alias, so it can't create a fix. Architect review added: runtime area backfill resolves through fixes, and the Compare key applies a fix before coarsening.

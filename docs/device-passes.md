@@ -36,6 +36,7 @@ Dev, on CloudKit Development.
 - **today-prep:** On iPad, check two Thanksgiving Week Prep steps; on iPhone, confirm they are checked, then leave one unchecked overnight and find it under Still open. Move a step to Tomorrow, open its recipe, and confirm checkmarks in the Prep Plan column. ([brief](efforts/archive/today-prep.md))
 - **prep-times-and-day-groceries:** On iPad, follow the prep-times-and-day-groceries device gate in the effort brief. ([brief](efforts/archive/prep-times-and-day-groceries.md))
 - **ingredient-name-fixes:** Deploy the Production schema (one new table). On iPad, put “fresh mint leaves” and “mint” on a list from two recipes (a real Thanksgiving miss), use Same As… and confirm one item; rebuild and confirm one item without a new fix; verify the fix appears in Name Fixes on iPhone after sync; delete it there and rebuild to confirm two items. ([brief](efforts/archive/ingredient-name-fixes.md))
+- **kitchen-knowledge-promotion:** On the iPad, run Export What I've Taught; on the Mac, run `scripts/promote-knowledge -n` and check the summary includes the mint fix, then run it for real and open its data diff as a PR; install a build with that promotion and confirm the fix is gone from Name Fixes while fresh mint leaves and mint still merge into one item. ([brief](efforts/archive/kitchen-knowledge-promotion.md))
 
 ## Held
 

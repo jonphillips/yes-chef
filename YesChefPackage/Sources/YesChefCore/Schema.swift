@@ -1489,15 +1489,25 @@ private func recipeSyncMetadataStates(
 }
 
 public enum YesChefDataPasses {
-  // Raise this when a pass changes or a new pass is added.
-  public static let currentVersion = 2
+  // Raise codeVersion when the pass list changes. The file version independently re-runs passes
+  // when promoted kitchen knowledge changes.
+  private static let codeVersion = 3
+  public static var currentVersion: Int { codeVersion + BuiltInKnowledge.current.version }
 
   public static func runIfNeeded(in database: any DatabaseWriter) async {
-    await runIfNeeded(in: database, beforePass: { _ in })
+    await runIfNeeded(in: database, knowledge: .current, beforePass: { _ in })
   }
 
   static func runIfNeeded(
     in database: any DatabaseWriter,
+    beforePass: @escaping @Sendable (Int) throws -> Void
+  ) async {
+    await runIfNeeded(in: database, knowledge: .current, beforePass: beforePass)
+  }
+
+  static func runIfNeeded(
+    in database: any DatabaseWriter,
+    knowledge: BuiltInKnowledge,
     beforePass: @escaping @Sendable (Int) throws -> Void
   ) async {
     let needsAllPasses: Bool
@@ -1533,6 +1543,10 @@ public enum YesChefDataPasses {
       ("canonical names", { db in
         let updated = try GroceryCanonicalNameCache.refreshStale(in: db)
         if updated > 0 { AppLog.dataIntegrity.notice("canonical-name-refresh updatedCount=\(updated, privacy: .public)") }
+      }),
+      ("knowledge cleanup", { db in
+        let deleted = try BuiltInKnowledgeCleanup.run(in: db, knowledge: knowledge)
+        if deleted > 0 { AppLog.dataIntegrity.notice("built-in-knowledge-cleanup deletedCount=\(deleted, privacy: .public)") }
       }),
       ("cuisine and course", { db in
         let audit = try RecipeRepository.backfillCuisineCourseFacets(in: db)

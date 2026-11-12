@@ -31,20 +31,19 @@ public struct GroceryTripAssignment: Codable, Identifiable, Equatable, Sendable 
 }
 
 public enum GroceryTripRule {
-  private static let keepers: Set<String> = [
-    "onion", "garlic", "shallot", "potato", "sweet potato", "yam", "carrot", "celery", "beet",
-    "parsnip", "turnip", "rutabaga", "cabbage", "ginger", "lemon", "lime", "orange", "apple",
-    "cranberry", "butternut squash", "acorn squash", "kabocha squash", "delicata squash",
-    "spaghetti squash", "pumpkin",
-  ]
-
   private static let advanceAreas: Set<String> = [
     "Canned & Dry", "Condiments & Oils", "Spices", "Baking", "Beverages", "Dairy", "Frozen", "Household",
   ]
 
-  public static func defaultTrip(canonicalName: String, area: String?) -> GroceryTrip {
+  public static func defaultTrip(
+    canonicalName: String,
+    area: String?,
+    knowledge: BuiltInKnowledge = .current
+  ) -> GroceryTrip {
     let name = CanonicalIngredient.baseName(canonicalName) ?? canonicalName
+    if let trip = knowledge.trips[name].flatMap(GroceryTrip.init(rawValue:)) { return trip }
     let words = name.split(separator: " ").map(String.init)
+    let keepers = Set(knowledge.keepers)
     let isOnionThatWilts = ["green onion", "green onions", "spring onion", "spring onions"].contains(name)
     let isKeeper = keepers.contains(name) || [words.first, words.last].contains { $0.map(keepers.contains) == true }
     if !isOnionThatWilts && isKeeper { return .advance }
@@ -54,7 +53,11 @@ public enum GroceryTripRule {
 }
 
 public enum GroceryTripRepository {
-  public static func trips(forCanonicalNames names: [String], in db: Database) throws -> [String: GroceryTrip] {
+  public static func trips(
+    forCanonicalNames names: [String],
+    in db: Database,
+    knowledge: BuiltInKnowledge = .current
+  ) throws -> [String: GroceryTrip] {
     let fixes = try IngredientNameFixes.load(in: db)
     let normalizedNames = Set(names.compactMap(fixes.canonicalName))
     let saved = try GroceryTripAssignment.fetchAll(db).filter { normalizedNames.contains($0.canonicalName) }
@@ -65,7 +68,11 @@ public enum GroceryTripRepository {
     }
     let areas = try GroceryStoreAreaCache.resolvedAreas(for: Array(normalizedNames), in: db, fixes: fixes)
     return Dictionary(uniqueKeysWithValues: normalizedNames.map { name in
-      (name, savedByName[name]?.trip ?? GroceryTripRule.defaultTrip(canonicalName: name, area: areas[name]?.title))
+      (name, savedByName[name]?.trip ?? GroceryTripRule.defaultTrip(
+        canonicalName: name,
+        area: areas[name]?.title,
+        knowledge: knowledge
+      ))
     })
   }
 

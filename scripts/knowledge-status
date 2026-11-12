@@ -1,0 +1,9 @@
+#!/bin/sh
+# Report pending Yes Chef knowledge exports for TestFlight preflight. Always non-failing.
+folder="$HOME/Library/Mobile Documents/iCloud~com~jonphillips~yeschef/Documents/Knowledge"
+[ -d "$folder" ] || exit 0
+for file in "$folder"/*.json; do
+  [ -f "$file" ] || continue
+  printf 'Pending kitchen knowledge export: %s\n' "$(basename "$file")"
+done
+exit 0

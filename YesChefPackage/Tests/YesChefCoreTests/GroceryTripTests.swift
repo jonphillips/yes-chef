@@ -22,6 +22,24 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func builtInTripEntryPrecedesKeeperAndSavedSwitchPrecedesBuiltIn() throws {
+      @Dependency(\.defaultDatabase) var database
+      let knowledge = BuiltInKnowledge(trips: ["onion": "fresh"], keepers: ["onion"])
+      #expect(GroceryTripRule.defaultTrip(canonicalName: "onion", area: nil, knowledge: knowledge) == .fresh)
+      try database.write { db in
+        try GroceryTripAssignment.upsert {
+          GroceryTripAssignment(
+            id: DeterministicID.groceryTrip(canonicalName: "onion"),
+            canonicalName: "onion",
+            trip: .advance,
+            dateModified: Date(timeIntervalSinceReferenceDate: 900_801_000)
+          )
+        }.execute(db)
+        #expect(try GroceryTripRepository.trips(forCanonicalNames: ["onion"], in: db, knowledge: knowledge)["onion"] == .advance)
+      }
+    }
+
+    @Test
     func savedSwitchWinsAndAreaCorrectionSetsTheDefault() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 900_100_000)
