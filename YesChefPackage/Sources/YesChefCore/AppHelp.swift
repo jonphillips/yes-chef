@@ -46,8 +46,8 @@ public struct AppHelpPage: Equatable, Sendable {
       ]),
       Section(heading: "Prep plan", bullets: [
         "The **Prep Plan** column lists work to do ahead. Build it from the **AI** menu: **Ask now** to work with the in-app chat, or **Hand off** to ChatGPT and **Paste** the reply. Tap a step to edit it.",
-        "On a menu longer than one day, steps are grouped by the day you do the work.",
-        "**Prep** opens a checklist of steps due now. Tap a step to read its recipe; checks sync to your other devices. Swipe a step to move it to tomorrow."
+        "On a menu longer than one day, steps are grouped by the day you do the work. The Prep Plan's **⋯ › Show Times** adds each step's approximate time.",
+        "**Prep** opens a checklist of steps due now, with their times. Tap a step to read its recipe; checks sync to your other devices. Swipe a step to move it to tomorrow."
       ]),
       Section(heading: "Cooking", bullets: [
         "**Cook these** opens the menu's recipes together for cooking."
@@ -59,7 +59,7 @@ public struct AppHelpPage: Equatable, Sendable {
     title: "How Groceries Work",
     sections: [
       Section(heading: "Adding ingredients", bullets: [
-        "**Add Ingredients** adds a calendar day or a menu to this list. You pick which lines to add first.",
+        "**Add Ingredients** adds a calendar day or a menu to this list. You pick which lines to add first. **Add Day to Groceries**, on a menu day or a Calendar day, opens the same choices for one day.",
         "Lines matching a pantry item set to **Always have it** start unchecked under **Skipped Pantry Staples**. Check one to buy it anyway.",
         "Turn on **Split into two trips** to send each line to an **Advance** list or a **Fresh** list. Tap a line's **Advance** or **Fresh** tag to switch it. The app remembers your switch next time."
       ]),

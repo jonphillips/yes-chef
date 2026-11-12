@@ -219,6 +219,49 @@ extension RecipeCoreTests {
     }
 
     @Test
+    func dayScopedMenuAddUsesOnlyTheSelectedDaysRecipeItem() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 806_000_000)
+      let recipeID = SampleUUIDSequence.uuid(17_001)
+      let sectionID = SampleUUIDSequence.uuid(17_002)
+      var uuids = SampleUUIDSequence(start: 17_100)
+      let dayZeroItemID = SampleUUIDSequence.uuid(17_010)
+      let dayOneItemID = SampleUUIDSequence.uuid(17_011)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(in: db, now: now, uuid: { uuids.next() })
+        try insertRecipeFixture(
+          recipeID: recipeID,
+          sectionID: sectionID,
+          title: "Roasted Carrots",
+          lines: [IngredientLine(
+            id: SampleUUIDSequence.uuid(17_003), recipeID: recipeID, sectionID: sectionID,
+            originalText: "2 carrots", quantity: 2, quantityText: "2", item: "carrots", sortOrder: 0, confidence: .medium
+          )],
+          now: now,
+          in: db
+        )
+        let menuID = try MenuRepository.addMenu(title: "Thanksgiving", notes: nil, dayCount: 2, in: db, now: now, uuid: { uuids.next() })
+        _ = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 0, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { dayZeroItemID })
+        _ = try MenuRepository.addRecipeItem(menuID: menuID, recipeID: recipeID, dayOffset: 1, mealSlot: .dinner, notes: nil, in: db, now: now, uuid: { dayOneItemID })
+
+        let addedIDs = try GroceryRepository.addMenu(
+          menuID: menuID,
+          groceryListID: listID,
+          in: db,
+          now: now,
+          uuid: { uuids.next() },
+          dayOffset: 1
+        )
+        let source = try GroceryItemListRequest().fetch(db)
+          .filter { addedIDs.contains($0.id) }
+          .flatMap(\.sources)
+        expectNoDifference(source.map(\.menuItemID), [dayOneItemID])
+        expectNoDifference(source.map(\.recipeID), [recipeID])
+      }
+    }
+
+    @Test
     func individualMealPlanAndMenuItemsUseTheirOwnScales() throws {
       @Dependency(\.defaultDatabase) var database
       let now = Date(timeIntervalSinceReferenceDate: 805_700_000)

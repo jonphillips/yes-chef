@@ -1020,7 +1020,7 @@ struct GroceryIngredientSelectionView: View {
 
   private var canSplitIntoTrips: Bool {
     switch context.source {
-    case .menu, .mealPlanRows: true
+    case .menu, .menuDay, .mealPlanRows: true
     case .recipe: false
     }
   }

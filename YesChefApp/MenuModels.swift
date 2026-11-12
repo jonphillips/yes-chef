@@ -44,6 +44,7 @@ final class MenuLibraryModel {
   var errorMessage: String?
   var isShowingError = false
   @ObservationIgnored var toastCenter: AppToastCenter?
+  var onAddMenuDayToGroceries: (@MainActor (CoreMenu.ID, Int) -> Void)?
 
   init(toastCenter: AppToastCenter? = nil) {
     self.toastCenter = toastCenter

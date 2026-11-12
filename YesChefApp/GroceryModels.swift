@@ -346,19 +346,29 @@ final class GroceryLibraryModel {
   }
 
   func addSelectedMealRowsButtonTapped(_ rows: [MealPlanItemRowData]) {
-    selectMealRowsButtonTapped(rows)
+    Task { await selectMealRowsButtonTapped(rows) }
   }
 
-  func selectMealRowsButtonTapped(_ rows: [MealPlanItemRowData]) {
+  func selectMealRowsButtonTapped(_ rows: [MealPlanItemRowData]) async {
     let recipeRows = rows.filter { $0.item.kind == .recipe && $0.item.recipeID != nil }
     guard !recipeRows.isEmpty else { return }
     let date = recipeRows.first?.item.scheduledDate
-    loadIngredientSelection(
-      source: .mealPlanRows(recipeRows.map(\.item.id)),
-      title: date?.formatted(.dateTime.month(.abbreviated).day()) ?? "Meal Plan",
-      subtitle: "Meal Calendar",
-      recipeIDs: Set(recipeRows.compactMap(\.item.recipeID))
-    )
+    do {
+      let presentation = try await database.read { db in
+        GroceryIngredientSelectionPresentation(
+          context: GroceryIngredientSelectionContext(
+            source: .mealPlanRows(recipeRows.map(\.item.id)),
+            title: date?.formatted(.dateTime.month(.abbreviated).day()) ?? "Meal Plan",
+            subtitle: "Meal Calendar"
+          ),
+          choices: try GroceryIngredientChoiceRequest(recipeIDs: Set(recipeRows.compactMap(\.item.recipeID))).fetch(db)
+        )
+      }
+      destination = .selectIngredients(presentation)
+    } catch {
+      errorMessage = String(describing: error)
+      isShowingError = true
+    }
   }
 
   func selectMenuButtonTapped(menuID: CoreMenu.ID) {
@@ -378,6 +388,45 @@ final class GroceryLibraryModel {
             choices: choices
           )
         }
+        destination = .selectIngredients(presentation)
+      } catch {
+        errorMessage = String(describing: error)
+        isShowingError = true
+      }
+    }
+  }
+
+  func selectMenuDayButtonTapped(menuID: CoreMenu.ID, dayOffset: Int) {
+    guard let menu = menuRows.first(where: { $0.menu.id == menuID })?.menu else { return }
+    Task {
+      do {
+        let presentation = try await database.read { db -> GroceryIngredientSelectionPresentation? in
+          let recipeIDs = try GroceryMenuRecipeIDsRequest(menuID: menu.id, dayOffset: dayOffset).fetch(db)
+          guard !recipeIDs.isEmpty else { return nil }
+          let choices = try GroceryIngredientChoiceRequest(recipeIDs: recipeIDs).fetch(db)
+          let currentMenu = try Menu.find(menu.id).fetchOne(db) ?? menu
+          let placements = try MenuPlacement.where { $0.menuID.eq(menu.id) }.fetchAll(db)
+          let day = "Day \(dayOffset + 1)"
+          let title: String
+          if placements.count == 1,
+             let date = Calendar.autoupdatingCurrent.date(byAdding: .day, value: dayOffset, to: placements[0].startDate) {
+            let weekday = date.formatted(.dateTime.weekday(.wide))
+            let dateText = date.formatted(.dateTime.month(.abbreviated).day())
+            title = "\(day) · \(weekday), \(dateText)"
+          } else {
+            title = day
+          }
+          return GroceryIngredientSelectionPresentation(
+            context: GroceryIngredientSelectionContext(
+              source: .menuDay(menu.id, dayOffset: dayOffset),
+              title: title,
+              subtitle: currentMenu.title,
+              tripListTitle: currentMenu.title
+            ),
+            choices: choices
+          )
+        }
+        guard let presentation else { return }
         destination = .selectIngredients(presentation)
       } catch {
         errorMessage = String(describing: error)
@@ -472,7 +521,7 @@ final class GroceryLibraryModel {
           let freshIDs = lineIDsByTrip[.fresh] ?? []
           if !advanceIDs.isEmpty {
             let listID = try GroceryRepository.tripListID(
-              title: "\(context.title) — Advance", in: db, now: now, uuid: { uuid() }
+              title: "\(context.tripListTitle) — Advance", in: db, now: now, uuid: { uuid() }
             )
             advanceListID = listID
             try addSelectedIngredients(
@@ -482,7 +531,7 @@ final class GroceryLibraryModel {
           }
           if !freshIDs.isEmpty {
             let listID = try GroceryRepository.tripListID(
-              title: "\(context.title) — Fresh", in: db, now: now, uuid: { uuid() }
+              title: "\(context.tripListTitle) — Fresh", in: db, now: now, uuid: { uuid() }
             )
             freshListID = listID
             try addSelectedIngredients(
@@ -540,79 +589,6 @@ final class GroceryLibraryModel {
     selectMenuButtonTapped(menuID: menuID)
   }
 
-  func addMenuImmediately(menuID: CoreMenu.ID) {
-    do {
-      let selectedListID = selectedListID
-      let listID = try database.write { db in
-        let listID = try selectedOrDefaultGroceryListID(
-          selectedListID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        try GroceryRepository.addMenu(
-          menuID: menuID,
-          groceryListID: listID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        return listID
-      }
-      self.selectedListID = listID
-      scheduleCategorization()
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-    }
-  }
-
-  /// Adds every recipe row for a day straight to the selected (or default) grocery list, with no
-  /// review sheet. The review-sheet `destination` is presented in the Grocery tab's own view
-  /// hierarchy, so a call originating in the Meal Calendar (a different tab) has nowhere to show it
-  /// — this immediate path is the Meal-Calendar entry point (item 2). A success toast stands in for
-  /// the sheet's confirmation.
-  @discardableResult
-  func addMealRowsImmediately(_ rows: [MealPlanItemRowData]) -> Bool {
-    let recipeRows = rows.filter { $0.item.kind == .recipe && $0.item.recipeID != nil }
-    guard !recipeRows.isEmpty else { return false }
-    let date = recipeRows.first?.item.scheduledDate
-    do {
-      let selectedListID = selectedListID
-      let result = try database.write { db -> (CoreGroceryList.ID, Int) in
-        let listID = try selectedOrDefaultGroceryListID(
-          selectedListID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        let itemIDs = try GroceryRepository.addMealPlanRows(
-          recipeRows,
-          groceryListID: listID,
-          in: db,
-          now: now,
-          uuid: { uuid() }
-        )
-        return (listID, itemIDs.count)
-      }
-      self.selectedListID = result.0
-      toastCenter?.postSuccess(
-        GroceryAddConfirmation(
-          sourceTitle: date?.formatted(.dateTime.month(.abbreviated).day()) ?? "Meal Plan",
-          sourceSubtitle: "Meal Calendar",
-          listTitle: title(forList: result.0),
-          ingredientCount: result.1
-        ).message
-      )
-      scheduleCategorization()
-      return true
-    } catch {
-      errorMessage = String(describing: error)
-      isShowingError = true
-      return false
-    }
-  }
-
   func addRecipeButtonTapped(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil
@@ -649,6 +625,9 @@ private extension GroceryLibraryModel {
     case let .menu(menuID):
       try GroceryRepository.addMenu(menuID: menuID, groceryListID: groceryListID, in: db, now: now,
         uuid: { uuid() }, includedIngredientLineIDs: selectedIDs)
+    case let .menuDay(menuID, dayOffset):
+      try GroceryRepository.addMenu(menuID: menuID, groceryListID: groceryListID, in: db, now: now,
+        uuid: { uuid() }, includedIngredientLineIDs: selectedIDs, dayOffset: dayOffset)
     }
   }
 }
@@ -1005,12 +984,28 @@ struct GroceryIngredientSelectionContext: Hashable, Sendable {
     case recipe(Recipe.ID, ScaleContext)
     case mealPlanRows([MealPlanItem.ID])
     case menu(CoreMenu.ID)
+    case menuDay(CoreMenu.ID, dayOffset: Int)
   }
 
   var source: Source
   var title: String
   var subtitle: String?
   var displayScale: Double = 1
+  var tripListTitle: String
+
+  init(
+    source: Source,
+    title: String,
+    subtitle: String?,
+    displayScale: Double = 1,
+    tripListTitle: String? = nil
+  ) {
+    self.source = source
+    self.title = title
+    self.subtitle = subtitle
+    self.displayScale = displayScale
+    self.tripListTitle = tripListTitle ?? title
+  }
 }
 
 struct GroceryAddConfirmation: Identifiable, Hashable, Sendable {

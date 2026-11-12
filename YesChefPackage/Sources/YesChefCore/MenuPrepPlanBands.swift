@@ -3,10 +3,12 @@ import Foundation
 public struct MenuPrepPlanBandStep: Equatable, Sendable {
   public var step: PrepPlanStepRecord
   public var sessionLabel: String?
+  public var headingTime: Int?
 
-  public init(step: PrepPlanStepRecord, sessionLabel: String?) {
+  public init(step: PrepPlanStepRecord, sessionLabel: String?, headingTime: Int? = nil) {
     self.step = step
     self.sessionLabel = sessionLabel
+    self.headingTime = headingTime
   }
 }
 
@@ -31,22 +33,22 @@ public enum MenuPrepPlanBanding {
     dayCount: Int,
     placementStartDate: Date? = nil,
     today: Date = .now,
-    calendar: Calendar = .autoupdatingCurrent
+    calendar: Calendar = .autoupdatingCurrent,
+    showsTimes: Bool = false
   ) -> [MenuPrepPlanBand] {
-    guard dayCount > 1 else { return sessionBands(steps) }
+    guard dayCount > 1 else { return sessionBands(steps, showsTimes: showsTimes) }
 
     let flexible = steps.filter { $0.workDayOffset == nil }
     var result: [MenuPrepPlanBand] = []
     if !flexible.isEmpty {
-      var priorSession: String?
       result.append(MenuPrepPlanBand(
         id: "flexible",
         title: "Flexible",
-        steps: flexible.sorted { $0.sortOrder < $1.sortOrder }.map { step in
-          let label = priorSession == step.session ? nil : step.session
-          priorSession = step.session
-          return MenuPrepPlanBandStep(step: step, sessionLabel: label)
-        }
+        steps: headingSteps(
+          flexible.sorted { $0.sortOrder < $1.sortOrder },
+          showsTimes: showsTimes,
+          showsSession: true
+        )
       ))
     }
 
@@ -56,12 +58,7 @@ public enum MenuPrepPlanBanding {
     }, by: \.0)
     for offset in dated.keys.sorted() {
       let daySteps = (dated[offset] ?? []).map(\.1).sorted { $0.sortOrder < $1.sortOrder }
-      var priorSession: String?
-      let bandSteps = daySteps.map { step -> MenuPrepPlanBandStep in
-        let label = priorSession == step.session ? nil : step.session
-        priorSession = step.session
-        return MenuPrepPlanBandStep(step: step, sessionLabel: label)
-      }
+      let bandSteps = headingSteps(daySteps, showsTimes: showsTimes, showsSession: true)
       let workDate = placementStartDate.flatMap { calendar.date(byAdding: .day, value: offset, to: $0) }
       let isToday = placementStartDate != nil && workDate.map { calendar.isDate($0, inSameDayAs: today) } == true
       let title = isToday ? "Today" : dayTitle(offset: offset, start: placementStartDate, calendar: calendar)
@@ -75,7 +72,7 @@ public enum MenuPrepPlanBanding {
     return result
   }
 
-  private static func sessionBands(_ steps: [PrepPlanStepRecord]) -> [MenuPrepPlanBand] {
+  private static func sessionBands(_ steps: [PrepPlanStepRecord], showsTimes: Bool) -> [MenuPrepPlanBand] {
     var groups: [(session: String, steps: [PrepPlanStepRecord])] = []
     for step in steps.sorted(by: { $0.sortOrder < $1.sortOrder }) {
       if groups.last?.session == step.session {
@@ -90,7 +87,25 @@ public enum MenuPrepPlanBanding {
       MenuPrepPlanBand(
         id: "session:\(index):\(group.session)",
         title: group.session,
-        steps: group.steps.map { MenuPrepPlanBandStep(step: $0, sessionLabel: nil) }
+        steps: headingSteps(group.steps, showsTimes: showsTimes, showsSession: showsTimes)
+      )
+    }
+  }
+
+  static func headingSteps(
+    _ steps: [PrepPlanStepRecord],
+    showsTimes: Bool,
+    showsSession: Bool
+  ) -> [MenuPrepPlanBandStep] {
+    var priorHeading: (time: Int?, session: String)?
+    return steps.map { step in
+      let heading = (time: showsTimes ? step.timeOfDay : nil, session: step.session)
+      let hasHeading = priorHeading?.time != heading.time || priorHeading?.session != heading.session
+      priorHeading = heading
+      return MenuPrepPlanBandStep(
+        step: step,
+        sessionLabel: hasHeading && showsSession ? step.session : nil,
+        headingTime: hasHeading ? heading.time : nil
       )
     }
   }
@@ -112,7 +127,8 @@ public enum PrepPlanProgress {
     dayCount: Int,
     placements: [MenuPlacement],
     today: Date,
-    calendar: Calendar = .autoupdatingCurrent
+    calendar: Calendar = .autoupdatingCurrent,
+    showsTimes: Bool = false
   ) -> Set<PrepPlanStepRecord.ID> {
     guard !placements.isEmpty else {
       return Set(steps.filter { $0.completedAt != nil }.map(\.id))
@@ -169,7 +185,8 @@ public struct TodayPrepLayout: Equatable, Sendable {
     dayCount: Int,
     placements: [MenuPlacement],
     today: Date,
-    calendar: Calendar = .autoupdatingCurrent
+    calendar: Calendar = .autoupdatingCurrent,
+    showsTimes: Bool = false
   ) -> TodayPrepLayout {
     let done = PrepPlanProgress.doneStepIDs(
       steps: steps, dayCount: dayCount, placements: placements, today: today, calendar: calendar
@@ -186,7 +203,8 @@ public struct TodayPrepLayout: Equatable, Sendable {
         dayCount: dayCount,
         placementStartDate: placements.count == 1 ? placements[0].startDate : nil,
         today: today,
-        calendar: calendar
+        calendar: calendar,
+        showsTimes: showsTimes
       )
       return TodayPrepLayout(
         mode: .manual,
@@ -200,13 +218,11 @@ public struct TodayPrepLayout: Equatable, Sendable {
     let start = calendar.startOfDay(for: placement.startDate)
     let offset = calendar.dateComponents([.day], from: start, to: calendar.startOfDay(for: today)).day ?? 0
     func labeledSteps(_ steps: [PrepPlanStepRecord]) -> [MenuPrepPlanBandStep] {
-      let sorted = steps.sorted { $0.sortOrder < $1.sortOrder }
-      var prior: String?
-      return sorted.map { step in
-        let label = prior == step.session ? nil : step.session
-        prior = step.session
-        return MenuPrepPlanBandStep(step: step, sessionLabel: label)
-      }
+      MenuPrepPlanBanding.headingSteps(
+        steps.sorted { $0.sortOrder < $1.sortOrder },
+        showsTimes: showsTimes,
+        showsSession: true
+      )
     }
     func daySteps(_ filter: (PrepPlanStepRecord) -> Bool) -> [MenuPrepPlanBandStep] {
       labeledSteps(steps.filter(filter))

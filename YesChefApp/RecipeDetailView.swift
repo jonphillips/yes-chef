@@ -18,6 +18,7 @@ struct RecipeDetailView: View {
   let groceryModel: GroceryLibraryModel
   let isFocusActive: Bool
   let hostsHandoffReviews: Bool
+  let showsToolbar: Bool
   let focusButtonTapped: (() -> Void)?
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
@@ -30,6 +31,7 @@ struct RecipeDetailView: View {
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
     hostsHandoffReviews: Bool = false,
+    showsToolbar: Bool = true,
     isFocusActive: Bool = false,
     focusButtonTapped: (() -> Void)? = nil,
     onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void = { _ in }
@@ -51,6 +53,7 @@ struct RecipeDetailView: View {
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
     self.hostsHandoffReviews = hostsHandoffReviews
+    self.showsToolbar = showsToolbar
     self.isFocusActive = isFocusActive
     self.focusButtonTapped = focusButtonTapped
     self.onRecipeSelected = onRecipeSelected
@@ -163,71 +166,73 @@ struct RecipeDetailView: View {
 
   @ToolbarContentBuilder
   private var recipeToolbar: some ToolbarContent {
-    ToolbarItemGroup(placement: .topBarLeading) {
-      if isSplitEnabled, let focusButtonTapped {
-        FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
-      }
-    }
-    ToolbarItemGroup(placement: .primaryAction) {
-      Button {
-        groceryModel.addRecipeButtonTapped(
-          recipeID: model.recipeID,
-          scaleContext: model.scaleContext
-        )
-      } label: {
-        Label("Groceries", symbol: .addToGroceries)
-      }
-      Button {
-        mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
-      } label: {
-        Label("Plan", symbol: .plan)
-      }
-      HandoffMenu(
-        handOff: {
-          if model.activeVariation == nil {
-            copyAdjustmentPrompt()
-          } else {
-            isConfirmingBaseRecipeHandoff = true
-          }
-        },
-        paste: {
-          let results = UIPasteboard.general.string.map { [$0] } ?? []
-          Task { await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID)) }
-        },
-        isAskActive: Binding(
-          get: { model.destination.chat != nil },
-          set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
-        )
-      )
-    }
-    ToolbarItemGroup(placement: .secondaryAction) {
-      Button {
-        libraryModel.editButtonTapped(recipeID: model.recipeID)
-      } label: {
-        Label("Edit", symbol: .edit)
-      }
-      Button {
-        model.openWorkbenchButtonTapped()
-      } label: {
-        Label("Workbench", symbol: .workbench)
-      }
-
-      if model.recipe?.originalSnapshot != nil {
-        Button {
-          libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("View Original", systemImage: "doc.text.magnifyingglass")
+    if showsToolbar {
+      ToolbarItemGroup(placement: .topBarLeading) {
+        if isSplitEnabled, let focusButtonTapped {
+          FocusToolbarButton(isActive: isFocusActive, action: focusButtonTapped)
         }
       }
-      Button {
-        libraryModel.deleteButtonTapped(recipeID: model.recipeID)
-      } label: {
-        Label("Archive", systemImage: "archivebox")
+      ToolbarItemGroup(placement: .primaryAction) {
+        Button {
+          groceryModel.addRecipeButtonTapped(
+            recipeID: model.recipeID,
+            scaleContext: model.scaleContext
+          )
+        } label: {
+          Label("Groceries", symbol: .addToGroceries)
+        }
+        Button {
+          mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Plan", symbol: .plan)
+        }
+        HandoffMenu(
+          handOff: {
+            if model.activeVariation == nil {
+              copyAdjustmentPrompt()
+            } else {
+              isConfirmingBaseRecipeHandoff = true
+            }
+          },
+          paste: {
+            let results = UIPasteboard.general.string.map { [$0] } ?? []
+            Task { await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID)) }
+          },
+          isAskActive: Binding(
+            get: { model.destination.chat != nil },
+            set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
+          )
+        )
       }
-      Button(role: .destructive) {
-        libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
-      } label: {
-        Label("Delete…", symbol: .delete)
+      ToolbarItemGroup(placement: .secondaryAction) {
+        Button {
+          libraryModel.editButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Edit", symbol: .edit)
+        }
+        Button {
+          model.openWorkbenchButtonTapped()
+        } label: {
+          Label("Workbench", symbol: .workbench)
+        }
+
+        if model.recipe?.originalSnapshot != nil {
+          Button {
+            libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("View Original", systemImage: "doc.text.magnifyingglass")
+          }
+        }
+        Button {
+          libraryModel.deleteButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Archive", systemImage: "archivebox")
+        }
+        Button(role: .destructive) {
+          libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
+        } label: {
+          Label("Delete…", symbol: .delete)
+        }
       }
     }
   }

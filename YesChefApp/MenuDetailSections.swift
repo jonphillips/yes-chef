@@ -263,6 +263,16 @@ private struct MenuDaySection: View {
         }
         .accessibilityLabel("Add recipe to Day \(dayNumber)")
 
+        if rows.contains(where: { $0.item.kind == .recipe && $0.item.recipeID != nil }), model.onAddMenuDayToGroceries != nil {
+          Button {
+            model.onAddMenuDayToGroceries?(menu.id, dayOffset)
+          } label: {
+            Label("Add Day to Groceries", symbol: .addToGroceries)
+              .labelStyle(.iconOnly)
+          }
+          .accessibilityLabel("Add Day \(dayNumber) to Groceries")
+        }
+
         Menu {
           HandoffMenuActions(
             handoffSource: .menuDay(menu.id, dayOffset: dayOffset),

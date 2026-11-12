@@ -7,10 +7,10 @@ Origin: Jon, 2026-11-11, looking at Thanksgiving Week's dinner hour and the Groc
 persistent model change. Jon's advance grocery trip is around **Thu Nov 19**, and Thanksgiving is Thu Nov 26, so the
 grocery half matters first.
 
-Decisions: [ADR-0034 Amendment 4](../decisions/ADR-0034-prep-plan-work-session-timeline.md) (E1–E3),
-[ADR-0068 Amendment 1](../decisions/ADR-0068-two-trip-grocery-split.md) (F1–F2), and the glyph line in
-[ADR-0067](../decisions/ADR-0067-todays-prep.md) D1. Read them first. Precedent: the archived
-[`grocery-two-trips`](archive/grocery-two-trips.md) brief built the sheet this effort reuses.
+Decisions: [ADR-0034 Amendment 4](../../decisions/ADR-0034-prep-plan-work-session-timeline.md) (E1–E3),
+[ADR-0068 Amendment 1](../../decisions/ADR-0068-two-trip-grocery-split.md) (F1–F2), and the glyph line in
+[ADR-0067](../../decisions/ADR-0067-todays-prep.md) D1. Read them first. Precedent: the archived
+[`grocery-two-trips`](grocery-two-trips.md) brief built the sheet this effort reuses.
 
 ## Where things are (architect, 2026-11-11, `origin/main` 55cc1a5)
 
@@ -158,7 +158,7 @@ This touches `YesChefApp/` model code, so the target runs (guardrail #9).
 - A menu day's **Add Day to Groceries** opens the sheet for that day, and a split fills the menu's two lists. The
   Calendar's **Add Day to Groceries** opens the sheet.
 - The help pages match the app. Label fixes, if any, are listed in the PR body (ADR-0066 D5).
-- Tests above. Verification per [`verification.md`](../verification.md), including the generic app build and
+- Tests above. Verification per [`verification.md`](../../verification.md), including the generic app build and
   `YesChefTests`. Then closeout (ADR-0005 D16).
 - **Jon's device gate (before Nov 19 for the grocery half):** on the iPad, open **Thanksgiving Week 2026**. Tap Day 5's
   **Add Day to Groceries**, turn on **Split into two trips**, and add. Then add Day 4 the same way, and confirm both

@@ -136,7 +136,7 @@ an item for good, he can change its pantry setting.
 
 ## Amendment 1 — A menu day and the Calendar's day button open the same sheet (2026-11-11)
 
-Accepted 2026-11-11 by Jon. Brief: [`prep-times-and-day-groceries`](../efforts/prep-times-and-day-groceries.md).
+Accepted 2026-11-11 by Jon. Brief: [`prep-times-and-day-groceries`](../efforts/archive/prep-times-and-day-groceries.md).
 Extends D1 to two more ways in.
 
 **The problem.** The sheet with **Split into two trips** only opens from **Groceries › Add Ingredients**. A menu adds

@@ -181,12 +181,39 @@ struct TodayPrepLayoutTests {
     #expect(layout.bands.isEmpty == false)
   }
 
+  @Test
+  func datedTodayHeadingsIncludeTimesWhenRequested() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    let today = calendar.date(byAdding: .day, value: 1, to: start)!
+    let steps = [
+      step(1, offset: 1, session: "Dinner", timeOfDay: 1_020),
+      step(2, offset: 1, session: "Dinner", timeOfDay: 1_050)
+    ]
+    let layout = TodayPrepLayout.make(
+      steps: steps,
+      dayCount: 3,
+      placements: [placement(start, id: 8)],
+      today: today,
+      calendar: calendar,
+      showsTimes: true
+    )
+    #expect(layout.sections.first(where: { $0.kind == .today })?.steps.map(\.headingTime) == [1_020, 1_050])
+  }
+
   private func placement(_ date: Date, id: Int) -> MenuPlacement {
     let uuid = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", id))!
     return MenuPlacement(id: uuid, menuID: uuid, startDate: date, dateCreated: date, dateModified: date)
   }
 
-  private func step(_ order: Int, offset: Int?, session: String? = nil, completedAt: Date? = nil) -> PrepPlanStepRecord {
+  private func step(
+    _ order: Int,
+    offset: Int?,
+    session: String? = nil,
+    completedAt: Date? = nil,
+    timeOfDay: Int? = nil
+  ) -> PrepPlanStepRecord {
     let id = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", 100 + order))!
     return PrepPlanStepRecord(
       id: id,
@@ -194,6 +221,7 @@ struct TodayPrepLayoutTests {
       sortOrder: order,
       session: session ?? (order.isMultiple(of: 2) ? "Morning" : "Evening"),
       task: "Task \(order)",
+      timeOfDay: timeOfDay,
       workDayOffset: offset,
       completedAt: completedAt
     )
