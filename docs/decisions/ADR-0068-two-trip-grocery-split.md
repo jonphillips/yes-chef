@@ -133,3 +133,32 @@ an item for good, he can change its pantry setting.
 - The add sheet gains a toggle and a per-line tag, shown only for menu and calendar-day sources.
 - A **Remind me** or **Always confirm** pantry item now reaches the list, where its rule applies. That's the
   intended behavior, but Jon will see items he used to have to re-check by hand.
+
+## Amendment 1 — A menu day and the Calendar's day button open the same sheet (2026-11-11)
+
+Accepted 2026-11-11 by Jon. Brief: [`prep-times-and-day-groceries`](../efforts/prep-times-and-day-groceries.md).
+Extends D1 to two more ways in.
+
+**The problem.** The sheet with **Split into two trips** only opens from **Groceries › Add Ingredients**. A menu adds
+all of its days at once, so Thanksgiving Week's eight days can't go in one day at a time. The Calendar day's
+**⋯ › Add Day to Groceries** skips the sheet and adds everything straight to the current list, so it gets no split
+and no D4 pantry skip. Jon assumed the Calendar button already offered the split.
+
+### F1 — Each menu day gets an Add Day to Groceries button
+
+The button row on each day of a menu's **Dishes** list (next to **Add Recipe** and **Hand off**) gains **Add Day to
+Groceries**, using the same cart glyph as the Calendar's. It opens the Add Ingredients sheet with only that day's
+recipe dishes, and **Split into two trips** is offered, as it is for a whole menu.
+
+When split, a menu day fills **the menu's two lists**, "*<menu title>* — Advance" and "— Fresh", not a pair per day.
+Adding several days, or the whole menu, builds up the same two lists, which D1's exact-title reuse already supports.
+The sheet's title names the day, so you can see which day you're adding. Without the split, the add goes to the
+selected list, as every other add does.
+
+### F2 — The Calendar's Add Day to Groceries opens the sheet
+
+The Calendar day's **⋯ › Add Day to Groceries** opens the same sheet that **Groceries › Add Ingredients › *date***
+opens, instead of adding straight to the list. It costs one more tap, and the day gets line picking, the split and
+the pantry skip. The immediate add has no other caller, so it's deleted.
+
+No schema change.

@@ -344,7 +344,7 @@ in the run-up, specific on the day. Nil means any time that day. Existing rows s
 - **Producers:** the in-app weave, the Copy Prep Prompt round trip, and `stage_prep_plan` each give every step on a
   work day an approximate time, estimated from the meal's time when the menu doesn't state one. Flexible steps send
   none.
-- **Shown:** in the step editor (an optional time) and in the chat review. The step row shows only the session.
+- **Shown:** in the step editor (an optional time) and in the chat review. The step row shows only the session. *(Revised by Amd 4: Today's Prep always shows the time, and the menu's plan shows it when **Show Times** is on.)*
 - **Cost:** one nullable column on a synced table, so another CloudKit Production deploy before any TestFlight
   upload. Its consumer ships with it.
 
@@ -383,3 +383,38 @@ order.
 - **A whole-plan restage mode** (drafted and withdrawn the same day). It would make the chat copy back every step it
   isn't changing, which is where a long plan drifts, and one stage holds at most 20 dishes. Jon restages chosen meal
   days, which the per-dish mode already covers, and deletes leftover steps that belong to no dish by hand.
+
+## Amendment 4 — Times show in Today's Prep, and in the plan when you ask (2026-11-11)
+
+Accepted 2026-11-11 by Jon. Brief: [`prep-times-and-day-groceries`](../efforts/prep-times-and-day-groceries.md).
+Revises Amd 3-C1's **Shown** bullet. The time stays a sort key and the session stays the label. This only changes
+where the time is shown.
+
+**The problem.** Thanksgiving's dinner hour, with the plan sorted by time (Amd 3), reads: "After turkey is removed",
+"Final 30 minutes", "About 30 minutes before dinner", "Just before dinner", "About 15 minutes before dinner", "Just
+before dinner". Each label is fine alone. Read in a row, they don't say what comes first, and "Just before dinner"
+shows up twice. The stored time would settle it, but only the editor and the chat review show it. Near dinner the
+plan needs to be exact ([ADR-0039 D5](ADR-0039-playbook-column-thinking-vs-doing.md): hand control back as the
+clock runs down).
+
+### E1 — Today's Prep always shows times
+
+Today's Prep is the near-dinner view, and it already has a date ([ADR-0067](ADR-0067-todays-prep.md) D2), so per
+[ADR-0039 Amd 1](ADR-0039-playbook-column-thinking-vs-doing.md) it needs no switch. A step with a time gets a
+heading of its time, then the session: "5:30 PM · About 30 minutes before dinner". A step with no time keeps today's
+session-only heading. A heading shows when the time or the session differs from the step above. Today it shows only
+when the session differs.
+
+### E2 — The menu's Prep Plan gets a Show Times switch
+
+The Prep Plan's **⋯** menu gains **Show Times**, off by default and remembered on this device for every menu. When
+it's on, the plan's headings follow E1. It only appears when at least one step has a time. That rules out one-day
+menus, which never store a time (Amd 3).
+
+### E3 — One heading rule
+
+Both views build their headings with the same Core function, which takes whether to show times. Today, the menu's
+bands and Today's Prep each repeat the session-only rule. Formatting the time for display stays in the app and uses
+the device's clock style.
+
+No schema change. The switch is a per-device preference, not synced data.
