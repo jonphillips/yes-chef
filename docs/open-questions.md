@@ -15,14 +15,23 @@ and everything downstream move forward without waiting on it.
   a `Recipe.kind` and a directional dish → component edge. Additive schema, so it's safe after the cut. Nothing forces it sooner.
 - **ATK "Gather Your Ingredients" repair** ([brief](efforts/archive/import-text-normalization.md)) — P1 only, a
   backup-first data pass; see the fuller candidate below.
-- **Tandoor idea harvest** ([notes](efforts/archive/tandoor-idea-harvest.md)) — reference notes mined from Tandoor
-  Recipes. Nothing ratified; read before the next ADR they touch.
+- **Tandoor idea harvest** ([notes](efforts/archive/tandoor-idea-harvest.md)) — the alias rows graduated to
+  [ADR-0069](decisions/ADR-0069-ingredient-name-fixes.md). Still parked: the `{base, form, prep}` ingredient model and
+  the never-unit / transpose-words / site-scoped rules. Read before the next ADR they touch.
 - **Commit authority as a typed, test-enforced property** ([review](efforts/archive/application-actions-review.md) D1) —
   the one new track from the 2026-08-02 application-actions review, never built. OQ1 (where the declaration lives) is open.
 - **In-app browser Passwords autofill** ([spike](efforts/archive/browser-passwords-autofill-spike.md)) — the
   2026-07-08 spike defending ADR-0009's "never store credentials." First confirm autofill still fails.
 - **Full-screen moves the app tabs to the top** ([dogfood 2026-09-21](efforts/archive/dogfood-fixes-2026-09-21.md)
   Thread F) — the one thread from that pass not confirmed in code. Check on device before scoping.
+
+**A junk pantry item came from Add to Pantry on a misparsed grocery line (found 2026-11-12).** The pantry has
+"red wine vinegar and 1 tablespoon warm water for ten minutes or so". Pantry items have two writers: the pantry
+editor and **Add to Pantry** on a grocery item (`GroceryLibraryModel.addToPantryButtonTapped`), which copies the
+grocery item's title as is. That title came from an ingredient line whose parsed `item` swallowed an instruction, so
+the real producer is that recipe line. Delete the pantry row, then fix the line in its recipe (find it by searching
+for "warm water for ten minutes"). If it recurs, Add to Pantry could refuse a title that doesn't look like a name.
+ADR-0069 fixes don't help here: this is a bad parse, not a second spelling.
 
 **Make-ahead dishes pull their groceries onto the Advance trip (ADR-0068, Later).** A dish whose prep starts before the Fresh trip needs its perishables bought on the Advance trip (pie, stock). The prep plan knows each dish's work days. It needs a Fresh-trip date: take it from the menu's calendar placement plus a "Fresh trip: N days before" setting on the split (ADR-0039 Amd 1, date over toggle), not calendar entries for trips. Pick up after Jon's Thanksgiving 2026 shop shows whether it's needed.
 

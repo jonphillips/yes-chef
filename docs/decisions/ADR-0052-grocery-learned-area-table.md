@@ -233,7 +233,8 @@ mechanism to *an audit over* the stability mechanism.
   learned aliases; our `CanonicalIngredient` canonicalizes deterministically but has no learned-alias memory, so two
   spellings of one food can miss each other. The same source-tagged-table pattern extends there
   ([[decompose-notes-into-typed-homes]] adjacent). Explicitly **out of scope** — placement first, prove the pattern,
-  then generalize on evidence.
+  then generalize on evidence. **Taken up by [ADR-0069](ADR-0069-ingredient-name-fixes.md) (2026-11-12)**, as
+  user-written rows only.
 - **OQ3 — the review-gate reversal (D4). RESOLVED 2026-08-05 (Jon).** Auto-promote-with-audit ratified over a
   hard gate. (Recorded here rather than deleted: a future reader wondering why the 2026-07-13 gate went away
   finds the reasoning in D4 and the sign-off here.)
