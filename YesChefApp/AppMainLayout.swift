@@ -263,11 +263,13 @@ private struct GroceriesTab: View {
 
   var body: some View {
     if usesCompactTabLayout {
-      GroceryDetailView(
-        model: model,
-        mealCalendarModel: mealCalendarModel,
-        showsListPicker: true
-      )
+      NavigationStack {
+        GroceryDetailView(
+          model: model,
+          mealCalendarModel: mealCalendarModel,
+          showsListPicker: true
+        )
+      }
     } else {
       NavigationSplitView(columnVisibility: $columnVisibility) {
         GroceryListView(model: model)
