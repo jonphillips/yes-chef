@@ -64,7 +64,7 @@ public struct AppHelpPage: Equatable, Sendable {
         "Turn on **Split into two trips** to send each line to an **Advance** list or a **Fresh** list. Tap a line's **Advance** or **Fresh** tag to switch it. The app remembers your switch next time."
       ]),
       Section(heading: "Merging", bullets: [
-        "The same ingredient from different recipes becomes one item with the amounts added up, when the units can be added (cups with cups, grams with grams). Otherwise it stays a separate item.",
+        "The same ingredient from different recipes becomes one item with the amounts added up, when the units can be added. Otherwise it stays a separate item.",
         "Use **Same As…** when two names mean one ingredient. The fix applies to future lists, and you can review or remove it from **List Actions › Name Fixes**.",
         "Long-press an item to see where it came from, or remove one recipe's share."
       ]),
@@ -74,7 +74,11 @@ public struct AppHelpPage: Equatable, Sendable {
         "Swipe an item right and tap **Add to Pantry** to stop buying it."
       ]),
       Section(heading: "Store areas", bullets: [
-        "Items are grouped by store area. Change one with **Edit Item › Aisle**. The app remembers your change for that ingredient from then on."
+        "Items are grouped by store area. Change one with **Edit Item › Aisle**; the app remembers it for that ingredient."
+      ]),
+      Section(heading: "Teaching everyone", bullets: [
+        "Your **Same As…**, **Aisle** and trip fixes can ship to everyone: tap **Settings › Export What I've Taught**. On someone else's device, send it with **Share Export File**.",
+        "Then run scripts/promote-knowledge on the Mac before TestFlight. Shipped fixes leave **Name Fixes** but still work."
       ])
     ]
   )
