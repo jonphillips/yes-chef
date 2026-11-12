@@ -48,7 +48,7 @@ The menu toolbar gains **Prep** beside **Cook these**, shown when the menu's pla
 full-screen cover (`TodayPrepView`), presented the way the cook session is, with `.keepsScreenAwakeWhilePresented()` and
 a **Close** button, as the cook session's cover has.
 
-The glyph is a literal `checklist`. Under ADR-0065 D3 a glyph joins `AppSymbol` when its concept first appears on a
+The glyph is a literal `flame.gauge.open` (Jon, 2026-11-11, replacing `checklist`). Under ADR-0065 D3 a glyph joins `AppSymbol` when its concept first appears on a
 second surface, and this is one surface. If a second entry point arrives (see Deferred), it joins the table then.
 
 ### D2 — "Today" when the menu has a date, a band picker when it doesn't

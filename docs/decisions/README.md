@@ -41,7 +41,7 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0031](ADR-0031-llmclientkit-responses-api-migration.md) — Migrate the OpenAI backend of LLMClientKit to the Responses API *(Proposed, 2026-07-12)*
 - [ADR-0032](ADR-0032-workbench-reference-material-fetch.md) — Workbench reference material (app-side fetch, provider-agnostic context) *(Accepted, 2026-07-23)*
 - [ADR-0033](ADR-0033-recipe-detail-polish.md) — Recipe-detail polish: metadata chips + servings-attached scaler *(Accepted, 2026-07-12)*
-- [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) — The prep plan is one weaveable, work-session timeline *(Accepted, 2026-07-12; Amd 2–3 2026-11-11)*
+- [ADR-0034](ADR-0034-prep-plan-work-session-timeline.md) — The prep plan is one weaveable, work-session timeline *(Accepted, 2026-07-12; Amd 2–4 2026-11-11)*
 - [ADR-0035](ADR-0035-grocery-store-area-grouping.md) — Group the grocery list by store area, categorized on-device *(Accepted, 2026-07-12)*
 - [ADR-0036](ADR-0036-promote-note-to-recipe.md) — Promote a recipe-shaped note into a real recipe *(Accepted, 2026-07-12)*
 - [ADR-0037](ADR-0037-grocery-seed-coverage-diagnostic.md) — Seed-coverage diagnostic: a review queue for grocery store-area misses *(Accepted, 2026-07-13)*
@@ -75,5 +75,5 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0065](ADR-0065-one-glyph-per-concept.md) — One glyph per concept, owned by `AppSymbol`; recipe is `richtext.page` everywhere and there is no recipe-collection glyph *(Accepted, 2026-11-10)*
 - [ADR-0066](ADR-0066-in-app-help-pages.md) — A screen can carry a short help page, and the chat reads it too; menus gain Add Menu… *(Accepted, 2026-11-11)*
 - [ADR-0067](ADR-0067-todays-prep.md) — **Today's Prep**: a view for doing the prep plan, checking steps off with a synced `completedAt` that counts per run of the menu *(Accepted, 2026-11-11)*
-- [ADR-0068](ADR-0068-two-trip-grocery-split.md) — Groceries split into two trips by a fixed rule, your switches stick, the add sheet skips only **Always have it** pantry items, and Groceries gets a help page *(Accepted, 2026-11-11)*
+- [ADR-0068](ADR-0068-two-trip-grocery-split.md) — Groceries split into two trips by a fixed rule, your switches stick, the add sheet skips only **Always have it** pantry items, and Groceries gets a help page *(Accepted, 2026-11-11; Amd 1 2026-11-11)*
 
