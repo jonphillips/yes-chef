@@ -76,4 +76,5 @@ ADR, not here (jon-platform ADR-0005 D14). Add the line when you write the ADR.
 - [ADR-0066](ADR-0066-in-app-help-pages.md) — A screen can carry a short help page, and the chat reads it too; menus gain Add Menu… *(Accepted, 2026-11-11)*
 - [ADR-0067](ADR-0067-todays-prep.md) — **Today's Prep**: a view for doing the prep plan, checking steps off with a synced `completedAt` that counts per run of the menu *(Accepted, 2026-11-11)*
 - [ADR-0068](ADR-0068-two-trip-grocery-split.md) — Groceries split into two trips by a fixed rule, your switches stick, the add sheet skips only **Always have it** pantry items, and Groceries gets a help page *(Accepted, 2026-11-11; Amd 1 2026-11-11)*
-
+- [ADR-0069](ADR-0069-ingredient-name-fixes.md) — Ingredient name fixes: a synced table says two names are one ingredient, applied wherever keys are compared; built-in aliases come from promoted fixes, not hand edits *(Accepted, 2026-11-12)*
+- [ADR-0070](ADR-0070-what-you-teach-reaches-everyone.md) — What you teach the app reaches everyone: household state stays private, kitchen knowledge is promoted into a bundled data file before each TestFlight build *(Accepted, 2026-11-12)*
