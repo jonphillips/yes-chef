@@ -53,7 +53,8 @@ let package = Package(
         .product(name: "SQLiteData", package: "sqlite-data"),
         .product(name: "StructuredQueriesCore", package: "swift-structured-queries"),
         .product(name: "SwiftSoup", package: "SwiftSoup"),
-      ]
+      ],
+      resources: [.process("Resources")]
     ),
     .testTarget(
       name: "YesChefCoreTests",

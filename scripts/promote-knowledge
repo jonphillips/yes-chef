@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Merge Yes Chef iCloud knowledge exports into the reviewed bundled data file.
+
+Run before each TestFlight build, review the resulting JSON diff in a PR, and let that PR ship it.
+"""
+import argparse
+import datetime as dt
+import json
+import shutil
+import sys
+import unicodedata
+import uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+KNOWLEDGE = ROOT / "YesChefPackage/Sources/YesChefCore/Resources/BuiltInKnowledge.json"
+ICLOUD = Path.home() / "Library/Mobile Documents/iCloud~com~jonphillips~yeschef/Documents/Knowledge"
+
+
+def normalize(value):
+    value = unicodedata.normalize("NFD", str(value).lower())
+    return "".join(char for char in value if unicodedata.category(char) != "Mn")
+
+
+def timestamp(value):
+    result = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return result.replace(tzinfo=dt.timezone.utc) if result.tzinfo is None else result
+
+
+def load_export(path):
+    data = json.loads(path.read_text())
+    return timestamp(data["exportedAt"]), data
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--dry-run", action="store_true")
+    parser.add_argument("exports", nargs="*", type=Path)
+    args = parser.parse_args()
+    paths = args.exports or sorted(ICLOUD.glob("*.json"))
+    paths = [path for path in paths if path.is_file()]
+    if not paths:
+        print("No knowledge exports found.")
+        return 0
+
+    knowledge = json.loads(KNOWLEDGE.read_text())
+    incoming = {kind: {} for kind in ("aliases", "areas", "trips")}
+    conflicts, skipped = 0, 0
+    for path in paths:
+        exported_at, export = load_export(path)
+        entries = {
+            "aliases": [(row["from"], row["to"]) for row in export.get("nameFixes", [])],
+            "areas": [(row["name"], row["area"]) for row in export.get("areas", [])],
+            "trips": [(row["name"], row["trip"]) for row in export.get("trips", [])],
+        }
+        for kind, rows in entries.items():
+            for key, value in rows:
+                normalized_key = normalize(key)
+                previous = incoming[kind].get(normalized_key)
+                if previous and previous[2] != value:
+                    conflicts += 1
+                    if exported_at < previous[0]:
+                        continue
+                elif previous:
+                    skipped += 1
+                    if exported_at > previous[0]:
+                        incoming[kind][normalized_key] = (exported_at, str(key), str(value))
+                    continue
+                incoming[kind][normalized_key] = (exported_at, str(key), str(value))
+
+    changes = {kind: {} for kind in incoming}
+    for kind, rows in incoming.items():
+        for normalized_key, (_, key, value) in rows.items():
+            existing = {normalize(name): old for name, old in knowledge[kind].items()}
+            if normalized_key in existing and existing[normalized_key] == value:
+                skipped += 1
+                continue
+            if normalized_key in existing:
+                conflicts += 1
+            if kind == "aliases" and normalize(value) != normalized_key:
+                target = normalize(value)
+                if target in existing and normalize(existing[target]) != target:
+                    raise ValueError(f"refusing alias chain: {key} → {value}")
+                if target in incoming[kind] and normalize(incoming[kind][target][2]) != target:
+                    raise ValueError(f"refusing alias chain: {key} → {value}")
+                seen = {normalized_key}
+                cursor = target
+                while cursor in incoming[kind]:
+                    if cursor in seen:
+                        if cursor == normalized_key:
+                            break
+                        raise ValueError(f"refusing alias cycle at {key}")
+                    seen.add(cursor)
+                    next_value = normalize(incoming[kind][cursor][2])
+                    if next_value == cursor:
+                        break
+                    cursor = next_value
+            changes[kind][key] = value
+
+    counts = {"Added": 0, "Changed": 0}
+    for kind, rows in changes.items():
+        for key, value in rows.items():
+            existing_key = next((name for name in knowledge[kind] if normalize(name) == normalize(key)), None)
+            if existing_key is None:
+                counts["Added"] += 1
+            else:
+                counts["Changed"] += 1
+                del knowledge[kind][existing_key]
+            knowledge[kind][key] = value
+    print(f"Added: {counts['Added']}  Changed: {counts['Changed']}  Conflicts: {conflicts}  Skipped: {skipped}")
+    if args.dry_run:
+        return 0
+    if counts["Added"] + counts["Changed"]:
+        knowledge["version"] += 1
+        KNOWLEDGE.write_text(json.dumps(knowledge, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+    merged = ICLOUD / "Merged"
+    merged.mkdir(parents=True, exist_ok=True)
+    for path in paths:
+        destination = merged / path.name
+        if destination.exists():
+            destination = merged / f"{path.stem}-{uuid.uuid4().hex}{path.suffix}"
+        shutil.move(str(path), destination)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (KeyError, ValueError, OSError, json.JSONDecodeError) as error:
+        print(f"promote-knowledge: {error}", file=sys.stderr)
+        sys.exit(1)

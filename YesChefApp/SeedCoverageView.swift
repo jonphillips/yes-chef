@@ -1,7 +1,6 @@
 import Foundation
 import SQLiteData
 import SwiftUI
-import UIKit
 import YesChefCore
 
 struct SeedCoverageView: View {
@@ -48,7 +47,7 @@ struct SeedCoverageView: View {
       } header: {
         Text("\(reviewScope.title) model placements (\(scopedAssignments.count))")
       } footer: {
-        Text("Model placements already persist. Confirming records your review; correcting one creates a user placement that wins permanently. Promoting confirmed placements into the reviewed seed floor is optional.")
+        Text("Model placements already persist. Confirming records your review; correcting one creates a user placement that wins permanently. Confirmed placements can be included in a kitchen knowledge export.")
       }
     }
     .navigationTitle("Learned Areas")
@@ -57,18 +56,7 @@ struct SeedCoverageView: View {
     } message: {
       Text(model.errorMessage ?? "Unknown error")
     }
-    .toolbar {
-      ToolbarItem(placement: .topBarTrailing) {
-        Menu("Promote confirmed to seed", systemImage: "doc.on.doc") {
-          Button("Copy confirmed placements as seed entries") {
-            UIPasteboard.general.string = SeedCoverageReport.swiftLiteralEntries(
-              for: report.confirmedModelAssignments
-            )
-          }
-          .disabled(report.confirmedModelAssignments.isEmpty)
-        }
-      }
-    }
+
   }
 }
 

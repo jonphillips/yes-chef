@@ -169,39 +169,5 @@ extension RecipeCoreTests {
       }
     }
 
-    @Test
-    func exportsOptionalSeedPromotionEntriesInAuditOrder() {
-      let now = Date(timeIntervalSinceReferenceDate: 900_200_000)
-      let entries = SeedCoverageReport.swiftLiteralEntries(
-        for: [
-          GroceryAreaAssignment(
-            id: SampleUUIDSequence.uuid(90_201),
-            canonicalName: "sumac",
-            area: "Spices",
-            source: .model,
-            dateModified: now
-          ),
-          GroceryAreaAssignment(
-            id: SampleUUIDSequence.uuid(90_202),
-            canonicalName: "harissa",
-            area: "Condiments & Oils",
-            source: .model,
-            dateModified: now
-          ),
-          GroceryAreaAssignment(
-            id: SampleUUIDSequence.uuid(90_203),
-            canonicalName: "miso",
-            area: "Frozen",
-            source: .model,
-            dateModified: now.addingTimeInterval(1)
-          ),
-        ]
-      )
-
-      expectNoDifference(
-        entries,
-        "\"harissa\": .condimentsAndOils,\n\"miso\": .frozen,\n\"sumac\": .spices,"
-      )
-    }
   }
 }

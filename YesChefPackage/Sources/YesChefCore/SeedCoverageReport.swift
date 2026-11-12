@@ -30,16 +30,7 @@ public struct SeedCoverageReport: Equatable, Sendable {
     )
   }
 
-  /// Produces paste-ready entries for the optional promotion into the reviewed seed floor.
-  public static func swiftLiteralEntries(for assignments: [GroceryAreaAssignment]) -> String {
-    assignments
-      .sorted(by: areModelAssignmentsInAuditOrder)
-      .map { assignment in
-        let area = GroceryStoreArea.normalized(assignment.area)?.swiftLiteral ?? ".other"
-        return "\(assignment.canonicalName.debugDescription): \(area),"
-      }
-      .joined(separator: "\n")
-  }
+
 }
 
 public struct SeedCoverageReportRequest: FetchKeyRequest {
@@ -67,25 +58,4 @@ private func areModelAssignmentsInAuditOrder(
     return lhs.dateModified > rhs.dateModified
   }
   return lhs.id.uuidString < rhs.id.uuidString
-}
-
-private extension GroceryStoreArea {
-  var swiftLiteral: String {
-    switch self {
-    case .produce: ".produce"
-    case .bakery: ".bakery"
-    case .deli: ".deli"
-    case .cannedAndDry: ".cannedAndDry"
-    case .condimentsAndOils: ".condimentsAndOils"
-    case .spices: ".spices"
-    case .baking: ".baking"
-    case .beverages: ".beverages"
-    case .meatAndSeafood: ".meatAndSeafood"
-    case .household: ".household"
-    case .dairy: ".dairy"
-    case .frozen: ".frozen"
-    case .other: ".other"
-    case let .custom(title): ".custom(\(title.debugDescription))"
-    }
-  }
 }

@@ -64,6 +64,7 @@ struct SettingsView: View {
 
       Section("Developer") {
         seedCoverageRow
+        kitchenKnowledgeExportRow
 #if DEBUG
         Text("Yes Chef Dev · CloudKit Development")
         modelCallInventoryRow
@@ -396,6 +397,23 @@ struct SettingsView: View {
     }
   }
 
+  @ViewBuilder private var kitchenKnowledgeExportRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .kitchenKnowledgeExport
+      } label: {
+        SettingsPane.kitchenKnowledgeExport.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        KitchenKnowledgeExportView()
+      } label: {
+        SettingsPane.kitchenKnowledgeExport.label
+      }
+    }
+  }
+
   @ViewBuilder private var facetCoverageRow: some View {
     if let selectedPane {
       Button {
@@ -508,6 +526,8 @@ struct SettingsDetailPane: View {
       }
     case .seedCoverage:
       SeedCoverageView()
+    case .kitchenKnowledgeExport:
+      KitchenKnowledgeExportView()
     case .facetCoverage:
       NavigationStack {
         FacetCoverageView()
