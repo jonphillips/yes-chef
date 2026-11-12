@@ -77,10 +77,10 @@ extension RecipeCoreTests {
         let rows = try GroceryItemListRequest().fetch(db)
           .filter { itemIDs.contains($0.id) }
 
-        expectNoDifference(rows.map(\.item.title), ["anchovies", "red onion", "celery ribs"])
-        expectNoDifference(rows.map(\.item.quantityText), ["4", "1/2", "2"])
+        expectNoDifference(rows.map(\.item.title), ["anchovies", "celery ribs", "red onion"])
+        expectNoDifference(rows.map(\.item.quantityText), ["4", "2", "1/2"])
         expectNoDifference(rows.map(\.item.unit), [nil, nil, nil])
-        expectNoDifference(rows.map(\.item.notes), ["minced", "thinly sliced", "sliced"])
+        expectNoDifference(rows.map(\.item.notes), ["minced", "sliced", "thinly sliced"])
       }
     }
   }

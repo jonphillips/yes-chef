@@ -489,6 +489,12 @@ public enum GroceryRepository {
         item.quantityText = formatGroceryQuantity(mergedMeasure.quantity)
         item.unit = mergedMeasure.unit?.nonEmptyGroceryText
       }
+      item.notes = try GroceryRepository.mergedNotes(
+        for: item,
+        withRecipeNotes: draft.notes,
+        sources: try GroceryItemSource.where { $0.groceryItemID.eq(item.id) }.fetchAll(db),
+        in: db
+      )
       item.dateModified = now
       try GroceryItem.upsert { item }.execute(db)
       try insertSource(source, groceryItemID: item.id, in: db)
@@ -559,7 +565,7 @@ public enum GroceryRepository {
         return $0.id.uuidString < $1.id.uuidString
       }
       .first { item in
-        item.canConsolidate(with: draft, fixes: fixes)
+        GroceryRepository.canConsolidate(item, with: draft, fixes: fixes)
       }
   }
 
@@ -940,12 +946,12 @@ private func areGroceryItemRowsInIncreasingOrder(
   if lhs.item.isPurchased != rhs.item.isPurchased {
     return !lhs.item.isPurchased
   }
-  if lhs.item.sortOrder != rhs.item.sortOrder {
-    return lhs.item.sortOrder < rhs.item.sortOrder
-  }
   let titleComparison = lhs.item.title.localizedStandardCompare(rhs.item.title)
   if titleComparison != .orderedSame {
     return titleComparison == .orderedAscending
+  }
+  if lhs.item.sortOrder != rhs.item.sortOrder {
+    return lhs.item.sortOrder < rhs.item.sortOrder
   }
   return lhs.item.id.uuidString < rhs.item.id.uuidString
 }
@@ -985,28 +991,8 @@ func areMenuItemsInIncreasingOrder(_ lhs: MenuItem, _ rhs: MenuItem) -> Bool {
 }
 
 private extension GroceryItem {
-  func canConsolidate(with draft: GroceryGeneratedItemDraft, fixes: IngredientNameFixes) -> Bool {
-    fixes.canonicalName(canonicalIngredientName) == draft.fixedName
-      && CanonicalIngredient.canonicalText(aisle) == CanonicalIngredient.canonicalText(draft.aisle)
-      && CanonicalIngredient.canonicalText(notes) == CanonicalIngredient.canonicalText(draft.notes)
-      && canMergeMeasure(with: draft)
-  }
-
   var measure: Measure? {
     quantity.map { Measure(quantity: $0, unit: unit) }
-  }
-
-  func canMergeMeasure(with draft: GroceryGeneratedItemDraft) -> Bool {
-    switch (measure, draft.measure) {
-    case let (.some(lhs), .some(rhs)):
-      return lhs.merged(with: rhs) != nil
-
-    case (.none, .none):
-      return quantityText == nil && draft.quantityText == nil
-
-    default:
-      return false
-    }
   }
 }
 

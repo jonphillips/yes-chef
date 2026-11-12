@@ -1,6 +1,5 @@
-# Next Up — Consolidate List
+# Next Up — nothing dispatched
 
-**Slices:** effort `grocery-consolidate-list`
-**Briefs:** [docs/efforts/grocery-consolidate-list.md](efforts/grocery-consolidate-list.md)
-**Done when:** per the brief
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

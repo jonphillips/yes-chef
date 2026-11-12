@@ -263,6 +263,12 @@ private struct GroceryListActionsMenu: View {
       } label: {
         Label("Name Fixes", systemImage: "arrow.left.arrow.right")
       }
+
+      Button {
+        model.consolidateListButtonTapped(listID: row.id)
+      } label: {
+        Label("Consolidate List", systemImage: "arrow.triangle.merge")
+      }
     } label: {
       Label("List Actions", systemImage: "ellipsis.circle")
     }

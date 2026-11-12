@@ -169,7 +169,7 @@ and **Same As…** teaches the app that two names are one, from then on.
 
 ## Amendment 1 — Notes and store areas don't block a merge; Consolidate List (2026-11-12)
 
-Status: **Accepted** — 2026-11-12 (Jon). Effort: [`efforts/grocery-consolidate-list.md`](../efforts/grocery-consolidate-list.md).
+Status: **Accepted** — 2026-11-12 (Jon). Effort: [`efforts/archive/grocery-consolidate-list.md`](../efforts/archive/grocery-consolidate-list.md).
 Origin: Jon, 2026-11-12, on the Thanksgiving Advance list, with three **unsalted butter** lines (2, 6 and 6
 tablespoons): *"So why aren't these unsalted butters merging?"* All three had the same key, area and unit. They stayed
 apart because their recipe notes differed ("or about 5 tablespoons for 3½ cups strained stock", a pie's slicing

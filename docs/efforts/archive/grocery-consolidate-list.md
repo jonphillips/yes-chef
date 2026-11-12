@@ -6,7 +6,7 @@ Summary: Grocery items merge on the fixed key and units alone (notes and store a
 Origin: Jon, 2026-11-12, on the Thanksgiving Advance list, with three **unsalted butter** lines that wouldn't merge.
 One slice, one PR.
 
-Decisions: [ADR-0069 Amendment 1](../decisions/ADR-0069-ingredient-name-fixes.md#amendment-1--notes-and-store-areas-dont-block-a-merge-consolidate-list-2026-11-12)
+Decisions: [ADR-0069 Amendment 1](../../decisions/ADR-0069-ingredient-name-fixes.md#amendment-1--notes-and-store-areas-dont-block-a-merge-consolidate-list-2026-11-12)
 (A1–A5). Read it first, then ADR-0069 D2 (base vs fixed keys) and D5 (Same As).
 
 ## Where things are (architect, 2026-11-12, `origin/main` 61147b0)
