@@ -80,6 +80,69 @@ extension RecipeCoreTests {
       }
     }
 
+    /// The Thanksgiving butters: three items a list built before ADR-0069 Amd 1 kept apart because their recipe
+    /// notes differed. Their notes are recipe notes, so the merged item keeps none.
+    @Test
+    func dropsDisagreeingRecipeNotesWhenConsolidating() throws {
+      @Dependency(\.defaultDatabase) var database
+      let now = Date(timeIntervalSinceReferenceDate: 805_263_000)
+      var uuids = SampleUUIDSequence(start: 17_800)
+
+      try database.write { db in
+        let listID = try GroceryRepository.ensureDefaultList(in: db, now: now, uuid: { uuids.next() })
+        let butters: [(recipe: String, quantity: Double, preparation: String?)] = [
+          ("Turkey", 2, nil),
+          ("Gravy", 6, "or about 5 tablespoons for 3½ cups strained stock"),
+          ("Pumpkin Pie", 6, "cold, cut into 1/4-inch slices"),
+        ]
+        var itemIDs: [GroceryItem.ID] = []
+        for (index, butter) in butters.enumerated() {
+          let recipeID = uuids.next()
+          let sectionID = uuids.next()
+          let line = IngredientLine(
+            id: uuids.next(),
+            recipeID: recipeID,
+            sectionID: sectionID,
+            originalText: "\(Int(butter.quantity)) tablespoons unsalted butter",
+            quantity: butter.quantity,
+            quantityText: String(Int(butter.quantity)),
+            unit: "tablespoons",
+            item: "unsalted butter",
+            preparation: butter.preparation,
+            sortOrder: 0,
+            confidence: .medium
+          )
+          try insertRecipeFixture(
+            recipeID: recipeID, sectionID: sectionID, title: butter.recipe, lines: [line], now: now, in: db
+          )
+          let itemID = uuids.next()
+          itemIDs.append(itemID)
+          try GroceryItem.insert {
+            GroceryItem(
+              id: itemID, groceryListID: listID, title: "unsalted butter", canonicalName: "unsalted butter",
+              quantity: butter.quantity, quantityText: String(Int(butter.quantity)), unit: "tablespoons",
+              aisle: "Dairy", notes: butter.preparation, sortOrder: index, dateCreated: now, dateModified: now
+            )
+          }.execute(db)
+          try GroceryItemSource.insert {
+            GroceryItemSource(
+              id: uuids.next(), groceryItemID: itemID, origin: .recipe, recipeID: recipeID,
+              ingredientLineID: line.id, ingredientText: line.originalText, dateCreated: now
+            )
+          }.execute(db)
+        }
+
+        #expect(try GroceryRepository.consolidate(listID: listID, in: db, now: now.addingTimeInterval(5)) == 2)
+        let items = try GroceryItem.where { $0.groceryListID.eq(listID) }.fetchAll(db)
+        let survivor = try #require(items.first)
+        #expect(items.count == 1)
+        #expect(survivor.id == itemIDs[0])
+        #expect(survivor.quantity == 14)
+        #expect(survivor.notes == nil)
+        #expect(try GroceryItemSource.where { $0.groceryItemID.eq(survivor.id) }.fetchCount(db) == 3)
+      }
+    }
+
     @Test
     func consolidatesWithNewFixButLeavesIncompatibleUnitsTogether() throws {
       @Dependency(\.defaultDatabase) var database
