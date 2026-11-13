@@ -255,3 +255,12 @@ Three points D5 and D7 left open or got slightly wrong, settled in the S1 brief:
 
 "In My Recipes" also matches your recipes by source URL, not only by import ref, because a recipe you captured
 from the same page yourself has no ref.
+
+## Amendment 2 — The mirror's read-only guard is a pragma, not a second connection (2026-11-13)
+
+D6 said the screens read the mirror through a read-only connection and only the fetcher holds a writable one.
+SQLiteData's observation only sees writes made through the same database pool, so with two connections an open
+cookbook would never refresh after a fetch. The mirror uses one pool instead. Every connection opens with
+`PRAGMA query_only = 1`, and only the mirror's `apply` lifts it, inside a single serialized write. Any other write
+still throws, which is what D6 asked for. S2 also keeps the scale in memory in a cookbook, because the reader
+normally saves it. Cook mode in a cookbook moves to S4.
