@@ -1,7 +1,6 @@
 import Dependencies
 import Foundation
 import SQLiteData
-import SQLite3
 
 /// A disposable, unsynchronized cache. All consumers share this guarded database pool.
 public final class CookbookMirror: Sendable {
@@ -34,29 +33,9 @@ public final class CookbookMirror: Sendable {
       try migrator.migrate(creation)
       try creation.close()
     }
-    // GRDB's pool setup needs a non-empty WAL before its query-only writer opens.
-    // Persist the WAL across closing this short-lived bootstrap connection.
-    let bootstrap = try DatabaseQueue(path: fileURL.path)
-    try bootstrap.writeWithoutTransaction { db in
-      _ = try String.fetchOne(db, sql: "PRAGMA journal_mode = WAL")
-      var flag: CInt = 1
-      let result = sqlite3_file_control(db.sqliteConnection, nil, SQLITE_FCNTL_PERSIST_WAL, &flag)
-      guard result == SQLITE_OK else { throw DatabaseError(resultCode: .init(rawValue: result)) }
-      try db.execute(sql: "CREATE TABLE grdb_wal_bootstrap (id INTEGER); DROP TABLE grdb_wal_bootstrap")
-    }
-    try bootstrap.close()
-    var configuration = Configuration()
-    configuration.prepareDatabase { db in
-      var flag: CInt = 1
-      let result = sqlite3_file_control(db.sqliteConnection, nil, SQLITE_FCNTL_PERSIST_WAL, &flag)
-      guard result == SQLITE_OK else { throw DatabaseError(resultCode: .init(rawValue: result)) }
-      try db.execute(sql: "PRAGMA query_only = 1")
-    }
-    self.database = try withDependencies {
-      $0.context = .live
-    } operation: {
-      try SQLiteData.defaultDatabase(path: fileURL.path, configuration: configuration)
-    }
+    let pool = try DatabasePool(path: fileURL.path)
+    try pool.writeWithoutTransaction { try $0.execute(sql: "PRAGMA query_only = 1") }
+    self.database = pool
     self.fileURL = fileURL
   }
 

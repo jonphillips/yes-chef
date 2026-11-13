@@ -296,13 +296,13 @@ DEBUG-only.
    directory excluded from backup.
    - **Open:** if the file's applied migrations aren't exactly `YesChefSchema.migrator()`'s, delete the file
      (with `-wal` and `-shm`) and create it fresh. Never migrate a mirror: it's a cache (D2). Create it through a
-     short-lived plain connection that runs the migrator and closes. Then open the guarded pool below with
-     `SQLiteData.defaultDatabase(path:configuration:)`, **without** the metadatabase attach and with no
+     short-lived plain connection that runs the migrator and closes. Then open the guarded `DatabasePool` below, **without** the metadatabase attach and with no
      `SyncEngine`.
    - **Read-only guard:** use one `DatabasePool` for both the screens and the writer, not a second read-only
      connection. Observation (`@Fetch`) only sees writes made through the same pool, and a separate writer would
-     leave an open cookbook stale after S4's fetch. Every connection runs `PRAGMA query_only = 1` in
-     `prepareDatabase`. Only `apply` lifts it, inside one `writeWithoutTransaction` block: `query_only = 0`, then
+     leave an open cookbook stale after S4's fetch. Set `PRAGMA query_only = 1` on the pool's writer after the
+     pool opens and before it is exposed; the pool's readers are opened read-only. Only `apply` lifts it,
+     inside one `writeWithoutTransaction` block: `query_only = 0`, then
      the transaction, then `query_only = 1` in a `defer`. The writer is serialized, so no other write can land in
      between. Any other `write` throws `SQLITE_READONLY`. That's the D6 backstop.
    - **`apply(upserting: [RecipeBundle], deleting: [Recipe.ID])`**, one transaction. It uses the owner's IDs as
