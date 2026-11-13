@@ -15,6 +15,8 @@ struct AppMainLayout: View {
   let mealCalendarModel: MealCalendarModel
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
+  let cookbookLibraryModel: CookbookLibraryModel
+  let cookbookCopyModel: CookbookCopyModel
   let createRecipeModel: CreateRecipeModel
   let chatAccessInboxModel: ChatAccessInboxModel
   let chatAccessExportModel: ChatAccessExportModel
@@ -37,12 +39,14 @@ struct AppMainLayout: View {
         fromChatTab
         createRecipeTab
         powerBrowserTab
+        if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
         browserTab
         workbenchesTab
         settingsTab
       } else {
         recipesTab
         powerBrowserTab
+        if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
         menusTab
         mealCalendarTab
         groceriesTab
@@ -147,6 +151,20 @@ struct AppMainLayout: View {
       Label(AppSection.powerBrowser.title, symbol: AppSection.powerBrowser.symbol)
     }
     .defaultVisibility(.hidden, for: .tabBar)
+  }
+
+  private var cookbooksTab: some TabContent<AppSection?> {
+    Tab(value: AppSection.cookbooks) {
+      FamilyCookbooksView(
+        model: cookbookLibraryModel,
+        copyModel: cookbookCopyModel,
+        mealCalendarModel: mealCalendarModel,
+        groceryModel: groceryModel,
+        onRecipeSelected: onRecipeSelected
+      )
+    } label: {
+      Label(AppSection.cookbooks.title, symbol: AppSection.cookbooks.symbol)
+    }
   }
 
   private var browserTab: some TabContent<AppSection?> {

@@ -15,6 +15,7 @@ struct AppContainer: View {
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
   @State private var cookbookCopyModel: CookbookCopyModel
+  @State private var cookbookLibraryModel: CookbookLibraryModel
   @State private var recipeModel = RecipeLibraryModel()
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
@@ -40,6 +41,7 @@ struct AppContainer: View {
     let toastCenter = AppToastCenter()
     let cookbookCopyModel = CookbookCopyModel()
     cookbookCopyModel.toastCenter = toastCenter
+    let cookbookLibraryModel = CookbookLibraryModel()
     let inboxModel = ChatAccessInboxModel()
     inboxModel.toastCenter = toastCenter
     let mealCalendarModel = MealCalendarModel(toastCenter: toastCenter)
@@ -54,6 +56,7 @@ struct AppContainer: View {
     }
     _toastCenter = State(wrappedValue: toastCenter)
     _cookbookCopyModel = State(wrappedValue: cookbookCopyModel)
+    _cookbookLibraryModel = State(wrappedValue: cookbookLibraryModel)
     _chatAccessInboxModel = State(wrappedValue: inboxModel)
     _mealCalendarModel = State(wrappedValue: mealCalendarModel)
     _menuModel = State(wrappedValue: menuModel)
@@ -76,6 +79,8 @@ struct AppContainer: View {
       mealCalendarModel: mealCalendarModel,
       menuModel: menuModel,
       groceryModel: groceryModel,
+      cookbookLibraryModel: cookbookLibraryModel,
+      cookbookCopyModel: cookbookCopyModel,
       createRecipeModel: createRecipeModel,
       chatAccessInboxModel: chatAccessInboxModel,
       chatAccessExportModel: chatAccessExportModel,
@@ -610,7 +615,7 @@ struct RecipeListView: View {
         }
       }
     }
-    .navigationTitle("Recipes")
+    .navigationTitle(model.scope.recipeListTitle)
     .toolbar(removing: .sidebarToggle)
     .searchable(
       text: $model.searchText,

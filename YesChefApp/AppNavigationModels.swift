@@ -5,11 +5,19 @@ import YesChefCore
 enum LibraryScope: Hashable {
   case mine
   case cookbook(CookbookContext)
+
+  var recipeListTitle: String {
+    switch self {
+    case .mine: "Recipes"
+    case let .cookbook(context): "\(context.ownerName)'s Recipes"
+    }
+  }
 }
 
 struct CookbookContext: Hashable {
   var ownerName: String
   var mirror: CookbookMirror
+  var loadedAt: Date = .now
 
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.ownerName == rhs.ownerName && lhs.mirror.fileURL == rhs.mirror.fileURL
@@ -103,6 +111,7 @@ struct TodayPrepPresentation: Hashable, Identifiable {
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
+  case cookbooks
   case fromChat
   case createRecipe
   case groceries
@@ -118,6 +127,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .recipes: "Recipes"
+    case .cookbooks: "Family Cookbooks"
     case .fromChat: "From Chat"
     case .createRecipe: "Create Recipe"
     case .groceries: "Groceries"
@@ -133,6 +143,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var symbol: AppSymbol {
     switch self {
     case .recipes: .recipe
+    case .cookbooks: AppSymbol("books.vertical")
     case .fromChat: .fromChat
     case .createRecipe: .addRecipes
     case .workbenches: .workbench
