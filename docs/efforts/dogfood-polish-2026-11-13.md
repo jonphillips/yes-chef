@@ -128,7 +128,8 @@ data pass.
 - `image` applies it with `Image.symbolRenderingMode(_:)`, so it stays an `Image`, and `Label(_:symbol:)` picks it up.
 - `func rendering(_:) -> AppSymbol` returns a copy with the mode replaced, for call sites:
   `Image(symbol: .menu.rendering(.hierarchical)).foregroundStyle(.blue)`.
-- No concept gets a mode in this PR. Jon sets them, one line each.
+- No concept gets a mode in this PR. Jon sets them, one line each. The custom symbols are layered (#509), so
+  `.hierarchical` draws them two-tone.
 - Add `.share` → `square.and.arrow.up` (A5). Add it to the lint regex, and convert **Share List** in
   `GroceryViews.swift` to `Label("Share List", symbol: .share)`.
 

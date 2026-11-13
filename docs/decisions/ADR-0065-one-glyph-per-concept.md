@@ -138,7 +138,8 @@ Origin: Jon, 2026-11-13. He wanted to give a concept a treatment like `.symbolRe
 - **A3 — Color is not part of a concept.** A baked color would override system tinting: a selected sidebar row, a
   disabled button and the toolbar tint would all keep it. It would also make `image` a `View`, which `Label`'s icon
   slot can't take. Color stays a modifier at the call site.
-- **A4 — Custom symbols render monochrome under `.hierarchical`** until their SVGs get layer annotations. That's an
-  asset change, not part of A1.
+- **A4 — Custom symbols are layered like Apple's.** The page or menu card is the secondary layer, and the badge or
+  arrow is primary, as in `cart.badge.plus` ([#509](https://github.com/jonphillips/yes-chef/pull/509)). A new custom
+  symbol follows the same split.
 - **A5 — Share joins the vocabulary** as `.share` → `square.and.arrow.up`. It now appears on two surfaces: Share List
   on groceries and Share Recipe… on recipe detail (D3's rule). The lint regex gains it.
