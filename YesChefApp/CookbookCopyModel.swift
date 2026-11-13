@@ -89,14 +89,16 @@ final class CookbookCopyModel {
     context: CookbookContext,
     sourceID: Recipe.ID
   ) async throws {
+    let copyDate = now
+    let makeUUID = uuid
     let result = try await libraryDatabase.write { db in
       try RecipeRepository.copyCookbookRecipe(
         bundle,
         ownerName: context.ownerName,
         displayImages: [:],
         in: db,
-        now: now,
-        uuid: { uuid() }
+        now: copyDate,
+        uuid: { makeUUID() }
       )
     }
     copyIDsBySource[sourceID, default: []].append(result.recipeID)
