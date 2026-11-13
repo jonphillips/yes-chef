@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
-Status: Designed (S0 passed on device 2026-11-13; S1 not yet briefed).
-Summary: Browse family members' recipes read-only and copy one into yours. The S0 transport spike passed (ADR-0071 § S0 result); S1 (bundle v2 and copy-import) is next to brief.
+Status: Ready
+Summary: Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed on device; S1 is the recipe bundle v2 payload and copy-import, package-only.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
@@ -10,12 +10,12 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 ## Ledger
 
 - [x] **S0** — transport spike (this brief, below). Device pass cleared 2026-11-13; results in ADR-0071 § S0 result
-- [ ] **S1** — bundle v2 and copy-import (ADR-0071 § Order; briefed after S0)
+- [ ] **S1** — bundle v2 and copy-import (this brief, below)
 - [ ] **S2** — mirror database and read-only visiting
 - [ ] **S3** — publish
 - [ ] **S4** — accept and fetch
 
-## Where things are (architect, 2026-11-13, `origin/main` e5b3143)
+## Where things are for S0 (architect, 2026-11-13, `origin/main` e5b3143)
 
 - `YesChefApp/YesChef-Dev.entitlements`: `com.apple.developer.icloud-container-identifiers` lists only
   `iCloud.com.jonphillips.yeschef`. `project.yml` (line 173) points the Dev configuration at this file.
@@ -117,3 +117,138 @@ Security) first.
 **Pass:** every step holds. **Fail:** the share can't be accepted, a write succeeds, or anything shows up in library
 sync. Either way, the architect records the result and timings in ADR-0071. A pass makes S1 Ready. A fail moves the
 plan to the snapshot-file fallback (ADR-0071 D3).
+
+## S1 — Bundle v2 and copy-import
+
+Package-only: everything is in `YesChefPackage/Sources/YesChefCore` with package tests. There's no App change, no
+CloudKit, no UI and no schema change. S2 builds the mirror and the Copy button on top of this, and S3 publishes this
+payload, so S1 has to settle the payload's shape and what a copy does.
+
+### Where things are (architect, 2026-11-13, `origin/main` 47d7a06)
+
+- `RecipeBundleCoding.swift`: `RecipeBundle` (line 4) has synthesized `Codable`. `snapshotData` (line 68) writes
+  `Recipe.originalSnapshot` at version 1, and `decodeSnapshot` (line 98) reads it.
+- `RecipeRepository+Import.swift`: `importBundle` (line 197) is the Paprika path. It **keeps the bundle's IDs**, and
+  its `matchingImportRefs` (line 519) **deletes** content-empty duplicate recipes as a side effect. Copy must use
+  neither. `rawMatchingImportRefs` (line 606) is the read-only matcher.
+- `RecipeAdjustment.swift`: `createStandaloneRecipe` (line 1565) is the existing fresh-ID clone, with ID maps for
+  sections and photos. Follow it, but its force-unwrapped map lookups (`ingredientSectionIDs[line.sectionID]!`) must
+  become thrown errors. A payload from someone else's device is input, not trusted state.
+- `RecipeVariationPayload` (`RecipeAdjustment.swift` line 193). Its ops anchor to base rows by ID, with text
+  fallback: `RecipeIngredientReference.id` (an `IngredientLine.ID`), `RecipeMethodStepReplacement.id` and
+  `RecipeStepReference.id` (`InstructionStep.ID`s), and `.insert(after:sectionID:text:)`'s `InstructionSection.ID`
+  (line 744).
+- `RecipeCategoryRepository.swift`: `reconcileCategories` (line 875) and `findOrCreateImportedCategory` (line 917)
+  already do find-or-create by `"Facet > Parent > Child"` path, but turn a path whose facet you lack into one loose
+  label named `"Cuisine > Thai"`. `CategoryHierarchy.pathComponents` (line 148) gives a category's path.
+- `RecipeRelatedRecipe.swift`: one undirected row per pair (`canonicalPair`, line 67; `linkRelatedRecipes`,
+  line 139). `RecipeServeWith` rows have an optional `linkedRecipeID`, so a text-only serve-with is already a valid row.
+- `RecipeImportIdentity.swift`: `RecipeImportIdentityKey(sourceURL:title:)` is the normalizer for matching.
+
+### Build
+
+1. **`RecipeBundle` version 2** (ADR-0071 D5). Add `RecipeBundleCoding.currentVersion = 2`. Add these fields, all
+   decoded with `decodeIfPresent` and an empty default (write the `init(from:)` the way `RecipeVariationPayload`
+   does), so every existing snapshot decodes unchanged:
+   - `labels: [LabelPath]`, where `LabelPath` is `facet: String?` plus `path: [String]` (root to leaf). A nil
+     facet means a loose label.
+   - `serveWith: [RecipeServeWith]` and `relatedRecipes: [RecipeRelatedRecipe]` (every pair touching this recipe).
+   - `variations: [RecipeVariation]`, with `deltas` carried as-is.
+   - `linkTargets: [LinkTarget]` (`recipeID`, `title`, `sourceURL`) for every recipe a serve-with or related row
+     points at. It makes a payload self-contained: copying needs the target's identity, and Phase 1's "send a copy"
+     file has no mirror to look it up in.
+
+   `categoryNames` stays filled as today, so v1 readers still show labels. `snapshotData` keeps writing version 1
+   and leaves the new fields empty: `originalSnapshot` is provenance, not a cookbook payload.
+2. **Payload builder.** `CookbookPayload.bundles(in db:) -> [RecipeBundle]` builds a v2 bundle for every recipe that
+   isn't archived, with the owner's own IDs (the mirror needs them, D2). Photos keep `thumbnailData` and drop
+   `displayData` (D5: display images travel as their own asset in S3). Rating and favorite stay as they are; they're
+   the owner's and the mirror shows them as theirs. Also add `encodedPayload(_:) -> Data` (sorted keys, every array
+   in a fixed order) and `contentHash(_:) -> String` (SHA-256 hex of those bytes). S3 compares hashes, so the same
+   library must always produce the same bytes. Reading the whole library is fine, the way `ChatAccessExportBuilder`
+   does it; S3 measures before anyone optimizes.
+3. **Decoding a payload.** `RecipeBundleCoding.decodePayload(_:)` throws `.newerVersion(n)` when `version` is
+   greater than `currentVersion`. It never decodes it partially. S4 counts these ("12 recipes need a newer Yes Chef",
+   D4).
+4. **Copy-import** (D7). Put `RecipeRepository.copyCookbookRecipe(_ bundle:, ownerName:, displayImages:
+   [RecipePhoto.ID: Data], in db:, now:, uuid:) throws -> CookbookCopyResult` in a new
+   `RecipeRepository+CookbookCopy.swift`. It's a pure database operation (guardrail #2), one transaction, and it
+   always copies. Asking "Open Mine / Copy Anyway" first is S2's job, using item 5.
+   - **Fresh IDs** for every row, through explicit old-to-new maps: recipe, source, ingredient and instruction
+     sections, lines, steps, notes, photos, serve-with rows and variations. Remap `coverPhotoID` and each line's
+     and step's `sectionID`. A child that points at a parent missing from the bundle throws.
+   - **Kept verbatim:** `originalSnapshot` (it still holds the owner's IDs, which is fine because it's passive
+     provenance), each line's `originalText`, the source URL, `makeAhead`, `chefItUp`, notes with their types and
+     pins, and `libraryPlacement`.
+   - **Reset:** `rating` is nil, `favorite` false, `archived` false, `viewScale` 1, and `dateCreated` and
+     `dateModified` are `now`. No `RecipeActiveVariation` is copied: which variation is showing is the owner's view
+     state.
+   - **Provenance:** `RecipeSource.importedFrom = "Copied from <ownerName>'s cookbook"` and `dateImported = now`.
+     If the bundle has no source, create one with just those two fields. Any earlier `importedFrom` value is still
+     in `originalSnapshot`.
+   - **Photos:** thumbnails come from the bundle. `displayData` comes from `displayImages` when it holds that
+     photo's (old) ID, and stays nil otherwise. S4 fetches it before copying.
+   - **Variations:** remap every anchor ID in the decoded `RecipeVariationPayload` through the line, step and
+     instruction-section maps. An anchor ID that's not in the map (already dangling on the owner's side) becomes nil,
+     and its text fallback is kept. The op is never dropped. A `deltas` blob that won't decode is copied unchanged
+     and named in the result's warnings.
+   - **Labels:** a v2 bundle uses `labels`. Find or create the facet by name (case-insensitive), creating it if
+     you don't have it, then find or create each path component under it. A nil facet finds or creates a loose
+     label. Your existing labels win wherever names match. A v1 bundle falls back to today's
+     `reconcileCategories(categoryNames, looseNames: tagNames)`.
+   - **Serve-with:** a row whose `linkedRecipeID` resolves (item 6) points at your recipe. Otherwise it's kept as a
+     text-only row (title and note, `linkedRecipeID` nil) and listed in the result.
+   - **Related recipes:** each pair whose other end resolves is linked to your recipe through `linkRelatedRecipes`.
+     A pair that doesn't resolve can't be a row (`relatedRecipeID` is required), so it isn't stored. It's listed in
+     the result by title, and S2 shows it at copy time with an offer to copy that recipe too (ADR-0071 D7 Amendment).
+   - **Import ref:** write a `RecipeImportRef` keyed on the bundle's `RecipeImportIdentityKey`, so the recipe reads as
+     In My Recipes afterwards. A second ref with the same key after Copy Anyway is expected.
+   - The result carries the new recipe ID, `textOnlyServeWith: [String]`, `unlinkedRelated: [String]` and
+     `warnings`.
+5. **"In My Recipes" lookup.** Add `RecipeRepository.existingCopies(of bundle:, in db:) -> [Recipe.ID]`, which is
+   read-only and never deletes anything. It returns your non-archived recipes whose import ref matches the bundle's
+   identity key **or** whose `RecipeSource.url` normalizes to the bundle's source URL. Import refs alone would miss a
+   recipe the viewer captured from the same page on their own, because web capture writes no ref. A title-only key
+   matches on refs only.
+6. **Resolving link targets.** A `LinkTarget` resolves to your recipe when `existingCopies` of its identity returns
+   exactly one. Zero or several means no match: it becomes text, and nothing is guessed.
+
+### Keep
+
+- No synced table, column or migration changes (D8). No App, CloudKit or UI code; the S0 spike stays as it is.
+- `importBundle`, `matchingImportRefs` and `reconcileCategories` keep their current behavior for their current
+  callers. Share helpers by extracting them, not by changing those paths.
+- `ChatAccessExportBuilder` isn't switched to the new builder in this slice.
+
+### Tests (package, `YesChefCoreTests`)
+
+- **Compatibility:** every existing snapshot fixture and a v1 bundle still decode, and `snapshotData` output is
+  unchanged for a recipe with no v2 content. A v2 bundle round-trips. `decodePayload` refuses version 3 with
+  `.newerVersion(3)`.
+- **Builder:** archived recipes are left out. Labels carry facet and path. A serve-with or related link to another
+  recipe adds that recipe to `linkTargets`. Photos have thumbnails and no display data. Building twice from the same
+  database gives byte-identical output and the same hash, and editing one recipe changes only its hash.
+- **Copy, fresh IDs:** no copied row shares an ID with the bundle, and every child points at the new recipe and the
+  new sections. Copying the same bundle twice gives two independent recipes, and editing one leaves the other alone.
+- **Copy, preservation:** `originalSnapshot` is byte-equal, line `originalText` and the source URL are equal, notes
+  keep type and pin, and rating and favorite are reset. `importedFrom` names the owner, and a bundle with no source
+  gets one.
+- **Copy, variations:** an ingredient substitute, a step replacement and a step insert anchored by ID all still
+  resolve on the copy (apply the variation to the copy and compare it with the original applied to the original).
+  This includes two identical ingredient lines, where text fallback alone would pick the wrong one. A dangling ID
+  keeps its text, and an unreadable `deltas` blob is copied unchanged and warned about.
+- **Copy, labels:** an existing facet and path is reused, not duplicated. A missing facet is created. A loose label
+  is matched by name. A v1 bundle goes through the old path.
+- **Copy, links:** a serve-with target you already copied is linked; one you haven't becomes text and is listed. A
+  related target you have is paired; one you don't is listed and not stored. A target matching two of your recipes
+  stays unlinked.
+- **Lookup:** a recipe is found by import ref and by source URL alone, an archived one isn't found, and the lookup
+  writes nothing (row counts are unchanged, including when duplicate refs exist).
+- **Malformed input:** a line whose `sectionID` isn't in the bundle throws, and nothing is written.
+
+### Done when
+
+- `scripts/check-drift.sh` is green. No `YesChefApp/` change, so there's no generic iOS build and no `YesChefTests`
+  run (guardrail #9).
+- Closeout (ADR-0005 D16) runs with `--keep-brief`. It ticks S1 in the ledger and advances `NEXT_UP.md` per ADR-0005
+  D12. S1 has no device pass: nothing in it is visible until S2.

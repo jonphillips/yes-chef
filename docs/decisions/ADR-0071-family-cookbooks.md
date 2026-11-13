@@ -236,3 +236,22 @@ What S3 and S4 take from it:
   to decide until they use it.
 - **OQ3 — "update my copy."** If copies drifting from an improved original becomes a real complaint, a later ADR can
   offer a side-by-side with the source (ADR-0023's review surface), keyed by the import ref. Not now.
+
+## Amendment 1 — Copy details settled while briefing S1 (2026-11-13)
+
+Three points D5 and D7 left open or got slightly wrong, settled in the S1 brief:
+
+- **Unlinked related recipes aren't stored as text.** D7 said links whose target you lack "stay as text with a
+  visible note on the copy". That holds for serve-with: a text-only serve-with row is already valid. A related-recipe
+  pair can't exist without both recipes, and a generic note would be a new untyped home (notes are being drained,
+  not grown). So the copy stores nothing for those. It lists them when you copy and offers to copy them too, which
+  is when acting on them is useful.
+- **Payloads name their link targets.** A v2 bundle carries `linkTargets` (ID, title, source URL) for every recipe
+  its serve-with and related rows point at. Copying needs the target's identity to find your copy of it, and the
+  Phase 1 single-recipe file has no mirror to look it up in.
+- **Copy remaps variation anchors.** Variation deltas anchor to ingredient lines and steps by ID
+  ([ADR-0021](ADR-0021-recipe-variations.md)). Fresh IDs would leave every anchor on its text fallback, which
+  picks the wrong line when two lines read the same. The copy maps anchor IDs to the new rows and never drops an op.
+
+"In My Recipes" also matches your recipes by source URL, not only by import ref, because a recipe you captured
+from the same page yourself has no ref.

@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [Family cookbooks](family-cookbooks.md) — **Designed** (S0 passed on device 2026-11-13; S1 not yet briefed). Browse family members' recipes read-only and copy one into yours. The S0 transport spike passed (ADR-0071 § S0 result); S1 (bundle v2 and copy-import) is next to brief.
+- [Family cookbooks](family-cookbooks.md) — **Ready.** Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed on device; S1 is the recipe bundle v2 payload and copy-import, package-only.
