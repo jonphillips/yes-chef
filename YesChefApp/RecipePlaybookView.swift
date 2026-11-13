@@ -93,10 +93,11 @@ struct RecipePlaybookView: View {
           learnings: model.learnings,
           showsTitle: false,
           showsEmptyPlaceholder: false,
-          addLearning: isReadOnly ? nil : model.createLearning,
-          updateLearning: isReadOnly ? nil : model.updateLearning,
-          deleteLearning: isReadOnly ? nil : model.deleteLearning,
-          reorderLearnings: isReadOnly ? nil : model.reorderLearnings
+          isReadOnly: isReadOnly,
+          addLearning: model.createLearning,
+          updateLearning: model.updateLearning,
+          deleteLearning: model.deleteLearning,
+          reorderLearnings: model.reorderLearnings
         )
       }
       RecipeServeWithStrip(
