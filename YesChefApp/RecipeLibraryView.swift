@@ -14,6 +14,8 @@ struct AppContainer: View {
   @Environment(SyncActivityRecorder.self) private var syncActivityRecorder
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
+  @State private var cookbookCopyModel: CookbookCopyModel
+  @State private var cookbookLibraryModel: CookbookLibraryModel
   @State private var recipeModel = RecipeLibraryModel()
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
@@ -37,6 +39,9 @@ struct AppContainer: View {
 
   init() {
     let toastCenter = AppToastCenter()
+    let cookbookCopyModel = CookbookCopyModel()
+    cookbookCopyModel.toastCenter = toastCenter
+    let cookbookLibraryModel = CookbookLibraryModel()
     let inboxModel = ChatAccessInboxModel()
     inboxModel.toastCenter = toastCenter
     let mealCalendarModel = MealCalendarModel(toastCenter: toastCenter)
@@ -50,6 +55,8 @@ struct AppContainer: View {
       groceryModel?.selectMenuDayButtonTapped(menuID: menuID, dayOffset: dayOffset)
     }
     _toastCenter = State(wrappedValue: toastCenter)
+    _cookbookCopyModel = State(wrappedValue: cookbookCopyModel)
+    _cookbookLibraryModel = State(wrappedValue: cookbookLibraryModel)
     _chatAccessInboxModel = State(wrappedValue: inboxModel)
     _mealCalendarModel = State(wrappedValue: mealCalendarModel)
     _menuModel = State(wrappedValue: menuModel)
@@ -72,6 +79,8 @@ struct AppContainer: View {
       mealCalendarModel: mealCalendarModel,
       menuModel: menuModel,
       groceryModel: groceryModel,
+      cookbookLibraryModel: cookbookLibraryModel,
+      cookbookCopyModel: cookbookCopyModel,
       createRecipeModel: createRecipeModel,
       chatAccessInboxModel: chatAccessInboxModel,
       chatAccessExportModel: chatAccessExportModel,
@@ -104,6 +113,7 @@ struct AppContainer: View {
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
+        cookbookCopyModel: cookbookCopyModel,
         toastCenter: toastCenter,
         onRecipeSelected: { presentedRecipe = $0 }
       )
@@ -424,23 +434,14 @@ private struct RecipeFullScreenCover: View {
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let cookbookCopyModel: CookbookCopyModel
   let toastCenter: AppToastCenter
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   var body: some View {
     NavigationStack {
-      RecipeDetailView(
-        recipeID: presentation.recipeID,
-        scaleContext: presentation.scaleContext,
-        workbenchID: presentation.workbenchID,
-        includingArchivedRecipe: presentation.includingArchivedRecipe,
-        libraryModel: recipeModel,
-        mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel,
-        hostsHandoffReviews: true,
-        onRecipeSelected: onRecipeSelected
-      )
-      .id(presentation.id)
+      detailView
+        .id(presentation.id)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Done") {
@@ -460,6 +461,39 @@ private struct RecipeFullScreenCover: View {
       mealCalendarModel: mealCalendarModel
     )
     .recipeDetailDestinations(recipeModel: recipeModel)
+  }
+
+  @ViewBuilder private var detailView: some View {
+    let route: (RecipeDetailPresentation) -> Void = onRecipeSelected
+    switch presentation.scope {
+    case .mine:
+      makeDetailView(onRecipeSelected: route)
+    case let .cookbook(context):
+      withDependencies {
+        $0.defaultDatabase = context.mirror.database
+      } operation: {
+        makeDetailView(onRecipeSelected: route)
+          .environment(\.recipeImageDatabase, context.mirror.database)
+      }
+    }
+  }
+
+  private func makeDetailView(
+    onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void
+  ) -> some View {
+    RecipeDetailView(
+      recipeID: presentation.recipeID,
+      scaleContext: presentation.scaleContext,
+      workbenchID: presentation.workbenchID,
+      includingArchivedRecipe: presentation.includingArchivedRecipe,
+      scope: presentation.scope,
+      libraryModel: recipeModel,
+      mealCalendarModel: mealCalendarModel,
+      groceryModel: groceryModel,
+      cookbookCopyModel: cookbookCopyModel,
+      hostsHandoffReviews: true,
+      onRecipeSelected: onRecipeSelected
+    )
   }
 }
 
@@ -537,19 +571,21 @@ struct RecipeListView: View {
               RecipeListRow(row: row, options: viewOptions)
                 .tag(row.recipe.id)
                 .swipeActions {
-                  Button {
-                    model.deleteButtonTapped(recipeID: row.recipe.id)
-                  } label: {
-                    Label("Archive", systemImage: "archivebox")
+                  if model.scope == .mine {
+                    Button {
+                      model.deleteButtonTapped(recipeID: row.recipe.id)
+                    } label: {
+                      Label("Archive", systemImage: "archivebox")
+                    }
+                    .tint(.red)
+                    // Keep the row until confirmation; destructive can invalidate the List update.
+                    Button {
+                      model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+                    } label: {
+                      Label("Delete…", symbol: .delete)
+                    }
+                    .tint(.red)
                   }
-                  .tint(.red)
-                  // The row remains until confirmation; a destructive role can cause an invalid List update.
-                  Button {
-                    model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
-                  } label: {
-                    Label("Delete…", symbol: .delete)
-                  }
-                  .tint(.red)
                 }
             }
           }
@@ -579,7 +615,7 @@ struct RecipeListView: View {
         }
       }
     }
-    .navigationTitle("Recipes")
+    .navigationTitle(model.scope.recipeListTitle)
     .toolbar(removing: .sidebarToggle)
     .searchable(
       text: $model.searchText,
@@ -608,7 +644,7 @@ struct RecipeListView: View {
           showsSourceMetadata: $showsSourceMetadata,
           showsCategoryMetadata: $showsCategoryMetadata
         )
-        if model.isSelectingWorkbenchRecipes {
+        if model.scope == .mine, model.isSelectingWorkbenchRecipes {
           Button {
             model.cancelWorkbenchSelectionButtonTapped()
           } label: {
@@ -620,7 +656,7 @@ struct RecipeListView: View {
             Label("Workbench These", symbol: .workbench)
           }
           .disabled(model.selectedWorkbenchRecipeIDs.isEmpty)
-        } else {
+        } else if model.scope == .mine {
           Button {
             model.workbenchSelectionButtonTapped()
           } label: {
@@ -629,11 +665,13 @@ struct RecipeListView: View {
           .disabled(model.isImporting)
         }
       }
-      ToolbarItem(placement: .secondaryAction) {
-        Button {
-          onArchivedRecipesRequested()
-        } label: {
-          Label("Archived Recipes", systemImage: "archivebox")
+      if model.scope == .mine {
+        ToolbarItem(placement: .secondaryAction) {
+          Button {
+            onArchivedRecipesRequested()
+          } label: {
+            Label("Archived Recipes", systemImage: "archivebox")
+          }
         }
       }
     }
@@ -738,7 +776,7 @@ private struct RecipeSortMenu: View {
   }
 }
 
-private struct RecipeFilterView: View {
+struct RecipeFilterView: View {
   let model: RecipeLibraryModel
 
   var body: some View {

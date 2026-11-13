@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [Family cookbooks](family-cookbooks.md) — **Ready.** Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed and S1 (bundle v2 and copy-import) is done; S2 is the mirror database, read-only visiting and Copy to My Recipes, fed by a DEBUG payload file.
+- [Family cookbooks](family-cookbooks.md) — **Ready.** S0 (transport spike), S1 (bundle v2 and copy-import), and S2 (mirror database, read-only visiting and Copy to My Recipes) are done; S3 publishes to the cookbook zone.

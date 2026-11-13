@@ -47,6 +47,7 @@ extension PowerBrowserModel {
   }
 
   func saveQueryEditsButtonTapped() {
+    guard scope == .mine else { return }
     guard let queryEditTarget else { return }
     do {
       let restoredLensID: RecipeLens.ID = switch queryEditTarget {
@@ -67,6 +68,7 @@ extension PowerBrowserModel {
   }
 
   func deleteLensButtonTapped(_ lens: RecipeLens) {
+    guard scope == .mine else { return }
     do {
       try database.write { db in try RecipeLensRepository.delete(lens, in: db) }
       if selectedLensID == lens.id { selectedLensID = nil }
@@ -90,6 +92,7 @@ extension PowerBrowserModel {
   }
 
   func saveLensButtonTapped(name: String) {
+    guard scope == .mine else { return }
     do {
       try database.write { db in
         _ = try RecipeLensRepository.create(
@@ -105,6 +108,7 @@ extension PowerBrowserModel {
 
   @discardableResult
   func addShelfButtonTapped(lensID: RecipeLens.ID, title: String, query: RecipeBrowserQuery) -> RecipeLensShelf? {
+    guard scope == .mine else { return nil }
     do {
       return try database.write { db in
         try RecipeLensRepository.addShelf(
@@ -125,27 +129,32 @@ extension PowerBrowserModel {
   }
 
   func renameLensButtonTapped(_ lens: RecipeLens, name: String) {
+    guard scope == .mine else { return }
     do {
       try database.write { db in try RecipeLensRepository.rename(lens, to: name, in: db, now: now) }
     } catch { lensError = error.localizedDescription }
   }
 
   func deleteShelfButtonTapped(_ shelf: RecipeLensShelf) {
+    guard scope == .mine else { return }
     do { try database.write { db in try RecipeLensRepository.removeShelf(shelf, in: db) } }
     catch { lensError = error.localizedDescription }
   }
 
   func renameShelfButtonTapped(_ shelf: RecipeLensShelf, title: String) {
+    guard scope == .mine else { return }
     do { try database.write { db in try RecipeLensRepository.renameShelf(shelf, to: title, in: db) } }
     catch { lensError = error.localizedDescription }
   }
 
   func reorderShelvesButtonTapped(_ ids: [RecipeLensShelf.ID], lensID: RecipeLens.ID) {
+    guard scope == .mine else { return }
     do { try database.write { db in try RecipeLensRepository.reorderShelves(lensID: lensID, orderedIDs: ids, in: db) } }
     catch { lensError = error.localizedDescription }
   }
 
   func showsRemainderChanged(_ value: Bool, lens: RecipeLens) {
+    guard scope == .mine else { return }
     do { try database.write { db in try RecipeLensRepository.setShowsRemainder(lens, to: value, in: db, now: now) } }
     catch { lensError = error.localizedDescription }
   }

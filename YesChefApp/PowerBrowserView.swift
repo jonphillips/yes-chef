@@ -306,7 +306,7 @@ private struct PowerBrowserResultsView: View {
     List {
       ForEach(rows) { row in
         Button {
-          onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id))
+          onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id, scope: model.scope))
         } label: {
           RecipeListRow(
             row: row,
@@ -352,6 +352,7 @@ private struct PowerBrowserLensToolbar: ToolbarContent {
   let model: PowerBrowserModel
 
   var body: some ToolbarContent {
+    if model.scope == .mine {
     ToolbarItem(placement: .principal) {
       Picker("Recipe Lens", selection: Binding(
         get: { model.selectedLensID },
@@ -370,6 +371,7 @@ private struct PowerBrowserLensToolbar: ToolbarContent {
       } else {
         Button("Save as Lens", systemImage: "bookmark") { model.saveAsLensButtonTapped() }
       }
+    }
     }
   }
 }

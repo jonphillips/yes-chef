@@ -206,7 +206,7 @@ extension RecipeRepository {
     return CookbookCopyResult(recipeID: recipeID, textOnlyServeWith: textOnly, unlinkedRelated: unlinked, warnings: warnings)
   }
 
-  private static func copyCookbookLabels(_ labels: [RecipeBundleCoding.LabelPath], recipeID: UUID, in db: Database, now: Date, uuid: () -> UUID) throws {
+  static func copyCookbookLabels(_ labels: [RecipeBundleCoding.LabelPath], recipeID: UUID, in db: Database, now: Date, uuid: () -> UUID) throws {
     var facets = try Facet.fetchAll(db)
     var categories = try Category.fetchAll(db)
     var joined: Set<UUID> = []

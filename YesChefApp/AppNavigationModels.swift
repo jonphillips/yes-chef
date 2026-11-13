@@ -1,26 +1,83 @@
+import Dependencies
 import SwiftUI
 import YesChefCore
+
+enum LibraryScope: Hashable {
+  case mine
+  case cookbook(CookbookContext)
+
+  var recipeListTitle: String {
+    switch self {
+    case .mine: "Recipes"
+    case let .cookbook(context): "\(context.ownerName)'s Recipes"
+    }
+  }
+}
+
+struct CookbookContext: Hashable {
+  var ownerName: String
+  var mirror: CookbookMirror
+  var loadedAt: Date = .now
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.ownerName == rhs.ownerName && lhs.mirror.fileURL == rhs.mirror.fileURL
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ownerName)
+    hasher.combine(mirror.fileURL)
+  }
+}
+
+@MainActor
+struct CookbookLibraryModels {
+  let recipes: RecipeLibraryModel
+  let powerBrowser: PowerBrowserModel
+
+  init(context: CookbookContext) {
+    let models = withDependencies {
+      $0.defaultDatabase = context.mirror.database
+    } operation: {
+      (
+        RecipeLibraryModel(scope: .cookbook(context)),
+        PowerBrowserModel(scope: .cookbook(context))
+      )
+    }
+    recipes = models.0
+    powerBrowser = models.1
+  }
+}
 
 struct RecipeDetailPresentation: Hashable, Identifiable {
   var recipeID: Recipe.ID
   var scaleContext: ScaleContext
   var workbenchID: Workbench.ID?
   var includingArchivedRecipe: Bool
+  var scope: LibraryScope
 
   init(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
-    includingArchivedRecipe: Bool = false
+    includingArchivedRecipe: Bool = false,
+    scope: LibraryScope = .mine
   ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
     self.workbenchID = workbenchID
     self.includingArchivedRecipe = includingArchivedRecipe
+    self.scope = scope
   }
 
   var id: String {
-    "\(recipeID.uuidString):\(scaleContext.id):\(workbenchID?.uuidString ?? ""):\(includingArchivedRecipe)"
+    "\(recipeID.uuidString):\(scaleContext.id):\(workbenchID?.uuidString ?? ""):\(includingArchivedRecipe):\(scopeID)"
+  }
+
+  private var scopeID: String {
+    switch scope {
+    case .mine: "mine"
+    case let .cookbook(context): "cookbook:\(context.mirror.fileURL.path)"
+    }
   }
 }
 
@@ -55,6 +112,7 @@ struct TodayPrepPresentation: Hashable, Identifiable {
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
+  case cookbooks
   case fromChat
   case createRecipe
   case groceries
@@ -70,6 +128,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .recipes: "Recipes"
+    case .cookbooks: "Family Cookbooks"
     case .fromChat: "From Chat"
     case .createRecipe: "Create Recipe"
     case .groceries: "Groceries"
@@ -85,6 +144,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var symbol: AppSymbol {
     switch self {
     case .recipes: .recipe
+    case .cookbooks: AppSymbol("books.vertical")
     case .fromChat: .fromChat
     case .createRecipe: .addRecipes
     case .workbenches: .workbench

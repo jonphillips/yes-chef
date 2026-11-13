@@ -10,6 +10,12 @@ import YesChefCore
 @Observable
 @MainActor
 final class RecipeLibraryModel {
+  let scope: LibraryScope
+
+  init(scope: LibraryScope = .mine) {
+    self.scope = scope
+  }
+
   struct CachedBrowserEngine {
     var data: RecipeBrowserData
     var engine: RecipeBrowserEngine
@@ -84,6 +90,7 @@ final class RecipeLibraryModel {
   }
 
   func workbenchTheseButtonTapped() {
+    guard scope == .mine else { return }
     let recipeIDs = selectedWorkbenchRecipeIDs
     guard !recipeIDs.isEmpty else { return }
     let selectedRows = recipeRows.filter { recipeIDs.contains($0.recipe.id) && !$0.recipe.archived }
@@ -171,6 +178,7 @@ final class RecipeLibraryModel {
   }
 
   func paprikaBackupSelected(_ result: Result<URL, any Error>) async {
+    guard scope == .mine else { return }
     do {
       let sourceURL = try result.get()
       importActivityTitle = "Supplementing"
@@ -202,6 +210,7 @@ final class RecipeLibraryModel {
   }
 
   func deleteButtonTapped(recipeID: Recipe.ID) {
+    guard scope == .mine else { return }
     destination = .deleteRecipe(recipeID)
   }
 
@@ -245,6 +254,7 @@ final class RecipeLibraryModel {
   }
 
   func restoreArchivedRecipeButtonTapped(recipeID: Recipe.ID) {
+    guard scope == .mine else { return }
     Task {
       let now = now
       do {
@@ -259,6 +269,7 @@ final class RecipeLibraryModel {
   }
 
   func deleteArchivedRecipeButtonTapped(recipeID: Recipe.ID) {
+    guard scope == .mine else { return }
     destination = .deleteArchivedRecipe(recipeID)
   }
 
@@ -709,6 +720,7 @@ final class RecipeDetailModel {
   let scaleContext: ScaleContext
   let workbenchID: Workbench.ID?
   let includingArchivedRecipe: Bool
+  let scope: LibraryScope
 
   @ObservationIgnored
   @Dependency(\.date.now) var now
@@ -760,19 +772,28 @@ final class RecipeDetailModel {
   var isLoadingRelatedRecipePicker = false
   @ObservationIgnored let detailFetchAnimationDescription: String
   private var lastAppliedPersistedScale: Double?
+  var cookbookSelectedVariationID: RecipeVariation.ID?
+  var hasCookbookVariationSelection = false
   private(set) var seededAskSection: PlaybookSectionKind?
+
+  var selectedVariationID: RecipeVariation.ID? {
+    guard scope != .mine, hasCookbookVariationSelection else { return detail?.activeVariationID }
+    return cookbookSelectedVariationID
+  }
 
   init(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
     includingArchivedRecipe: Bool = false,
+    scope: LibraryScope = .mine,
     toastCenter: AppToastCenter? = nil
   ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
     self.workbenchID = workbenchID
     self.includingArchivedRecipe = includingArchivedRecipe
+    self.scope = scope
     self.toastCenter = toastCenter
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("-YesChefDisableDetailFetchAnimation") {
@@ -1060,7 +1081,7 @@ final class RecipeDetailModel {
   private func setScaleFactor(_ scaleFactor: Double, persist: Bool) {
     guard self.scaleFactor != scaleFactor else { return }
     self.scaleFactor = scaleFactor
-    guard persist else { return }
+    guard persist, scope == .mine else { return }
     persistScaleFactor()
   }
 

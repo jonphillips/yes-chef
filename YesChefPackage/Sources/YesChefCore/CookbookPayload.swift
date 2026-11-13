@@ -19,9 +19,27 @@ public enum CookbookPayload {
     let serves = try RecipeServeWith.fetchAll(db)
     let related = try RecipeRelatedRecipe.fetchAll(db)
     let variations = try RecipeVariation.fetchAll(db)
+    let sourcesByRecipe = Dictionary(uniqueKeysWithValues: sources.map { ($0.recipeID, $0) })
+    return assemble(recipesToBuild: recipes.filter { !$0.archived }, targets: recipes.map { recipe in
+        .init(recipeID: recipe.id, title: recipe.title, sourceURL: sourcesByRecipe[recipe.id]?.url)
+      }, sources: sources,
+      ingredientSections: ingredientSections, ingredientLines: ingredientLines,
+      instructionSections: instructionSections, instructionSteps: instructionSteps,
+      notes: notes, photos: photos, categories: categories, facets: facets, joins: joins,
+      serves: serves, related: related, variations: variations)
+  }
+
+  private static func assemble(
+    recipesToBuild: [Recipe], targets: [RecipeBundleCoding.LinkTarget], sources: [RecipeSource],
+    ingredientSections: [IngredientSection], ingredientLines: [IngredientLine],
+    instructionSections: [InstructionSection], instructionSteps: [InstructionStep],
+    notes: [RecipeNote], photos: [RecipePhoto], categories: [Category], facets: [Facet],
+    joins: [RecipeCategory], serves: [RecipeServeWith], related: [RecipeRelatedRecipe],
+    variations: [RecipeVariation]
+  ) -> [RecipeBundleCoding.RecipeBundle] {
     let categoriesByID = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
     let facetsByID = Dictionary(uniqueKeysWithValues: facets.map { ($0.id, $0) })
-    let recipesByID = Dictionary(uniqueKeysWithValues: recipes.map { ($0.id, $0) })
+    let targetsByID = Dictionary(uniqueKeysWithValues: targets.map { ($0.recipeID, $0) })
     let sourcesByID = Dictionary(uniqueKeysWithValues: sources.map { ($0.recipeID, $0) })
     let ingredientSectionsByRecipeID = Dictionary(grouping: ingredientSections, by: \.recipeID)
     let ingredientLinesByRecipeID = Dictionary(grouping: ingredientLines, by: \.recipeID)
@@ -37,7 +55,7 @@ public enum CookbookPayload {
       relatedByRecipeID[pair.recipeID, default: []].append(pair)
       if pair.relatedRecipeID != pair.recipeID { relatedByRecipeID[pair.relatedRecipeID, default: []].append(pair) }
     }
-    return recipes.filter { !$0.archived }.sorted { $0.id.uuidString < $1.id.uuidString }.map { recipe in
+    return recipesToBuild.sorted { $0.id.uuidString < $1.id.uuidString }.map { recipe in
       let id = recipe.id
       let ownCategories = joinsByRecipeID[id, default: []].compactMap { categoriesByID[$0.categoryID] }
       let labels = ownCategories.map { category in
@@ -50,8 +68,7 @@ public enum CookbookPayload {
       let ownRelated = relatedByRecipeID[id, default: []]
       let targetIDs = Set(ownServes.compactMap(\.linkedRecipeID) + ownRelated.map { $0.recipeID == id ? $0.relatedRecipeID : $0.recipeID })
       let targets = targetIDs.compactMap { targetID -> RecipeBundleCoding.LinkTarget? in
-        guard let target = recipesByID[targetID] else { return nil }
-        return .init(recipeID: targetID, title: target.title, sourceURL: sourcesByID[targetID]?.url)
+        targetsByID[targetID]
       }
       return RecipeBundleCoding.RecipeBundle(
         version: RecipeBundleCoding.currentVersion, recipe: recipe, source: sourcesByID[id],
@@ -70,6 +87,46 @@ public enum CookbookPayload {
         variations: variationsByRecipeID[id, default: []], linkTargets: targets
       )
     }
+  }
+
+  public static func bundle(for id: Recipe.ID, in db: Database) throws -> RecipeBundleCoding.RecipeBundle? {
+    guard let recipe = try Recipe.find(id).fetchOne(db), !recipe.archived else { return nil }
+    let joins = try RecipeCategory.where { $0.recipeID.eq(id) }.fetchAll(db)
+    var categories: [Category] = []
+    var categoryIDs = Set<Category.ID>()
+    for join in joins {
+      var currentID: Category.ID? = join.categoryID
+      while let categoryID = currentID, categoryIDs.insert(categoryID).inserted,
+        let category = try Category.find(categoryID).fetchOne(db)
+      {
+        categories.append(category)
+        currentID = category.parentCategoryID
+      }
+    }
+    let facetIDs = Set(categories.compactMap(\.facetID))
+    let facets = try facetIDs.compactMap { try Facet.find($0).fetchOne(db) }
+    let serves = try RecipeServeWith.where { $0.recipeID.eq(id) }.fetchAll(db)
+    let related = try RecipeRelatedRecipe.where { $0.recipeID.eq(id) || $0.relatedRecipeID.eq(id) }.fetchAll(db)
+    let targetIDs = Set(serves.compactMap(\.linkedRecipeID) + related.map { $0.recipeID == id ? $0.relatedRecipeID : $0.recipeID })
+    let sources = try (targetIDs.union([id])).compactMap { targetID in
+      try RecipeSource.where { $0.recipeID.eq(targetID) }.fetchOne(db)
+    }
+    let sourceByRecipe = Dictionary(uniqueKeysWithValues: sources.map { ($0.recipeID, $0) })
+    let targets = try targetIDs.compactMap { targetID -> RecipeBundleCoding.LinkTarget? in
+      guard let title = try Recipe.find(targetID).select(\.title).fetchOne(db) else { return nil }
+      return .init(recipeID: targetID, title: title, sourceURL: sourceByRecipe[targetID]?.url)
+    }
+    return try assemble(
+      recipesToBuild: [recipe], targets: targets, sources: sources,
+      ingredientSections: IngredientSection.where { $0.recipeID.eq(id) }.fetchAll(db),
+      ingredientLines: IngredientLine.where { $0.recipeID.eq(id) }.fetchAll(db),
+      instructionSections: InstructionSection.where { $0.recipeID.eq(id) }.fetchAll(db),
+      instructionSteps: InstructionStep.where { $0.recipeID.eq(id) }.fetchAll(db),
+      notes: RecipeNote.where { $0.recipeID.eq(id) }.fetchAll(db),
+      photos: RecipePhoto.where { $0.recipeID.eq(id) }.fetchAll(db),
+      categories: categories, facets: facets, joins: joins, serves: serves, related: related,
+      variations: RecipeVariation.where { $0.recipeID.eq(id) }.fetchAll(db)
+    ).first
   }
 
   public static func encodedPayload(_ bundle: RecipeBundleCoding.RecipeBundle) throws -> Data {

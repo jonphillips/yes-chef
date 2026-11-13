@@ -16,6 +16,8 @@ struct RecipeDetailView: View {
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let cookbookCopyModel: CookbookCopyModel?
+  let scope: LibraryScope
   let isFocusActive: Bool
   let hostsHandoffReviews: Bool
   let showsToolbar: Bool
@@ -27,9 +29,11 @@ struct RecipeDetailView: View {
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
     includingArchivedRecipe: Bool = false,
+    scope: LibraryScope = .mine,
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
+    cookbookCopyModel: CookbookCopyModel? = nil,
     hostsHandoffReviews: Bool = false,
     showsToolbar: Bool = true,
     isFocusActive: Bool = false,
@@ -42,6 +46,7 @@ struct RecipeDetailView: View {
       scaleContext: scaleContext,
       workbenchID: workbenchID,
       includingArchivedRecipe: includingArchivedRecipe,
+      scope: scope,
       toastCenter: toastCenter
     )
     _model = State(
@@ -52,6 +57,8 @@ struct RecipeDetailView: View {
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
+    self.cookbookCopyModel = cookbookCopyModel
+    self.scope = scope
     self.hostsHandoffReviews = hostsHandoffReviews
     self.showsToolbar = showsToolbar
     self.isFocusActive = isFocusActive
@@ -114,6 +121,33 @@ struct RecipeDetailView: View {
     } message: {
       Text(model.errorMessage ?? "Something went wrong.")
     }
+    .confirmationDialog(
+      "Already in My Recipes",
+      isPresented: copyPromptIsPresented,
+      titleVisibility: .visible
+    ) {
+      if case let .existingCopies(_, _, ids)? = cookbookCopyModel?.prompt {
+        Button("Open Mine") {
+          Task {
+            if let recipeID = await cookbookCopyModel?.newestCopy(of: ids) {
+              onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, scope: .mine))
+            }
+            cookbookCopyModel?.clearPrompt()
+          }
+        }
+        Button("Copy Anyway") {
+          Task { await cookbookCopyModel?.copyAnywayButtonTapped() }
+        }
+      }
+      Button("Cancel", role: .cancel) { cookbookCopyModel?.clearPrompt() }
+    } message: {
+      Text("This recipe already has a copy in your library.")
+    }
+    .alert("Cookbook Copy", isPresented: copyResultIsPresented) {
+      Button("OK", role: .cancel) { cookbookCopyModel?.clearPrompt() }
+    } message: {
+      Text(copyPromptMessage)
+    }
     .handoffTransportAlert(handoffTransport)
     .handoffReviewDestinations(
       isPresentationEnabled: hostsHandoffReviews && model.destination.workbench == nil && !isVariationManagerPresented
@@ -155,6 +189,7 @@ struct RecipeDetailView: View {
       model: model,
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
+      cookbookCopyModel: cookbookCopyModel,
       isVariationManagerPresented: $isVariationManagerPresented,
       onRecipeSelected: onRecipeSelected
     )
@@ -173,47 +208,67 @@ struct RecipeDetailView: View {
         }
       }
       ToolbarItemGroup(placement: .primaryAction) {
-        Button {
-          groceryModel.addRecipeButtonTapped(
-            recipeID: model.recipeID,
-            scaleContext: model.scaleContext
+        if model.scope == .mine {
+          Button {
+            groceryModel.addRecipeButtonTapped(
+              recipeID: model.recipeID,
+              scaleContext: model.scaleContext
+            )
+          } label: {
+            Label("Groceries", symbol: .addToGroceries)
+          }
+          Button {
+            mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Plan", symbol: .plan)
+          }
+          HandoffMenu(
+            handOff: {
+              if model.activeVariation == nil {
+                copyAdjustmentPrompt()
+              } else {
+                isConfirmingBaseRecipeHandoff = true
+              }
+            },
+            paste: {
+              let results = UIPasteboard.general.string.map { [$0] } ?? []
+              Task { await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID)) }
+            },
+            isAskActive: Binding(
+              get: { model.destination.chat != nil },
+              set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
+            )
           )
-        } label: {
-          Label("Groceries", symbol: .addToGroceries)
-        }
-        Button {
-          mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Plan", symbol: .plan)
-        }
-        HandoffMenu(
-          handOff: {
-            if model.activeVariation == nil {
-              copyAdjustmentPrompt()
+        } else if case let .cookbook(context) = model.scope, let cookbookCopyModel {
+          let copyIDs = cookbookCopyModel.copyIDsBySource[model.recipeID] ?? []
+          Button {
+            if copyIDs.isEmpty {
+              Task { await cookbookCopyModel.copyButtonTapped(context: context, sourceID: model.recipeID) }
             } else {
-              isConfirmingBaseRecipeHandoff = true
+              Task {
+                if let recipeID = await cookbookCopyModel.newestCopy(of: copyIDs) {
+                  onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, scope: .mine))
+                }
+              }
             }
-          },
-          paste: {
-            let results = UIPasteboard.general.string.map { [$0] } ?? []
-            Task { await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID)) }
-          },
-          isAskActive: Binding(
-            get: { model.destination.chat != nil },
-            set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
-          )
-        )
+          } label: {
+            Label(copyIDs.isEmpty ? "Copy to My Recipes" : "Open Mine", systemImage: copyIDs.isEmpty ? "plus.circle" : "arrow.up.forward.square")
+          }
+          .task { await cookbookCopyModel.refreshCopyStatus(context: context, sourceID: model.recipeID) }
+        }
       }
       ToolbarItemGroup(placement: .secondaryAction) {
-        Button {
-          libraryModel.editButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Edit", symbol: .edit)
-        }
-        Button {
-          model.openWorkbenchButtonTapped()
-        } label: {
-          Label("Workbench", symbol: .workbench)
+        if model.scope == .mine {
+          Button {
+            libraryModel.editButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Edit", symbol: .edit)
+          }
+          Button {
+            model.openWorkbenchButtonTapped()
+          } label: {
+            Label("Workbench", symbol: .workbench)
+          }
         }
 
         if let shareText = model.shareText, let detail = model.detail {
@@ -222,24 +277,61 @@ struct RecipeDetailView: View {
           }
         }
 
-        if model.recipe?.originalSnapshot != nil {
+        if model.scope == .mine, model.recipe?.originalSnapshot != nil {
           Button {
             libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)
           } label: {
             Label("View Original", systemImage: "doc.text.magnifyingglass")
           }
         }
-        Button {
-          libraryModel.deleteButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Archive", systemImage: "archivebox")
-        }
-        Button(role: .destructive) {
-          libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Delete…", symbol: .delete)
+        if model.scope == .mine {
+          Button {
+            libraryModel.deleteButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Archive", systemImage: "archivebox")
+          }
+          Button(role: .destructive) {
+            libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Delete…", symbol: .delete)
+          }
         }
       }
+    }
+  }
+
+  private var copyPromptIsPresented: Binding<Bool> {
+    Binding(
+      get: {
+        if case .existingCopies? = cookbookCopyModel?.prompt { return true }
+        return false
+      },
+      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+    )
+  }
+
+  private var copyResultIsPresented: Binding<Bool> {
+    Binding(
+      get: {
+        switch cookbookCopyModel?.prompt {
+        case .copyResult?, .failure?: true
+        default: false
+        }
+      },
+      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+    )
+  }
+
+  private var copyPromptMessage: String {
+    switch cookbookCopyModel?.prompt {
+    case let .copyResult(result):
+      let lines = result.unlinkedRelated.isEmpty
+        ? [] : ["Related recipes not in your library: " + result.unlinkedRelated.joined(separator: ", ")]
+      let serves = result.textOnlyServeWith.isEmpty
+        ? [] : ["Kept as text: " + result.textOnlyServeWith.joined(separator: ", ")]
+      return (lines + serves + result.warnings).joined(separator: "\n")
+    case let .failure(message): return message
+    default: return ""
     }
   }
 }
@@ -348,6 +440,7 @@ private struct RecipeReaderView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
+  let cookbookCopyModel: CookbookCopyModel?
   @Binding var isVariationManagerPresented: Bool
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
@@ -398,7 +491,8 @@ private struct RecipeReaderView: View {
           RecipePhotoGallery(
             photos: model.displayablePhotos,
             coverPhotoID: model.recipe?.coverPhotoID,
-            setCoverPhoto: { model.coverPhotoButtonTapped($0) }
+            setCoverPhoto: { model.coverPhotoButtonTapped($0) },
+            isReadOnly: model.scope != .mine
           )
             .padding()
         }
@@ -439,9 +533,9 @@ private struct RecipeReaderView: View {
       .presentationDetents([.medium, .large])
     }
     .keepsScreenAwakeWhilePresented()
-    .onChange(of: model.detail?.activeVariationID) {
+    .onChange(of: model.selectedVariationID) {
       #if DEBUG
-        let selection = model.detail?.activeVariationID?.uuidString ?? "base"
+        let selection = model.selectedVariationID?.uuidString ?? "base"
         AppLog.performance.log(
           "recipe-detail-view active-variation-delivered selection=\(selection, privacy: .public)"
         )
@@ -456,6 +550,12 @@ private struct RecipeReaderView: View {
 
   private func header(_ recipe: Recipe) -> some View {
     VStack(alignment: .leading, spacing: 4) {
+      if model.scope != .mine, let cookbookCopyModel,
+        !(cookbookCopyModel.copyIDsBySource[model.recipeID] ?? []).isEmpty {
+        Label("In My Recipes", systemImage: "checkmark.circle.fill")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+      }
       HStack(alignment: .firstTextBaseline) {
         Text(recipe.title)
           .font(.title.bold())
@@ -482,9 +582,10 @@ private struct RecipeReaderView: View {
       }
       RecipeVariationSelector(
         variations: model.variations,
-        activeVariationID: model.detail?.activeVariationID,
+        activeVariationID: model.selectedVariationID,
         select: model.activeVariationSelectionChanged,
-        manage: { isVariationManagerPresented = true }
+        manage: { isVariationManagerPresented = true },
+        allowsManagement: model.scope == .mine
       )
     }
   }
@@ -541,14 +642,16 @@ private struct RecipeReaderView: View {
         WrappingLabels(labels: categoryDisplayNames, symbol: .category)
       }
 
-      Button {
-        model.suggestLabelsButtonTapped()
-      } label: {
-        Label("Edit Tags", symbol: .tag)
+      if model.scope == .mine {
+        Button {
+          model.suggestLabelsButtonTapped()
+        } label: {
+          Label("Edit Tags", symbol: .tag)
+        }
+        .buttonStyle(.bordered)
       }
-      .buttonStyle(.bordered)
 
-      if model.adjustmentRestorePoint != nil {
+      if model.scope == .mine, model.adjustmentRestorePoint != nil {
         Button {
           model.undoLastAdjustmentButtonTapped()
         } label: {
@@ -574,16 +677,18 @@ private struct RecipeReaderView: View {
               .font(.caption)
               .recipeChip()
           }
-          Button {
-            model.suggestLabelsButtonTapped()
-          } label: {
-            Label("Edit Tags", symbol: .tag)
-              .font(.caption.weight(.medium))
-              .frame(minHeight: 36)
+          if model.scope == .mine {
+            Button {
+              model.suggestLabelsButtonTapped()
+            } label: {
+              Label("Edit Tags", symbol: .tag)
+                .font(.caption.weight(.medium))
+                .frame(minHeight: 36)
+            }
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
 
-          if model.adjustmentRestorePoint != nil {
+          if model.scope == .mine, model.adjustmentRestorePoint != nil {
             Button {
               model.undoLastAdjustmentButtonTapped()
             } label: {
@@ -702,7 +807,8 @@ private struct RecipeReaderView: View {
     case .playbook:
       RecipePlaybookView(
         model: model,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        isReadOnly: model.scope != .mine
       )
     }
   }
@@ -753,7 +859,8 @@ private struct RecipeReaderView: View {
 
             RecipePlaybookView(
               model: model,
-              onRecipeSelected: onRecipeSelected
+              onRecipeSelected: onRecipeSelected,
+              isReadOnly: model.scope != .mine
             )
           }
           .padding()
@@ -782,7 +889,7 @@ private struct RecipeReaderView: View {
       if !model.instructionGroups.isEmpty {
         instructions
       }
-      if !model.workbenchCandidateLinks.isEmpty {
+      if model.scope == .mine, !model.workbenchCandidateLinks.isEmpty {
         WorkbenchCandidateLinksView(links: model.workbenchCandidateLinks, onRecipeSelected: onRecipeSelected)
       }
     }
@@ -943,9 +1050,10 @@ private extension RecipeReaderView {
 
       RecipeVariationSelector(
         variations: model.variations,
-        activeVariationID: model.detail?.activeVariationID,
+        activeVariationID: model.selectedVariationID,
         select: model.activeVariationSelectionChanged,
-        manage: { isVariationManagerPresented = true }
+        manage: { isVariationManagerPresented = true },
+        allowsManagement: model.scope == .mine
       )
     }
   }

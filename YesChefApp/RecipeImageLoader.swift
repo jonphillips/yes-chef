@@ -5,12 +5,28 @@ import SwiftUI
 import UIKit
 import YesChefCore
 
+private struct RecipeImageDatabaseKey: EnvironmentKey {
+  static let defaultValue: (any DatabaseWriter)? = nil
+}
+
+extension EnvironmentValues {
+  var recipeImageDatabase: (any DatabaseWriter)? {
+    get { self[RecipeImageDatabaseKey.self] }
+    set { self[RecipeImageDatabaseKey.self] = newValue }
+  }
+}
+
 /// Reads a photo's full-resolution `displayData` on demand from the concurrent
 /// reader pool. The detail fetch no longer carries these bytes (ADR-0029 Amd2
 /// S5b), so hero/full-screen rendering hydrates them here — on a pool reader,
 /// which never touches the serialized writer the `SyncEngine` contends for.
 enum RecipePhotoDisplayDataLoader {
-  static func load(photoID: RecipePhoto.ID) async -> Data? {
+  static func load(photoID: RecipePhoto.ID, database scopedDatabase: (any DatabaseWriter)?) async -> Data? {
+    if let scopedDatabase {
+      return try? await scopedDatabase.read { db in
+        try RecipePhoto.find(photoID).fetchOne(db)?.displayData
+      }
+    }
     @Dependency(\.defaultDatabase) var database
     return try? await database.read { db in
       try RecipePhoto.find(photoID).fetchOne(db)?.displayData
@@ -98,6 +114,7 @@ func downsampledRecipeImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? 
 /// variants read the full-resolution bytes on demand (ADR-0029 Amd2 S5b), so the
 /// detail fetch never has to haul `displayData` through the observed model.
 struct RecipePhotoImage: View {
+  @Environment(\.recipeImageDatabase) private var database
   let photoID: UUID
   let checksum: String?
   let variant: RecipePhotoImageVariant
@@ -146,10 +163,10 @@ struct RecipePhotoImage: View {
       if let thumbnailData {
         data = thumbnailData
       } else {
-        data = await RecipePhotoDisplayDataLoader.load(photoID: photoID)
+        data = await RecipePhotoDisplayDataLoader.load(photoID: photoID, database: database)
       }
     case .hero, .fullScreen:
-      data = await RecipePhotoDisplayDataLoader.load(photoID: photoID) ?? thumbnailData
+      data = await RecipePhotoDisplayDataLoader.load(photoID: photoID, database: database) ?? thumbnailData
     }
     guard let data else { return }
 

@@ -248,6 +248,11 @@ extension RecipeDetailModel {
   /// distinguish writer completion from the waiting time before this model task
   /// resumes on the main actor.
   func activeVariationSelectionChanged(_ variationID: RecipeVariation.ID?) {
+    if scope != .mine {
+      hasCookbookVariationSelection = true
+      cookbookSelectedVariationID = variationID
+      return
+    }
     let clock = ContinuousClock()
     let handlerEntry = clock.now
     let signposter = AppLog.performanceSignposter

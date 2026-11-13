@@ -249,52 +249,74 @@ struct LearningsSection: View {
   let learnings: [Learning]
   var showsTitle = true
   var showsEmptyPlaceholder = true
+  var isReadOnly = false
   var addLearning: ((String) -> LearningCreationResult)? = nil
   var updateLearning: (Learning, String) -> Void
   var deleteLearning: (Learning.ID) -> Void
   var reorderLearnings: ([Learning.ID], LearningReorderDestination) -> Void
 
   var body: some View {
-    EditableRowsSection(
-      title: showsTitle ? "Learnings" : "",
-      titleFont: .title2.weight(.semibold),
-      editorLabel: "Learning",
-      items: learnings,
-      itemText: \.text,
-      addItem: addLearning.map { addLearning in
-        { text in
-          switch addLearning(text) {
-          case .added, .duplicate:
-            true
-          case .failed:
-            false
+    Group {
+      if isReadOnly {
+        VStack(alignment: .leading, spacing: 8) {
+          if showsTitle {
+            Text("Learnings")
+              .font(.title2.weight(.semibold))
+          }
+          if learnings.isEmpty {
+            if showsEmptyPlaceholder {
+              Text("None yet.")
+                .foregroundStyle(.tertiary)
+            }
+          } else {
+            ForEach(learnings) { learning in
+              Text(learning.text)
+            }
           }
         }
-      },
-      addButtonLabel: "Add Learning",
-      addButtonIconOnly: true,
-      updateItem: updateLearning,
-      deleteItem: { deleteLearning($0.id) },
-      reorderItems: { sourceIDs, destinationID in
-        reorderLearnings(
-          sourceIDs,
-          destinationID.map(LearningReorderDestination.before) ?? .end
-        )
-      }
-    ) {
-      if showsEmptyPlaceholder {
-        Text("None yet.")
-          .foregroundStyle(.tertiary)
       } else {
-        EmptyView()
-      }
-    } itemContent: { learning in
-      Text(learning.text)
-    } badge: { learning in
-      if learning.provenance == .inApp {
-        Label("Hand-authored", symbol: .editRow)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        EditableRowsSection(
+          title: showsTitle ? "Learnings" : "",
+          titleFont: .title2.weight(.semibold),
+          editorLabel: "Learning",
+          items: learnings,
+          itemText: \.text,
+          addItem: addLearning.map { addLearning in
+            { text in
+              switch addLearning(text) {
+              case .added, .duplicate:
+                true
+              case .failed:
+                false
+              }
+            }
+          },
+          addButtonLabel: "Add Learning",
+          addButtonIconOnly: true,
+          updateItem: updateLearning,
+          deleteItem: { deleteLearning($0.id) },
+          reorderItems: { sourceIDs, destinationID in
+            reorderLearnings(
+              sourceIDs,
+              destinationID.map(LearningReorderDestination.before) ?? .end
+            )
+          }
+        ) {
+          if showsEmptyPlaceholder {
+            Text("None yet.")
+              .foregroundStyle(.tertiary)
+          } else {
+            EmptyView()
+          }
+        } itemContent: { learning in
+          Text(learning.text)
+        } badge: { learning in
+          if learning.provenance == .inApp {
+            Label("Hand-authored", symbol: .editRow)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
       }
     }
   }

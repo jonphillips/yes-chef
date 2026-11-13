@@ -4,6 +4,7 @@ import YesChefCore
 struct RecipePlaybookView: View {
   let model: RecipeDetailModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  var isReadOnly = false
 
   @State private var isMakeAheadExpanded = false
   @State private var isRelatedRecipesExpanded = false
@@ -63,7 +64,8 @@ struct RecipePlaybookView: View {
           relatedRecipes: model.relatedRecipes,
           model: model,
           onRecipeSelected: onRecipeSelected,
-          showsSectionTitle: false
+          showsSectionTitle: false,
+          isReadOnly: isReadOnly
         )
       }
       if !model.deliberationLogEntries.isEmpty {
@@ -91,6 +93,7 @@ struct RecipePlaybookView: View {
           learnings: model.learnings,
           showsTitle: false,
           showsEmptyPlaceholder: false,
+          isReadOnly: isReadOnly,
           addLearning: model.createLearning,
           updateLearning: model.updateLearning,
           deleteLearning: model.deleteLearning,
@@ -101,6 +104,7 @@ struct RecipePlaybookView: View {
         model: model,
         items: serveWith,
         needsRepair: serveWithNeedsRepair,
+        isReadOnly: isReadOnly,
         onRecipeSelected: onRecipeSelected
       )
     }
@@ -162,7 +166,7 @@ struct RecipePlaybookView: View {
       isFilled: isFilled,
       preview: preview,
       isExpanded: isExpanded,
-      showsActions: true,
+      showsActions: !isReadOnly,
       actions: { sectionEditButton(for: section, isFilled: isFilled) },
       content: content
     )
@@ -213,7 +217,7 @@ struct RecipePlaybookView: View {
     VStack(alignment: .leading, spacing: 12) {
       if let makeAhead {
         enrichmentContent(makeAhead, title: "Make-ahead")
-      } else {
+      } else if !isReadOnly {
         Button("Add make-ahead", systemImage: "plus") { editingSection = .makeAhead }
           .buttonStyle(.plain)
       }
@@ -224,7 +228,7 @@ struct RecipePlaybookView: View {
     VStack(alignment: .leading, spacing: 12) {
       if let chefItUp {
         enrichmentContent(chefItUp, title: "Chef It Up")
-      } else {
+      } else if !isReadOnly {
         Button("Add an idea", systemImage: "plus") { editingSection = .chefItUp }
           .buttonStyle(.plain)
       }
@@ -267,11 +271,14 @@ struct RecipePlaybookView: View {
     otherNotes: [RecipeNote]
   ) -> some View {
     if visibleNotes.isEmpty {
-      Button("Write a note", systemImage: "plus") { isWritingNote = true }
-        .buttonStyle(.plain)
+      if !isReadOnly {
+        Button("Write a note", systemImage: "plus") { isWritingNote = true }
+          .buttonStyle(.plain)
+      }
     } else {
       if !readerFeedbackNotes.isEmpty {
-        readerFeedbackView(readerFeedbackNotes)
+        if isReadOnly { notesView(readerFeedbackNotes) }
+        else { readerFeedbackView(readerFeedbackNotes) }
       }
       if !otherNotes.isEmpty {
         notesView(otherNotes)
@@ -366,6 +373,7 @@ private struct RecipeServeWithStrip: View {
   let model: RecipeDetailModel
   let items: [RecipeServeWith]
   let needsRepair: Bool
+  let isReadOnly: Bool
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
   @State private var editor: ServeWithItemEditorRoute?
@@ -379,7 +387,7 @@ private struct RecipeServeWithStrip: View {
         Text("Serve With")
           .font(.title3.bold())
         Spacer()
-        if !items.isEmpty {
+        if !items.isEmpty, !isReadOnly {
           Button { isManaging = true } label: {
             Image(symbol: .editRow)
           }
@@ -387,11 +395,11 @@ private struct RecipeServeWithStrip: View {
         }
       }
 
-      if needsRepair {
+      if needsRepair, !isReadOnly {
         ServeWithRepairBanner(repair: model.repairServeWithButtonTapped)
       }
 
-      if items.isEmpty {
+      if items.isEmpty, !isReadOnly {
         Button {
           editor = .add
         } label: {
@@ -409,8 +417,8 @@ private struct RecipeServeWithStrip: View {
             ForEach(items) { item in
               Button {
                 if let id = item.linkedRecipeID, model.detail?.resolvedServeWithRecipeIDs.contains(id) == true {
-                  onRecipeSelected(RecipeDetailPresentation(recipeID: id))
-                } else {
+                  onRecipeSelected(RecipeDetailPresentation(recipeID: id, scope: model.scope))
+                } else if !isReadOnly {
                   editor = .edit(item)
                 }
               } label: {
@@ -432,20 +440,26 @@ private struct RecipeServeWithStrip: View {
               .accessibilityHint(item.linkedRecipeID.map { model.detail?.resolvedServeWithRecipeIDs.contains($0) == true } == true
                 ? "Opens the linked recipe. Use Edit to change this accompaniment."
                 : "Opens the full note and editing actions.")
-              .contextMenu { Button("Edit") { editor = .edit(item) } }
-              .accessibilityAction(named: "Edit") { editor = .edit(item) }
+              .contextMenu {
+                if !isReadOnly { Button("Edit") { editor = .edit(item) } }
+              }
+              .accessibilityAction(named: "Edit") {
+                if !isReadOnly { editor = .edit(item) }
+              }
             }
-            Button {
-              editor = .add
-            } label: {
-              Label("Add", systemImage: "plus")
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 12)
-                .frame(minHeight: 38)
-                .background(.quaternary.opacity(0.55), in: Capsule())
+            if !isReadOnly {
+              Button {
+                editor = .add
+              } label: {
+                Label("Add", systemImage: "plus")
+                  .font(.subheadline.weight(.semibold))
+                  .padding(.horizontal, 12)
+                  .frame(minHeight: 38)
+                  .background(.quaternary.opacity(0.55), in: Capsule())
+              }
+              .buttonStyle(.plain)
+              .accessibilityLabel("Add Serve With item")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add Serve With item")
           }
         }
         .scrollIndicators(.visible)
