@@ -24,3 +24,5 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
+
+- [Family cookbooks](family-cookbooks.md) — **Ready.** S0 is a debug-only spike: a second CloudKit container, a zone-wide read-only share from one Apple ID to another, a 2000-record publish and fetch, timed, with library sync left untouched. S1–S4 get briefed after its device result.
