@@ -330,8 +330,8 @@ struct RecipeDetailView: View {
       let serves = result.textOnlyServeWith.isEmpty
         ? [] : ["Kept as text: " + result.textOnlyServeWith.joined(separator: ", ")]
       return (lines + serves + result.warnings).joined(separator: "\n")
-    case let .failure(message): message
-    default: ""
+    case let .failure(message): return message
+    default: return ""
     }
   }
 }

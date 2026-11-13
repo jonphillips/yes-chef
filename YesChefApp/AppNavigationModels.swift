@@ -29,6 +29,7 @@ struct CookbookContext: Hashable {
   }
 }
 
+@MainActor
 struct CookbookLibraryModels {
   let recipes: RecipeLibraryModel
   let powerBrowser: PowerBrowserModel

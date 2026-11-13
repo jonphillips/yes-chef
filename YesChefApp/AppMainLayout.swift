@@ -36,24 +36,28 @@ struct AppMainLayout: View {
         groceriesTab
         mealCalendarTab
         menusTab
-        fromChatTab
-        createRecipeTab
-        powerBrowserTab
-        if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
-        browserTab
-        workbenchesTab
+        TabSection("More") {
+          fromChatTab
+          createRecipeTab
+          powerBrowserTab
+          if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
+          browserTab
+          workbenchesTab
+        }
         settingsTab
       } else {
         recipesTab
-        powerBrowserTab
-        if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
         menusTab
         mealCalendarTab
         groceriesTab
-        browserTab
-        workbenchesTab
-        fromChatTab
-        createRecipeTab
+        TabSection("More") {
+          powerBrowserTab
+          if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
+          browserTab
+          workbenchesTab
+          fromChatTab
+          createRecipeTab
+        }
         settingsTab
       }
     }
