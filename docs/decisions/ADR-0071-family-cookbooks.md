@@ -5,7 +5,8 @@
 > their own library as an independent copy. Nothing else is shared, nothing is co-edited, and no synced table
 > changes.
 
-Status: **Proposed** — 2026-11-13. Scopes [ADR-0003](ADR-0003-private-libraries-recipe-transfer.md) Phase 2
+Status: **Accepted** — 2026-11-13, after the S0 transport spike passed on Jon's and Wendy's devices
+([S0 result](#s0-result-2026-11-13)). Scopes [ADR-0003](ADR-0003-private-libraries-recipe-transfer.md) Phase 2
 ("Family Cookbook"), which [ADR-0070](ADR-0070-what-you-teach-reaches-everyone.md) D2 left unscoped.
 Origin: Jon, 2026-11-13: *"let people view another user's recipes (sort, filter, all that stuff) and then copy a
 recipe to their own stash."* The users are Jon, Wendy, and maybe the boys: a handful of people who know each other.
@@ -191,6 +192,40 @@ Each slice is one dispatch; S1 and S2 need no CloudKit and can ship to TestFligh
 
 Phase 1 "Send a copy" (a single recipe file through the share sheet) is S1's payload and import plus a share-sheet
 action. Not in this plan; it's cheap after S1 if wanted.
+
+## S0 result (2026-11-13)
+
+**Pass.** The D3 transport stands, and the snapshot-file fallback isn't needed. Jon's device published from his
+library, which holds 2,223 recipes, and Wendy's iPhone viewed it. Both ran Yes Chef Dev against the cookbook
+container's Development environment. The spike merged as [#512](https://github.com/jonphillips/yes-chef/pull/512).
+
+| Step | Result |
+|---|---|
+| Share | Zone-wide share created on Jon's device; Wendy's iPhone accepted it a minute later. (The "Share ready" log line lists only the owner, Jon: role 1 is owner, permission 3 is read-write. It was written before Wendy joined. Her read-only permission is shown by Try to Write.) |
+| Publish 2,000 + profile | 86.8 s total: five 400-record batches at 16–18 s each, then the profile at 1.4 s (about 23 records/s) |
+| First fetch | 2,002 changed, 0 deleted, in 42.7 s |
+| Republish one | Wendy's next fetch: 1 changed in 2.4 s |
+| Try to Write | `CKError` 10 (`permissionFailure`): "CREATE operation not permitted" |
+| Library sync | Unaffected on both devices. The cookbook container's Development schema has only `CookbookProfile`, `CookbookRecipe`, `Users` and `cloudkit.share` |
+
+What S3 and S4 take from it:
+
+- **The share is a record in the zone.** The first fetch counted 2,002 records, not 2,001, because the spike counts
+  every changed record, and the zone-wide share itself (`cloudkit.zoneshare`) is one of them. The S4 fetcher applies
+  `CookbookRecipe` and `CookbookProfile` records and skips every other type, so the share can never count as an
+  unreadable recipe ("needs a newer Yes Chef", D4).
+- **The first publish takes about 90 seconds**, without photos. Thumbnails make the payloads bigger and display images
+  add assets, so S3 should expect several minutes. Because the zone is the state (D4), an interrupted publish costs
+  nothing: the next one compares hashes and uploads only what's left. S3 doesn't need to finish in one sitting, but
+  its status has to say "Published 1,200 of 2,223" rather than look done.
+- **A full fetch takes about 40 seconds** for 2,000 records. S4 shows progress on the first visit, and the browser
+  works on what's arrived.
+- **Log enum names, not raw values.** S3's sharing status names each participant and their permission in words. The
+  spike's raw values were easy to misread.
+- **Accepting from a cold launch wasn't shown.** The log has one acceptance, with no note of whether the app was
+  running. S0's acceptance code is disposable, so S4's device pass checks both ways an invitation arrives.
+- **Production schema.** The two record types exist only in the cookbook container's Development schema. They're
+  deployed to Production before the first TestFlight build that publishes (What this costs).
 
 ## Open questions
 

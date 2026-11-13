@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-13 — Family cookbook S0 device pass cleared (`plan/family-cookbooks-s0-result`)
+
+- **Result:** The S0 transport spike passed, and its line is gone from `device-passes.md`. ADR-0071 is Accepted, and its § S0 result records the timings and what S3 and S4 take from them.
+- **Verification:** Jon's and Wendy's Copy Log output on 2026-11-13: the share was accepted, 2,000 recipes and the profile published in 86.8 s, the first fetch took 42.7 s (2,002 records, including the zone share record), a republish fetched as exactly 1 change in 2.4 s, Try to Write failed with `CKError` 10, and library sync was unaffected. The cookbook record types appear only in the cookbook container's Development schema.
+
+---
 ## 2026-11-13 — Family cookbook transport spike (`effort/family-cookbooks`)
 
 - **Result:** Added a DEBUG-only CloudKit cookbook transport screen and share acceptance flow using the separate cookbook container. No synced schema or library sync code changed.

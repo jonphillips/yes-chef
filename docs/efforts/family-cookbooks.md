@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
-Status: Blocked (on Jon's S0 device pass).
-Summary: S0 is a debug-only spike: a second CloudKit container, a zone-wide read-only share from one Apple ID to another, a 2000-record publish and fetch, timed, with library sync left untouched. S1–S4 get briefed after its device result.
+Status: Designed (S0 passed on device 2026-11-13; S1 not yet briefed).
+Summary: Browse family members' recipes read-only and copy one into yours. The S0 transport spike passed (ADR-0071 § S0 result); S1 (bundle v2 and copy-import) is next to brief.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
@@ -9,7 +9,7 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 
 ## Ledger
 
-- [x] **S0** — transport spike (this brief, below)
+- [x] **S0** — transport spike (this brief, below). Device pass cleared 2026-11-13; results in ADR-0071 § S0 result
 - [ ] **S1** — bundle v2 and copy-import (ADR-0071 § Order; briefed after S0)
 - [ ] **S2** — mirror database and read-only visiting
 - [ ] **S3** — publish

@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [Family cookbooks](family-cookbooks.md) — **Blocked** (on Jon's S0 device pass). Browse family members' recipes read-only and copy one into yours (ADR-0071). S0 is a debug-only CloudKit transport spike; S1–S4 get briefed after its result.
+- [Family cookbooks](family-cookbooks.md) — **Designed** (S0 passed on device 2026-11-13; S1 not yet briefed). Browse family members' recipes read-only and copy one into yours. The S0 transport spike passed (ADR-0071 § S0 result); S1 (bundle v2 and copy-import) is next to brief.
