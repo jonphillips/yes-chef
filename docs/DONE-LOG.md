@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-13 — Family cookbooks S1 — bundle v2 and copy-import (`effort/family-cookbooks-s1`)
+
+- **Result:** Added versioned cookbook payloads and transactional copy-import with identity remapping, preserved provenance, and link resolution.
+- **Verification:** check-drift passed: 875 package tests, 20 supporting tests, and app test-target build; 3 known test issues.
+
+---
 ## 2026-11-13 — Family cookbook S0 device pass cleared (`plan/family-cookbooks-s0-result`)
 
 - **Result:** The S0 transport spike passed, and its line is gone from `device-passes.md`. ADR-0071 is Accepted, and its § S0 result records the timings and what S3 and S4 take from them.

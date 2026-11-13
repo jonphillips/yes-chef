@@ -10,7 +10,7 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 ## Ledger
 
 - [x] **S0** — transport spike (this brief, below). Device pass cleared 2026-11-13; results in ADR-0071 § S0 result
-- [ ] **S1** — bundle v2 and copy-import (this brief, below)
+- [x] **S1** — bundle v2 and copy-import (this brief, below)
 - [ ] **S2** — mirror database and read-only visiting
 - [ ] **S3** — publish
 - [ ] **S4** — accept and fetch
