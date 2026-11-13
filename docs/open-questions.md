@@ -11,11 +11,11 @@ and everything downstream move forward without waiting on it.
 **Parked briefs (ADR-0005 D10 archive sweep, 2026-10-30).** Designed but not scheduled. Each brief sits in
 `efforts/archive/`. Restore one to the root, restated `Designed` or `Ready`, in the plan PR that schedules it.
 
-- **Ingredient parser splits inside a parenthetical (found 2026-11-12, Thanksgiving Advance list).** The Pumpkin Pie
-  butter item's notes read "3/4 stick) cold unsalted butter, cut into 1/4-inch slices", so a line like "6 tablespoons
-  (3/4 stick) cold unsalted butter, cut into…" was split inside the parentheses. Reproduce from the recipe's stored
-  line before fixing; the original text is preserved, so a fix re-parses nothing by itself. Fold into the next
-  import/parsing slice.
+- **Top `safeAreaInset` bars may hide large titles (2026-11-13)** on Workbenches, Recipes, Browsers. Check on device.
+- **Ingredient parser splits inside a parenthetical (2026-11-12).** The Pumpkin Pie butter
+  item's notes read "3/4 stick) cold unsalted butter, cut into 1/4-inch slices", so a line like "6 tablespoons
+  (3/4 stick) cold unsalted butter, cut into…" was split inside the parentheses. Reproduce from the stored line first;
+  a fix re-parses nothing by itself. Fold into the next import slice.
 - **Prepared components** ([brief](efforts/archive/prepared-components.md), [ADR-0057](decisions/ADR-0057-prepared-components.md)) —
   a `Recipe.kind` and a directional dish → component edge. Additive schema, so it's safe after the cut. Nothing forces it sooner.
 - **ATK "Gather Your Ingredients" repair** ([brief](efforts/archive/import-text-normalization.md)) — P1 only, a
