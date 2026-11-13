@@ -108,6 +108,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   case facetCoverage
 #if DEBUG
   case modelCallInventory
+  case cookbookSpike
 #endif
 
   var id: Self { self }
@@ -123,6 +124,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .facetCoverage: "Label Recipes"
 #if DEBUG
     case .modelCallInventory: "Model Calls"
+    case .cookbookSpike: "Cookbook Spike"
 #endif
     }
   }
@@ -138,6 +140,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .facetCoverage: .tag
 #if DEBUG
     case .modelCallInventory: AppSymbol("sparkles")
+    case .cookbookSpike: AppSymbol("person.2")
 #endif
     }
   }

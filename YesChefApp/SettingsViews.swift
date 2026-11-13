@@ -68,6 +68,7 @@ struct SettingsView: View {
 #if DEBUG
         Text("Yes Chef Dev · CloudKit Development")
         modelCallInventoryRow
+        cookbookSpikeRow
 #endif
       }
 
@@ -447,6 +448,23 @@ struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var cookbookSpikeRow: some View {
+    if let selectedPane {
+      Button {
+        selectedPane.wrappedValue = .cookbookSpike
+      } label: {
+        SettingsPane.cookbookSpike.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        CookbookSpikeView()
+      } label: {
+        SettingsPane.cookbookSpike.label
+      }
+    }
+  }
 #endif
 }
 
@@ -536,6 +554,10 @@ struct SettingsDetailPane: View {
     case .modelCallInventory:
       NavigationStack {
         ModelCallInventoryView()
+      }
+    case .cookbookSpike:
+      NavigationStack {
+        CookbookSpikeView()
       }
 #endif
     case nil:

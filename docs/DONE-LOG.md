@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-13 — Family cookbook transport spike (`effort/family-cookbooks`)
+
+- **Result:** Added a DEBUG-only CloudKit cookbook transport screen and share acceptance flow using the separate cookbook container. No synced schema or library sync code changed.
+- **Verification:** scripts/check-drift.sh passed (868 package tests; YesChefTests build-for-testing passed); generic iOS build passed; YesChefTests passed (147 tests).
+- **Owed:** family-cookbooks §S0's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-13 — Dogfood polish: menus, groceries, and recipe sharing (`effort/dogfood-polish-2026-11-13`)
 
 - **Result:** Added Dated and Undated menus, clearer menu detail and grocery entry, kitchen fraction display, Same As candidates, symbol rendering modes, and plain text recipe sharing.

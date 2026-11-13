@@ -39,6 +39,7 @@ Dev, on CloudKit Development.
 - **kitchen-knowledge-promotion:** On the iPad, run Export What I've Taught; on the Mac, run `scripts/promote-knowledge -n` and check the summary includes the mint fix, then run it for real and open its data diff as a PR; install a build with that promotion and confirm the fix is gone from Name Fixes while fresh mint leaves and mint still merge into one item. ([brief](efforts/archive/kitchen-knowledge-promotion.md))
 - **grocery-consolidate-list:** On the iPad Thanksgiving Advance list, tap List Actions › Consolidate List and confirm the three unsalted butters become one 14-tablespoon item showing all three recipes on long-press. Add one more recipe with butter and confirm it merges straight in. ([brief](efforts/archive/grocery-consolidate-list.md))
 - **dogfood-polish-2026-11-13:** On iPad and iPhone, check dated sorting and new menu selection; menu title scrolling; Fresh rapid-add visibility and focus; Same As labels; rounded grocery quantities; and recipe sharing to Messages and Notes. ([brief](efforts/archive/dogfood-polish-2026-11-13.md))
+- **family-cookbooks §S0:** On Jon and Wendy devices, complete the S0 share, 2,000-record publish/fetch, republish, read-only write-denial, and library-sync isolation pass; paste both Copy Log outputs into the PR. ([brief](efforts/family-cookbooks.md))
 
 ## Held
 
