@@ -67,7 +67,7 @@ struct RecipeRelatedRecipeChoices: View {
   private func relatedRecipeRow(_ recipe: Recipe, isReadOnly: Bool) -> some View {
     HStack(alignment: .top, spacing: 8) {
       Button {
-        onRecipeSelected(RecipeDetailPresentation(recipeID: recipe.id))
+        onRecipeSelected(RecipeDetailPresentation(recipeID: recipe.id, scope: model.scope))
       } label: {
         VStack(alignment: .leading, spacing: 3) {
           Text(recipe.title)

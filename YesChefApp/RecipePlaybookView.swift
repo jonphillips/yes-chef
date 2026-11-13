@@ -416,7 +416,7 @@ private struct RecipeServeWithStrip: View {
             ForEach(items) { item in
               Button {
                 if let id = item.linkedRecipeID, model.detail?.resolvedServeWithRecipeIDs.contains(id) == true {
-                  onRecipeSelected(RecipeDetailPresentation(recipeID: id))
+                  onRecipeSelected(RecipeDetailPresentation(recipeID: id, scope: model.scope))
                 } else if !isReadOnly {
                   editor = .edit(item)
                 }

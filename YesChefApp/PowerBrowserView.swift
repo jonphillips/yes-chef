@@ -306,7 +306,7 @@ private struct PowerBrowserResultsView: View {
     List {
       ForEach(rows) { row in
         Button {
-          onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id))
+          onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id, scope: model.scope))
         } label: {
           RecipeListRow(
             row: row,

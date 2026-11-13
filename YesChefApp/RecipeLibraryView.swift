@@ -14,6 +14,7 @@ struct AppContainer: View {
   @Environment(SyncActivityRecorder.self) private var syncActivityRecorder
   @Dependency(\.createRecipeCoordinator) private var createRecipeCoordinator
   @State private var toastCenter: AppToastCenter
+  @State private var cookbookCopyModel: CookbookCopyModel
   @State private var recipeModel = RecipeLibraryModel()
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
@@ -37,6 +38,8 @@ struct AppContainer: View {
 
   init() {
     let toastCenter = AppToastCenter()
+    let cookbookCopyModel = CookbookCopyModel()
+    cookbookCopyModel.toastCenter = toastCenter
     let inboxModel = ChatAccessInboxModel()
     inboxModel.toastCenter = toastCenter
     let mealCalendarModel = MealCalendarModel(toastCenter: toastCenter)
@@ -50,6 +53,7 @@ struct AppContainer: View {
       groceryModel?.selectMenuDayButtonTapped(menuID: menuID, dayOffset: dayOffset)
     }
     _toastCenter = State(wrappedValue: toastCenter)
+    _cookbookCopyModel = State(wrappedValue: cookbookCopyModel)
     _chatAccessInboxModel = State(wrappedValue: inboxModel)
     _mealCalendarModel = State(wrappedValue: mealCalendarModel)
     _menuModel = State(wrappedValue: menuModel)
@@ -104,6 +108,7 @@ struct AppContainer: View {
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
+        cookbookCopyModel: cookbookCopyModel,
         toastCenter: toastCenter,
         onRecipeSelected: { presentedRecipe = $0 }
       )
@@ -424,6 +429,7 @@ private struct RecipeFullScreenCover: View {
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let cookbookCopyModel: CookbookCopyModel
   let toastCenter: AppToastCenter
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
@@ -453,11 +459,7 @@ private struct RecipeFullScreenCover: View {
   }
 
   @ViewBuilder private var detailView: some View {
-    let route: (RecipeDetailPresentation) -> Void = { next in
-      var next = next
-      next.scope = presentation.scope
-      onRecipeSelected(next)
-    }
+    let route: (RecipeDetailPresentation) -> Void = onRecipeSelected
     switch presentation.scope {
     case .mine:
       makeDetailView(onRecipeSelected: route)
@@ -483,6 +485,7 @@ private struct RecipeFullScreenCover: View {
       libraryModel: recipeModel,
       mealCalendarModel: mealCalendarModel,
       groceryModel: groceryModel,
+      cookbookCopyModel: cookbookCopyModel,
       hostsHandoffReviews: true,
       onRecipeSelected: onRecipeSelected
     )

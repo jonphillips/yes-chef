@@ -16,6 +16,7 @@ struct RecipeDetailView: View {
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let cookbookCopyModel: CookbookCopyModel?
   let scope: LibraryScope
   let isFocusActive: Bool
   let hostsHandoffReviews: Bool
@@ -32,6 +33,7 @@ struct RecipeDetailView: View {
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
+    cookbookCopyModel: CookbookCopyModel? = nil,
     hostsHandoffReviews: Bool = false,
     showsToolbar: Bool = true,
     isFocusActive: Bool = false,
@@ -55,6 +57,7 @@ struct RecipeDetailView: View {
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
+    self.cookbookCopyModel = cookbookCopyModel
     self.scope = scope
     self.hostsHandoffReviews = hostsHandoffReviews
     self.showsToolbar = showsToolbar
@@ -118,6 +121,33 @@ struct RecipeDetailView: View {
     } message: {
       Text(model.errorMessage ?? "Something went wrong.")
     }
+    .confirmationDialog(
+      "Already in My Recipes",
+      isPresented: copyPromptIsPresented,
+      titleVisibility: .visible
+    ) {
+      if case let .existingCopies(_, _, ids)? = cookbookCopyModel?.prompt {
+        Button("Open Mine") {
+          Task {
+            if let recipeID = await cookbookCopyModel?.newestCopy(of: ids) {
+              onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, scope: .mine))
+            }
+            cookbookCopyModel?.clearPrompt()
+          }
+        }
+        Button("Copy Anyway") {
+          Task { await cookbookCopyModel?.copyAnywayButtonTapped() }
+        }
+      }
+      Button("Cancel", role: .cancel) { cookbookCopyModel?.clearPrompt() }
+    } message: {
+      Text("This recipe already has a copy in your library.")
+    }
+    .alert("Cookbook Copy", isPresented: copyResultIsPresented) {
+      Button("OK", role: .cancel) { cookbookCopyModel?.clearPrompt() }
+    } message: {
+      Text(copyPromptMessage)
+    }
     .handoffTransportAlert(handoffTransport)
     .handoffReviewDestinations(
       isPresentationEnabled: hostsHandoffReviews && model.destination.workbench == nil && !isVariationManagerPresented
@@ -159,6 +189,7 @@ struct RecipeDetailView: View {
       model: model,
       handoffTransport: handoffTransport,
       libraryModel: libraryModel,
+      cookbookCopyModel: cookbookCopyModel,
       isVariationManagerPresented: $isVariationManagerPresented,
       onRecipeSelected: onRecipeSelected
     )
@@ -208,6 +239,22 @@ struct RecipeDetailView: View {
               set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
             )
           )
+        } else if case let .cookbook(context) = model.scope, let cookbookCopyModel {
+          let copyIDs = cookbookCopyModel.copyIDsBySource[model.recipeID] ?? []
+          Button {
+            if copyIDs.isEmpty {
+              Task { await cookbookCopyModel.copyButtonTapped(context: context, sourceID: model.recipeID) }
+            } else {
+              Task {
+                if let recipeID = await cookbookCopyModel.newestCopy(of: copyIDs) {
+                  onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, scope: .mine))
+                }
+              }
+            }
+          } label: {
+            Label(copyIDs.isEmpty ? "Copy to My Recipes" : "Open Mine", systemImage: copyIDs.isEmpty ? "plus.circle" : "arrow.up.forward.square")
+          }
+          .task { await cookbookCopyModel.refreshCopyStatus(context: context, sourceID: model.recipeID) }
         }
       }
       ToolbarItemGroup(placement: .secondaryAction) {
@@ -250,6 +297,41 @@ struct RecipeDetailView: View {
           }
         }
       }
+    }
+  }
+
+  private var copyPromptIsPresented: Binding<Bool> {
+    Binding(
+      get: {
+        if case .existingCopies? = cookbookCopyModel?.prompt { return true }
+        return false
+      },
+      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+    )
+  }
+
+  private var copyResultIsPresented: Binding<Bool> {
+    Binding(
+      get: {
+        switch cookbookCopyModel?.prompt {
+        case .copyResult?, .failure?: true
+        default: false
+        }
+      },
+      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+    )
+  }
+
+  private var copyPromptMessage: String {
+    switch cookbookCopyModel?.prompt {
+    case let .copyResult(result):
+      let lines = result.unlinkedRelated.isEmpty
+        ? [] : ["Related recipes not in your library: " + result.unlinkedRelated.joined(separator: ", ")]
+      let serves = result.textOnlyServeWith.isEmpty
+        ? [] : ["Kept as text: " + result.textOnlyServeWith.joined(separator: ", ")]
+      return (lines + serves + result.warnings).joined(separator: "\n")
+    case let .failure(message): message
+    default: ""
     }
   }
 }
@@ -358,6 +440,7 @@ private struct RecipeReaderView: View {
   let model: RecipeDetailModel
   let handoffTransport: HandoffInAppTransport
   let libraryModel: RecipeLibraryModel
+  let cookbookCopyModel: CookbookCopyModel?
   @Binding var isVariationManagerPresented: Bool
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
@@ -467,6 +550,12 @@ private struct RecipeReaderView: View {
 
   private func header(_ recipe: Recipe) -> some View {
     VStack(alignment: .leading, spacing: 4) {
+      if model.scope != .mine, let cookbookCopyModel,
+        !(cookbookCopyModel.copyIDsBySource[model.recipeID] ?? []).isEmpty {
+        Label("In My Recipes", systemImage: "checkmark.circle.fill")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+      }
       HStack(alignment: .firstTextBaseline) {
         Text(recipe.title)
           .font(.title.bold())
