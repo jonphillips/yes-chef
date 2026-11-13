@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [Family cookbooks](family-cookbooks.md) — **Designed** (S2 not yet briefed). Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed on device and S1 (bundle v2 and copy-import) is merged; S2 (mirror and read-only visiting) is next to brief.
+- [Family cookbooks](family-cookbooks.md) — **Ready.** Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed and S1 (bundle v2 and copy-import) is done; S2 is the mirror database, read-only visiting and Copy to My Recipes, fed by a DEBUG payload file.

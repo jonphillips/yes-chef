@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
-Status: Designed (S2 not yet briefed).
-Summary: Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed on device and S1 (bundle v2 and copy-import) is merged; S2 (mirror and read-only visiting) is next to brief.
+Status: Ready
+Summary: Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed and S1 (bundle v2 and copy-import) is done; S2 is the mirror database, read-only visiting and Copy to My Recipes, fed by a DEBUG payload file.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
@@ -11,9 +11,9 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 
 - [x] **S0** — transport spike (this brief, below). Device pass cleared 2026-11-13; results in ADR-0071 § S0 result
 - [x] **S1** — bundle v2 and copy-import (this brief, below)
-- [ ] **S2** — mirror database and read-only visiting
+- [ ] **S2** — mirror database and read-only visiting (this brief, below)
 - [ ] **S3** — publish
-- [ ] **S4** — accept and fetch
+- [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook
 
 ## Where things are for S0 (architect, 2026-11-13, `origin/main` e5b3143)
 
@@ -252,3 +252,152 @@ payload, so S1 has to settle the payload's shape and what a copy does.
   run (guardrail #9).
 - Closeout (ADR-0005 D16) runs with `--keep-brief`. It ticks S1 in the ledger and advances `NEXT_UP.md` per ADR-0005
   D12. S1 has no device pass: nothing in it is visible until S2.
+
+## S2 — Mirror and read-only visiting
+
+S2 makes a cookbook browsable without any CloudKit. A mirror database is filled from a payload file, and the Recipes
+list, the Power Browser and the reader run against it read-only. **Copy to My Recipes** brings a recipe across using
+S1. A DEBUG-only file export and load gets Jon's real library onto Wendy's phone for the device pass. S4 later fills
+the same mirror from the shared zone instead of a file. The mirror code is permanent; only the file loader is
+DEBUG-only.
+
+### Where things are (architect, 2026-11-13, PR #514 head f594c86)
+
+- `YesChefCore/Schema.swift`: `bootstrapDatabase(path:syncMode:eraseDatabaseOnSchemaChange:)` (line 65) builds the
+  migrator inline (lines 87–1401) and sets `defaultDatabase`. Its `prepareDatabase` attaches the **library
+  container's** metadatabase (line 72). `migrateRestoreCandidate` (line 1420) is the precedent for running the
+  migrator against another file. No list, browser or reader query reads sync metadata. Only `Schema.swift`,
+  `RecipeSyncRepair.swift` and `SyncHealthModel` do.
+- `YesChefCore/CookbookPayload.swift` and `RecipeRepository+CookbookCopy.swift` (S1): `bundles(in:)`,
+  `copyCookbookRecipe`, `existingCopies`, and the private `copyCookbookLabels` (find or create by facet and path).
+- `YesChefApp/RecipeLibraryView.swift`: `AppContainer` (line 11) owns `RecipeLibraryModel`, `PowerBrowserModel` and
+  the root presenters, `presentedRecipe` (line 33, `.fullScreenCover` at line 101) and `presentedCookSession`.
+- `YesChefApp/AppNavigationModels.swift`: `RecipeDetailPresentation` (line 4) and `AppSection` (line 56, a
+  `String`-backed `CaseIterable` enum).
+- `YesChefApp/RecipeDetailView.swift`: `init` (line 25) builds `RecipeDetailModel` inside the view's initializer and
+  takes your `RecipeLibraryModel`, `MealCalendarModel` and `GroceryLibraryModel`.
+- `YesChefApp/RecipeModels.swift`: `RecipeLibraryModel` (line 12) and `RecipeDetailModel` (line 695). **Reading
+  writes:** changing the scale persists it (`persistScaleFactor`, line 1067).
+- `YesChefApp/RecipeImageLoader.swift`: `RecipePhotoDisplayDataLoader.load` (line 12) resolves
+  `@Dependency(\.defaultDatabase)` inside a static function called from a view. It sees whatever the dependency is
+  *where it's called*, not the model's.
+- `YesChefApp/PowerBrowserModel.swift`: the saved-lens library (line 106) is your state, and it's empty in a mirror.
+- Models capture `@Dependency` values when they're created. A model created inside
+  `withDependencies { $0.defaultDatabase = mirror }` reads the mirror; a view, static helper or `@Fetch` declared in a
+  view doesn't.
+
+### Build — core (`YesChefCore`, package tests)
+
+1. **Extract the migrator.** Move the migration registrations out of `bootstrapDatabase` into
+   `YesChefSchema.migrator()`, and have `bootstrapDatabase` call it. This is a move, not a rewrite: every migration
+   body and identifier stays byte-identical and in the same order: shipped migrations are never rewritten. Library
+   bootstrap behaves exactly as before.
+2. **`CookbookMirror`** (new file). One per cookbook, at `Application Support/Cookbooks/<id>.sqlite`, with the
+   directory excluded from backup.
+   - **Open:** if the file's applied migrations aren't exactly `YesChefSchema.migrator()`'s, delete the file
+     (with `-wal` and `-shm`) and create it fresh. Never migrate a mirror: it's a cache (D2). Create it through a
+     short-lived plain connection that runs the migrator and closes. Then open the guarded pool below with
+     `SQLiteData.defaultDatabase(path:configuration:)`, **without** the metadatabase attach and with no
+     `SyncEngine`.
+   - **Read-only guard:** use one `DatabasePool` for both the screens and the writer, not a second read-only
+     connection. Observation (`@Fetch`) only sees writes made through the same pool, and a separate writer would
+     leave an open cookbook stale after S4's fetch. Every connection runs `PRAGMA query_only = 1` in
+     `prepareDatabase`. Only `apply` lifts it, inside one `writeWithoutTransaction` block: `query_only = 0`, then
+     the transaction, then `query_only = 1` in a `defer`. The writer is serialized, so no other write can land in
+     between. Any other `write` throws `SQLITE_READONLY`. That's the D6 backstop.
+   - **`apply(upserting: [RecipeBundle], deleting: [Recipe.ID])`**, one transaction. It uses the owner's IDs as
+     they are. For each bundle: upsert the recipe, source and children, and delete that recipe's children that are
+     no longer in the payload. Rebuild its labels with the S1 facet-and-path find-or-create (extract
+     `copyCookbookLabels` into a shared helper; don't copy it). Upsert serve-with rows as they are
+     (`linkedRecipeID` isn't a foreign key, so a link to a recipe not yet in the mirror is fine). Insert a related
+     pair only once its `recipeID` row exists. The pair arrives in both recipes' payloads, so it's inserted by
+     whichever comes second. After all upserts, delete the recipes in `deleting` (children cascade) and any related
+     pair whose `relatedRecipeID` was deleted. Then prune labels and facets that no mirror recipe uses.
+   - **`deleteMirror()`** removes the files.
+3. **Single-recipe bundle.** `CookbookPayload.bundle(for: Recipe.ID, in:)` shares code with `bundles(in:)`. Copy
+   reads its bundle from the mirror this way.
+4. **Payload file** (DEBUG callers, but the type is plain core code): `CookbookFile` holds `ownerName`,
+   `generatedAt` and `payloads: [Data]`, each one an `encodedPayload`. Loading decodes each payload with
+   `decodePayload` and counts `.newerVersion` instead of failing the load.
+
+### Build — app
+
+5. **Scope.** Add `LibraryScope` (`.mine` / `.cookbook(CookbookContext)`), where `CookbookContext` holds the owner's
+   name and the mirror. `RecipeDetailPresentation` gains `scope`, so a serve-with or related tap inside a cookbook
+   opens the linked recipe in the same cookbook. The root cover builds `RecipeDetailView`'s model inside
+   `withDependencies { $0.defaultDatabase = mirror.database }` when the scope is a cookbook.
+6. **Every database access in scope.** For each file the cookbook screens reach, list every `defaultDatabase`
+   resolution and `@Fetch` in the PR body, with how it gets the mirror. Models are created inside the scoped
+   `withDependencies`. Static helpers and view-level fetches take the database from the model, or from an
+   environment value the cookbook root sets. `RecipePhotoDisplayDataLoader` is the known case. A missed one reads or
+   writes **your** library while you're looking at someone else's, and nothing on screen would show it.
+7. **Write affordances.** In `.cookbook` scope, the list, browser and reader show no edit, rate, favorite, label,
+   archive, delete, import, chat, ask, adjust, variation editing, enrichment, workbench, cover photo, reader-feedback
+   editing, add to menu, calendar or groceries actions, and no lens saving. Choosing a variation to view and scaling
+   still work, **in memory only**: `setScaleFactor` never persists in a cookbook. Cook mode stays out of S2. For
+   each `database.write` reachable from those three screens, say in the PR body whether it's hidden or kept in
+   memory. The `query_only` guard is the backstop, not the plan.
+8. **Copy to My Recipes.** It's the reader's one primary action in a cookbook. The action lives in a root-owned
+   `CookbookCopyModel`, created outside the mirror scope, so it holds **your** library database (the cover's
+   `defaultDatabase` is the mirror). It reads `bundle(for:)` from the mirror, then checks
+   `existingCopies(of:)` in your library:
+   - no match: copy, then show a toast with **Open**;
+   - a match: ask **Open Mine / Copy Anyway** (several matches: Open Mine opens the newest);
+   - after copying, show the result's `textOnlyServeWith` and `unlinkedRelated` in one plain alert ("Related recipes
+     not in your library: …"). There's no copy-them-too action yet; it's in S4.
+
+   When you have a copy, the reader shows **In My Recipes** and the button reads **Open Mine**. Marking rows in the
+   list is in S4.
+9. **Where a cookbook appears.** Add `AppSection.cookbooks` ("Family Cookbooks"). It's shown only when at least one
+   mirror exists, so TestFlight users see nothing. It lists the mirrors by owner name. Choosing one shows the Recipes
+   list and the Power Browser against that mirror, under a header "Jon's Recipes · read-only · loaded <date>".
+10. **DEBUG file transport.** Settings › Developer gets two rows, DEBUG-only. **Export My Cookbook File** writes a
+    `CookbookFile` from `CookbookPayload.bundles` and offers the share sheet. **Load Cookbook File** uses
+    `fileImporter`, opens or replaces the mirror for that owner, applies every payload, and logs the counts
+    (applied, newer-version skipped, time). The S0 spike rows stay.
+
+### Keep
+
+- No synced table, column or migration change (D8). No CloudKit and no change to the S0 spike.
+- `.mine` behaves exactly as today: every scope check defaults to `.mine`.
+- No mirror rows ever enter your library except through `copyCookbookRecipe`.
+
+### Tests
+
+- **Package:** `YesChefSchema.migrator()` registers the same identifiers in the same order as before, checked against
+  a list captured from `main`. A mirror from an older migration list is recreated, not migrated. A plain `write` on
+  the mirror throws, and `apply` succeeds while an observation on the same pool sees the change. Applying the same
+  bundles twice changes nothing. A republished bundle with a removed line deletes that line. A deleted recipe takes
+  its children and both directions of its related pairs. A related pair inserts whichever recipe arrives second.
+  Labels are pruned when unused. A `CookbookFile` with one version-3 payload loads the rest and counts one skipped.
+- **App (`YesChefTests`):**
+  - A `RecipeDetailModel` built in cookbook scope reads the mirror while `defaultDatabase` outside it is a different
+    database, and it writes nothing to that database.
+  - Scale changes in cookbook scope don't persist.
+  - `CookbookCopyModel` copies into the library database, not the mirror, and takes the Open Mine / Copy Anyway
+    branch when a copy exists.
+
+### Done when
+
+- `scripts/check-drift.sh` is green, the generic iOS build passes, and `YesChefTests` passes on a simulator (this
+  slice changes App-layer models; guardrail #9).
+- The PR body has the database-access list (item 6) and the write-affordance list (item 7).
+- Closeout (ADR-0005 D16) runs with `--keep-brief`. It ticks S2, appends the device pass below, and advances
+  `NEXT_UP.md` per ADR-0005 D12.
+
+### Device pass (Jon and Wendy, about 30 minutes)
+
+Both devices run **Yes Chef Dev**, as in S0.
+
+1. **Jon's iPad:** Settings › Developer › **Export My Cookbook File**, then AirDrop it to Wendy's iPhone.
+2. **Wendy's iPhone:** **Load Cookbook File**. The log shows about 2,200 applied and 0 skipped, with the time.
+   **Family Cookbooks** appears, with Jon's Recipes.
+3. Browse Jon's Recipes: search, sort by rating, filter by a label in two facets, filter by time and by source. The
+   results match the same filters on Jon's iPad. Open the Power Browser on it.
+4. Open a recipe with a photo, a variation and a linked serve-with. Scale it, view the variation, and follow the
+   serve-with link (it stays in Jon's cookbook). There's no edit, rate, chat, menu or grocery action anywhere.
+   Reopen the recipe: the scale isn't remembered.
+5. **Copy to My Recipes.** It opens in Wendy's own library with fresh ratings, the variation intact, labels in her
+   own facets, and the source reading "Copied from Jon's cookbook". Back in the cookbook, the recipe shows
+   **In My Recipes**, and **Copy Anyway** makes a second, independent copy.
+6. Edit Wendy's copy. Jon's cookbook entry doesn't change. The copy reaches Wendy's other device through normal sync.
