@@ -199,6 +199,33 @@ struct CookbookPayloadTests {
     }
   }
 
+  @Test func textServeWithIsNotReportedAndPayloadBytesAreStable() throws {
+    @Dependency(\.defaultDatabase) var database
+    let recipe = Recipe(id: UUID(), title: "Roast", dateCreated: now, dateModified: now)
+    let first = Recipe(id: UUID(), title: "Gravy", dateCreated: now, dateModified: now)
+    let second = Recipe(id: UUID(), title: "Potatoes", dateCreated: now, dateModified: now)
+    func serve(_ title: String, linked: Recipe.ID?, order: Int) -> RecipeServeWith {
+      RecipeServeWith(id: UUID(), recipeID: recipe.id, linkedRecipeID: linked, title: title, sortOrder: order,
+        provenance: .handAuthored, dateCreated: now, dateModified: now)
+    }
+    try database.write { db in
+      try Recipe.insert { recipe }.execute(db)
+      try Recipe.insert { first }.execute(db)
+      try Recipe.insert { second }.execute(db)
+      try RecipeServeWith.insert { serve("Gravy", linked: first.id, order: 0) }.execute(db)
+      try RecipeServeWith.insert { serve("Green salad", linked: nil, order: 1) }.execute(db)
+      try RecipeServeWith.insert { serve("Potatoes", linked: second.id, order: 2) }.execute(db)
+      let bundle = try #require(try CookbookPayload.bundles(in: db).first { $0.recipe.id == recipe.id })
+      let again = try #require(try CookbookPayload.bundles(in: db).first { $0.recipe.id == recipe.id })
+      #expect(bundle.linkTargets.count == 2)
+      #expect(try CookbookPayload.encodedPayload(bundle) == CookbookPayload.encodedPayload(again))
+      try Recipe.find(first.id).delete().execute(db)
+      try Recipe.find(second.id).delete().execute(db)
+      let copy = try RecipeRepository.copyCookbookRecipe(bundle, ownerName: "Jon", displayImages: [:], in: db, now: now, uuid: UUID.init)
+      #expect(Set(copy.textOnlyServeWith) == ["Gravy", "Potatoes"])
+    }
+  }
+
   @Test func danglingVariationAnchorsKeepFallback() throws {
     @Dependency(\.defaultDatabase) var database
     let recipe = Recipe(id: UUID(), title: "Soup", dateCreated: now, dateModified: now)

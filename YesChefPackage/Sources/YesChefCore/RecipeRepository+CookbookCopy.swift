@@ -187,7 +187,7 @@ extension RecipeRepository {
     for row in bundle.serveWith {
       guard let id = serveRows[row.id] else { throw CookbookCopyError.missingParent(row.id) }
       let linked = try row.linkedRecipeID.flatMap { try resolve($0) }
-      if linked == nil { textOnly.append(row.title) }
+      if row.linkedRecipeID != nil, linked == nil { textOnly.append(row.title) }
       let copy = RecipeServeWith(id: id, recipeID: recipeID, linkedRecipeID: linked, title: row.title, note: row.note,
         sortOrder: row.sortOrder, provenance: row.provenance, dateCreated: row.dateCreated, dateModified: row.dateModified)
       try RecipeServeWith.insert { copy }.execute(db)

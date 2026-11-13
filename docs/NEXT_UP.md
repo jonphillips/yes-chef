@@ -1,6 +1,5 @@
-# Next Up — Family cookbooks, S1 bundle v2 and copy-import
+# Next Up — nothing dispatched
 
-**Slices:** effort `family-cookbooks` §S1
-**Briefs:** [docs/efforts/family-cookbooks.md](efforts/family-cookbooks.md)
-**Done when:** per the brief (§S1 · Done when)
+Nothing dispatched.
+
 **Owed:** see [device-passes.md](device-passes.md)

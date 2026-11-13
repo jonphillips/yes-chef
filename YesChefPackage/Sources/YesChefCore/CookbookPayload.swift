@@ -23,17 +23,31 @@ public enum CookbookPayload {
     let facetsByID = Dictionary(uniqueKeysWithValues: facets.map { ($0.id, $0) })
     let recipesByID = Dictionary(uniqueKeysWithValues: recipes.map { ($0.id, $0) })
     let sourcesByID = Dictionary(uniqueKeysWithValues: sources.map { ($0.recipeID, $0) })
+    let ingredientSectionsByRecipeID = Dictionary(grouping: ingredientSections, by: \.recipeID)
+    let ingredientLinesByRecipeID = Dictionary(grouping: ingredientLines, by: \.recipeID)
+    let instructionSectionsByRecipeID = Dictionary(grouping: instructionSections, by: \.recipeID)
+    let instructionStepsByRecipeID = Dictionary(grouping: instructionSteps, by: \.recipeID)
+    let notesByRecipeID = Dictionary(grouping: notes, by: \.recipeID)
+    let photosByRecipeID = Dictionary(grouping: photos, by: \.recipeID)
+    let joinsByRecipeID = Dictionary(grouping: joins, by: \.recipeID)
+    let servesByRecipeID = Dictionary(grouping: serves, by: \.recipeID)
+    let variationsByRecipeID = Dictionary(grouping: variations, by: \.recipeID)
+    var relatedByRecipeID: [Recipe.ID: [RecipeRelatedRecipe]] = [:]
+    for pair in related {
+      relatedByRecipeID[pair.recipeID, default: []].append(pair)
+      if pair.relatedRecipeID != pair.recipeID { relatedByRecipeID[pair.relatedRecipeID, default: []].append(pair) }
+    }
     return recipes.filter { !$0.archived }.sorted { $0.id.uuidString < $1.id.uuidString }.map { recipe in
       let id = recipe.id
-      let ownCategories = joins.filter { $0.recipeID == id }.compactMap { categoriesByID[$0.categoryID] }
+      let ownCategories = joinsByRecipeID[id, default: []].compactMap { categoriesByID[$0.categoryID] }
       let labels = ownCategories.map { category in
         RecipeBundleCoding.LabelPath(
           facet: category.facetID.flatMap { facetsByID[$0]?.name },
           path: CategoryHierarchy.pathComponents(for: category, categoriesByID: categoriesByID)
         )
       }
-      let ownServes = serves.filter { $0.recipeID == id }
-      let ownRelated = related.filter { $0.recipeID == id || $0.relatedRecipeID == id }
+      let ownServes = servesByRecipeID[id, default: []]
+      let ownRelated = relatedByRecipeID[id, default: []]
       let targetIDs = Set(ownServes.compactMap(\.linkedRecipeID) + ownRelated.map { $0.recipeID == id ? $0.relatedRecipeID : $0.recipeID })
       let targets = targetIDs.compactMap { targetID -> RecipeBundleCoding.LinkTarget? in
         guard let target = recipesByID[targetID] else { return nil }
@@ -41,19 +55,19 @@ public enum CookbookPayload {
       }
       return RecipeBundleCoding.RecipeBundle(
         version: RecipeBundleCoding.currentVersion, recipe: recipe, source: sourcesByID[id],
-        ingredientSections: ingredientSections.filter { $0.recipeID == id },
-        ingredientLines: ingredientLines.filter { $0.recipeID == id },
-        instructionSections: instructionSections.filter { $0.recipeID == id },
-        instructionSteps: instructionSteps.filter { $0.recipeID == id },
-        recipeNotes: notes.filter { $0.recipeID == id },
-        photos: photos.filter { $0.recipeID == id }.map { photo in
+        ingredientSections: ingredientSectionsByRecipeID[id, default: []],
+        ingredientLines: ingredientLinesByRecipeID[id, default: []],
+        instructionSections: instructionSectionsByRecipeID[id, default: []],
+        instructionSteps: instructionStepsByRecipeID[id, default: []],
+        recipeNotes: notesByRecipeID[id, default: []],
+        photos: photosByRecipeID[id, default: []].map { photo in
           var photo = photo
           photo.displayData = nil
           return photo
         },
         categoryNames: ownCategories.map(\.name).sorted(), labels: labels,
         serveWith: ownServes, relatedRecipes: ownRelated,
-        variations: variations.filter { $0.recipeID == id }, linkTargets: targets
+        variations: variationsByRecipeID[id, default: []], linkTargets: targets
       )
     }
   }

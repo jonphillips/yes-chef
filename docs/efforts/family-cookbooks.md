@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
-Status: Ready
-Summary: Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed on device; S1 is the recipe bundle v2 payload and copy-import, package-only.
+Status: Designed (S2 not yet briefed).
+Summary: Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed on device and S1 (bundle v2 and copy-import) is merged; S2 (mirror and read-only visiting) is next to brief.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
