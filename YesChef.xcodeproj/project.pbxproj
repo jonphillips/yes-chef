@@ -179,6 +179,7 @@
 		C5A6E39ACB59937B1AA66FC6 /* RecipeTextViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */; };
 		C5E6DBA4137BB6C113CFD100 /* ChatAccessInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D623DFA6C9D545A4DCFF71B7 /* ChatAccessInboxView.swift */; };
 		C9C5BCB9FCD07E7ACCB7728A /* ChatAccessInboxFileClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45D75CF362451D2A5C111E03 /* ChatAccessInboxFileClient.swift */; };
+		CA1738524D7C83B4E15E6830 /* CookbookScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5268A50ACE551C967AF9F890 /* CookbookScopeTests.swift */; };
 		CB4F5CEA046A10EF5FDE0892 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCF32B5108C44892607FF3B /* RecipeDetailView.swift */; };
 		CCFC4DC9297E465E3E045AAA /* CookSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */; };
 		CD5717B4A411916DC9E7499F /* RecipeChatWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */; };
@@ -307,6 +308,7 @@
 		4E98DAAE2876452488D71CD0 /* WideLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WideLayout.swift; sourceTree = "<group>"; };
 		4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeTextViews.swift; sourceTree = "<group>"; };
 		524747E80606624B20663AC9 /* HandoffReviewCoordinator+RecipeReturn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+RecipeReturn.swift"; sourceTree = "<group>"; };
+		5268A50ACE551C967AF9F890 /* CookbookScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookbookScopeTests.swift; sourceTree = "<group>"; };
 		54AC9C0D3BA4DD46B83A2A83 /* ChatAccessKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChatAccessKit; path = "../../jon-platform/packages/ChatAccessKit"; sourceTree = SOURCE_ROOT; };
 		556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedCoverageView.swift; sourceTree = "<group>"; };
 		557FDADA27F5D11ECEDADABA /* AppHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppHelpSheet.swift; sourceTree = "<group>"; };
@@ -524,6 +526,7 @@
 				9B4F1C5A6DBD76ED3478EC75 /* ChatAccessInboxModelTests.swift */,
 				842FC32385274C6E7D875B4D /* ChatAssistantSelectionTests.swift */,
 				4802BA56B714BCEF8679A289 /* ChatSurfaceTests.swift */,
+				5268A50ACE551C967AF9F890 /* CookbookScopeTests.swift */,
 				AF820DD380C76A8BFE19ED0E /* CreateRecipeModelTests.swift */,
 				1FC616A546A09303F072B989 /* GroceryTripModelTests.swift */,
 				17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */,
@@ -929,6 +932,7 @@
 				6DBBE364EC2B4CA8410CEEDB /* ChatAccessInboxModelTests.swift in Sources */,
 				0CC37A24661F09BC79B0D2DD /* ChatAssistantSelectionTests.swift in Sources */,
 				B1A4B0832475BA500093C538 /* ChatSurfaceTests.swift in Sources */,
+				CA1738524D7C83B4E15E6830 /* CookbookScopeTests.swift in Sources */,
 				4713F8207F92734799A501EE /* CreateRecipeModelTests.swift in Sources */,
 				811E6DD6C5011EBE4557BFA5 /* GroceryTripModelTests.swift in Sources */,
 				36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */,

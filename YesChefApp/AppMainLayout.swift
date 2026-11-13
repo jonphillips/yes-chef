@@ -196,6 +196,7 @@ struct AppMainLayout: View {
       SettingsTab(
         recipeModel: recipeModel,
         groceryModel: groceryModel,
+        cookbookLibraryModel: cookbookLibraryModel,
         automaticBackupModel: automaticBackupModel,
         chatAccessExportModel: chatAccessExportModel,
         chatAccessInboxModel: chatAccessInboxModel,
@@ -355,6 +356,7 @@ private struct SettingsTab: View {
 
   let recipeModel: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
+  let cookbookLibraryModel: CookbookLibraryModel
   let automaticBackupModel: AutomaticBackupModel
   let chatAccessExportModel: ChatAccessExportModel
   let chatAccessInboxModel: ChatAccessInboxModel
@@ -365,12 +367,13 @@ private struct SettingsTab: View {
     if usesCompactTabLayout {
       // The More tab supplies the compact navigation context. Passing no pane binding keeps these
       // rows as NavigationLinks instead of changing a split-view selection with no compact push.
-      SettingsView(model: recipeModel, groceryModel: groceryModel, automaticBackupModel: automaticBackupModel, chatAccessExportModel: chatAccessExportModel, chatAccessInboxModel: chatAccessInboxModel)
+      SettingsView(model: recipeModel, groceryModel: groceryModel, cookbookLibraryModel: cookbookLibraryModel, automaticBackupModel: automaticBackupModel, chatAccessExportModel: chatAccessExportModel, chatAccessInboxModel: chatAccessInboxModel)
     } else {
       NavigationSplitView(columnVisibility: $columnVisibility) {
         SettingsView(
           model: recipeModel,
           groceryModel: groceryModel,
+          cookbookLibraryModel: cookbookLibraryModel,
           automaticBackupModel: automaticBackupModel,
           chatAccessExportModel: chatAccessExportModel,
           chatAccessInboxModel: chatAccessInboxModel,

@@ -6,6 +6,7 @@ import YesChefCore
 struct SettingsView: View {
   let model: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
+  let cookbookLibraryModel: CookbookLibraryModel
   private let selectedPane: Binding<SettingsPane?>?
   @State private var syncHealth = SyncHealthModel()
   @State private var showingSyncDetail = false
@@ -26,11 +27,16 @@ struct SettingsView: View {
   /// on dismissal, before the Restore button's action could use it.
   @State private var isConfirmingRestore = false
   @State private var isPresentingRestoreRestartCover = false
+  @State private var isPresentingCookbookImporter = false
+  @State private var isPresentingCookbookShare = false
+  @State private var exportedCookbookURL: URL?
+  @State private var cookbookFileLog = ""
   @Environment(\.scenePhase) private var scenePhase
 
   init(
     model: RecipeLibraryModel,
     groceryModel: GroceryLibraryModel,
+    cookbookLibraryModel: CookbookLibraryModel,
     automaticBackupModel: AutomaticBackupModel,
     chatAccessExportModel: ChatAccessExportModel,
     chatAccessInboxModel: ChatAccessInboxModel,
@@ -38,6 +44,7 @@ struct SettingsView: View {
   ) {
     self.model = model
     self.groceryModel = groceryModel
+    self.cookbookLibraryModel = cookbookLibraryModel
     self.selectedPane = selectedPane
     self.automaticBackupModel = automaticBackupModel
     self.chatAccessExportModel = chatAccessExportModel
@@ -69,6 +76,7 @@ struct SettingsView: View {
         Text("Yes Chef Dev · CloudKit Development")
         modelCallInventoryRow
         cookbookSpikeRow
+        cookbookFileTransportRows
 #endif
       }
 
@@ -215,6 +223,16 @@ struct SettingsView: View {
       allowedContentTypes: [.yesChefSQLiteBackup, .data],
       onCompletion: backupRestoreSelected
     )
+    .fileImporter(
+      isPresented: $isPresentingCookbookImporter,
+      allowedContentTypes: [.json],
+      onCompletion: cookbookFileSelected
+    )
+    .sheet(isPresented: $isPresentingCookbookShare) {
+      if let exportedCookbookURL {
+        CookbookShareSheet(url: exportedCookbookURL)
+      }
+    }
     .alert("Restore This Backup?", isPresented: $isConfirmingRestore) {
       Button("Restore", role: .destructive) {
         Task {
@@ -432,6 +450,52 @@ struct SettingsView: View {
     }
   }
 #if DEBUG
+  @ViewBuilder private var cookbookFileTransportRows: some View {
+    Button {
+      Task {
+        do {
+          let url = try await cookbookLibraryModel.exportCookbookFile()
+          exportedCookbookURL = url
+          cookbookFileLog = "\(Date.now.formatted(date: .abbreviated, time: .shortened)) · Exported \(url.lastPathComponent)"
+          isPresentingCookbookShare = true
+        } catch {
+          cookbookFileLog = "Export failed: \(error)"
+        }
+      }
+    } label: {
+      Label("Export My Cookbook File", symbol: .share)
+    }
+
+    Button {
+      isPresentingCookbookImporter = true
+    } label: {
+      Label("Load Cookbook File", symbol: .fromChat)
+    }
+
+    if !cookbookFileLog.isEmpty {
+      Text(cookbookFileLog)
+        .font(.footnote.monospaced())
+        .foregroundStyle(cookbookFileLog.localizedCaseInsensitiveContains("failed") ? .red : .secondary)
+        .textSelection(.enabled)
+    }
+  }
+
+  private func cookbookFileSelected(_ result: Result<URL, any Error>) {
+    switch result {
+    case let .success(url):
+      Task {
+        do {
+          let load = try await cookbookLibraryModel.loadCookbookFile(at: url)
+          cookbookFileLog = "\(Date.now.formatted(date: .abbreviated, time: .shortened)) · Applied \(load.appliedCount), newer-version skipped \(load.newerVersionSkippedCount), time \(load.elapsedSeconds.formatted(.number.precision(.fractionLength(1))))s"
+        } catch {
+          cookbookFileLog = "Load failed: \(error)"
+        }
+      }
+    case let .failure(error):
+      cookbookFileLog = "Load failed: \(error)"
+    }
+  }
+
   @ViewBuilder private var modelCallInventoryRow: some View {
     if let selectedPane {
       Button {

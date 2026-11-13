@@ -1,6 +1,8 @@
+import Dependencies
 import Foundation
 import Observation
 import SwiftUI
+import UIKit
 import YesChefCore
 
 @Observable
@@ -14,8 +16,17 @@ final class CookbookLibraryModel {
 
   private(set) var entries: [Entry] = []
   private(set) var contexts: [CookbookContext] = []
+  @ObservationIgnored @Dependency(\.defaultDatabase) private var libraryDatabase
+  @ObservationIgnored @Dependency(\.date.now) private var now
+  @ObservationIgnored @Dependency(\.uuid) private var uuid
   private let directory: URL
   private let indexURL: URL
+
+  struct LoadResult {
+    var appliedCount: Int
+    var newerVersionSkippedCount: Int
+    var elapsedSeconds: Double
+  }
 
   init() {
     let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -47,6 +58,53 @@ final class CookbookLibraryModel {
     return context
   }
 
+  func exportCookbookFile() async throws -> URL {
+    let bundles = try await libraryDatabase.read { try CookbookPayload.bundles(in: $0) }
+    let payloads = try bundles.map(CookbookPayload.encodedPayload)
+    let file = CookbookFile(ownerName: Self.deviceOwnerName, generatedAt: now, payloads: payloads)
+    let data = try JSONEncoder().encode(file)
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("YesChef-\(Self.deviceOwnerName)-Cookbook")
+      .appendingPathExtension("json")
+    try data.write(to: url, options: .atomic)
+    return url
+  }
+
+  func loadCookbookFile(at url: URL) async throws -> LoadResult {
+    let startedAt = Date()
+    let didAccess = url.startAccessingSecurityScopedResource()
+    defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+    let file = try JSONDecoder().decode(CookbookFile.self, from: Data(contentsOf: url))
+    let decoded = try file.decodedPayloads()
+    let existingEntry = entries.first { $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }
+    let id = existingEntry?.id ?? uuid()
+    if let existing = contexts.first(where: { $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }) {
+      let currentIDs = try await existing.mirror.database.read { try Recipe.fetchAll($0).map(\.id) }
+      let incomingIDs = Set(decoded.bundles.map { $0.recipe.id })
+      try existing.mirror.apply(
+        upserting: decoded.bundles,
+        deleting: currentIDs.filter { !incomingIDs.contains($0) }
+      )
+      let context = CookbookContext(ownerName: file.ownerName, mirror: existing.mirror, loadedAt: file.generatedAt)
+      try store(context)
+    } else {
+      if existingEntry != nil {
+      let stale = try CookbookMirror(id: id, directory: directory)
+      try stale.deleteMirror()
+      }
+      entries.removeAll { $0.id == id || $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }
+      contexts.removeAll { $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }
+      let mirror = try CookbookMirror(id: id, directory: directory)
+      try mirror.apply(upserting: decoded.bundles, deleting: [])
+      try store(CookbookContext(ownerName: file.ownerName, mirror: mirror, loadedAt: file.generatedAt))
+    }
+    return LoadResult(
+      appliedCount: decoded.bundles.count,
+      newerVersionSkippedCount: decoded.newerVersionCount,
+      elapsedSeconds: Date().timeIntervalSince(startedAt)
+    )
+  }
+
   private func persist() throws {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -65,6 +123,25 @@ final class CookbookLibraryModel {
     contexts.sort { $0.ownerName.localizedCaseInsensitiveCompare($1.ownerName) == .orderedAscending }
   }
 
+  private static var deviceOwnerName: String {
+    var name = UIDevice.current.name
+    for suffix in ["'s iPhone", "'s iPad", "'s Mac"] where name.hasSuffix(suffix) {
+      name.removeLast(suffix.count)
+      break
+    }
+    return name.isEmpty ? "My" : name
+  }
+
+}
+
+struct CookbookShareSheet: UIViewControllerRepresentable {
+  let url: URL
+
+  func makeUIViewController(context: Context) -> UIActivityViewController {
+    UIActivityViewController(activityItems: [url], applicationActivities: nil)
+  }
+
+  func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 struct FamilyCookbooksView: View {
@@ -90,8 +167,9 @@ struct FamilyCookbooksView: View {
       }
       .navigationTitle("Family Cookbooks")
       .navigationDestination(for: CookbookContext.self) { context in
+        let currentContext = model.contexts.first(where: { $0.ownerName.caseInsensitiveCompare(context.ownerName) == .orderedSame }) ?? context
         CookbookRecipesView(
-          context: context,
+          context: currentContext,
           copyModel: copyModel,
           mealCalendarModel: mealCalendarModel,
           groceryModel: groceryModel,
