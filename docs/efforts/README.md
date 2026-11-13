@@ -24,3 +24,5 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
+
+- [Dogfood polish, November 13](dogfood-polish-2026-11-13.md) — **Ready.** Five fixes: Menus Dated / Undated; menu title in the content; Same As… drops twins; grocery Add Item in the list; amounts as fractions. No schema change.
