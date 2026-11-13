@@ -1,10 +1,12 @@
 # Effort — Dogfood polish, November 13
 
 Status: Ready
-Summary: Five fixes: Menus Dated / Undated; menu title in the content; Same As… drops twins; grocery Add Item in the list; amounts as fractions. No schema change.
+Summary: Seven fixes: Menus Dated / Undated; menu title in the content; Same As… drops twins; grocery Add Item in the list; amounts as fractions; AppSymbol rendering modes; Share Recipe… as text. No schema change.
 
 Origin: Jon, 2026-11-12 and 2026-11-13, dogfooding the Thanksgiving Week menu and its Advance / Fresh lists on the iPad
-and iPhone. One dispatch, one PR. No ADR: these are layout and display fixes inside existing decisions.
+and iPhone. One dispatch, one PR. Items 1–5 are layout and display fixes inside existing decisions. Item 6 is
+[ADR-0065 Amendment 1](../decisions/ADR-0065-one-glyph-per-concept.md#amendment-1--a-concept-can-carry-a-rendering-mode-color-stays-at-the-call-site-2026-11-13).
+Item 7 is a readable text copy, not ADR-0003's `.yeschef` transfer.
 
 ## Where things are (architect, 2026-11-13, `origin/main` 01c3b1c)
 
@@ -34,6 +36,12 @@ and iPhone. One dispatch, one PR. No ADR: these are layout and display fixes ins
 - `IngredientNameFixViews.swift`: `SameAsPickerSheet` (line 114). It already drops the item's own row by id, and it
   shows only each row's title and area. `AppDestinationPresentation.swift` (about line 138) passes it
   `groceryModel.selectedItemRows`.
+- `AppSymbol.swift`: the concept vocabulary (ADR-0065). `.swiftlint.yml` `concept_glyph_literal` lists the concept
+  glyph names five times; a new concept goes in each.
+- `RecipeDetailView.swift` (about line 207): the `.secondaryAction` overflow (Edit, Workbench, View Original, Archive,
+  Delete…). `RecipeDetailModel` (`RecipeModels.swift`, line 695) observes `detail: RecipeDetailData?`.
+- `GroceryListPlainTextRenderer.swift` (Core) and `GroceryViews.swift` (line 210, **Share List**) are the precedent
+  for item 7.
 - `WorkbenchViews.swift` (line 44) has a segmented control in a top `safeAreaInset`. **Don't copy it**: it's the same
   shape as the grocery bug.
 
@@ -111,6 +119,43 @@ renders the same way. Shopping for a little more beats a little less. `1.08333` 
 on rows written from now on. Existing rows keep their stored text until they're merged into or rebuilt. There's no
 data pass.
 
+## 6. AppSymbol carries a rendering mode (ADR-0065 Amendment 1)
+
+**Build.**
+- `AppSymbol` gains an optional rendering mode, given in its initializers (`AppSymbol("cart", rendering:
+  .hierarchical)`) and defaulting to none. Use a small `Sendable, Hashable` enum of the modes that need no colors
+  (monochrome, hierarchical, multicolor) mapped to `SymbolRenderingMode`, rather than storing `SymbolRenderingMode`.
+- `image` applies it with `Image.symbolRenderingMode(_:)`, so it stays an `Image`, and `Label(_:symbol:)` picks it up.
+- `func rendering(_:) -> AppSymbol` returns a copy with the mode replaced, for call sites:
+  `Image(symbol: .menu.rendering(.hierarchical)).foregroundStyle(.blue)`.
+- No concept gets a mode in this PR. Jon sets them, one line each.
+- Add `.share` → `square.and.arrow.up` (A5). Add it to the lint regex, and convert **Share List** in
+  `GroceryViews.swift` to `Label("Share List", symbol: .share)`.
+
+**Keep:** `systemName` and `systemNameForIntents` as they are; a rendering mode doesn't reach App Intents.
+
+## 7. Share Recipe… as text
+
+**Build.**
+- **Core.** `RecipePlainTextRenderer.render(_ detail: RecipeDetailData) -> String`, beside
+  `GroceryListPlainTextRenderer`. It renders the **base recipe at its own yield**, ignoring the active variation and
+  the on-screen scale, in this order:
+  - the title;
+  - the source name and URL, when there are any;
+  - the yield and times, when present;
+  - **Ingredients**, by section, with a section's name as a heading when it has one, and each line's display text at
+    scale 1;
+  - **Directions**, by section, steps numbered within each section;
+  - **Notes**, the recipe's notes, when there are any.
+
+  It leaves out learnings, the playbook, variations, Serve With, rating, tags and categories, which are your own
+  notes about the recipe, not the recipe. Blank parts produce no heading.
+- **App.** **Share Recipe…** in the recipe detail `.secondaryAction` overflow, after **Workbench**, as a
+  `ShareLink(item: text, subject: Text(title))` with `Label("Share Recipe…", symbol: .share)`. The text comes from
+  `RecipeDetailModel`, built from `detail`. Hide the item while `detail` is nil.
+
+**Keep:** no file, no photo and no new document type. ADR-0003's `.yeschef` transfer is a separate effort.
+
 ## Tests
 
 `YesChefCoreTests`:
@@ -119,11 +164,16 @@ data pass.
 - **Same As candidates:** the item itself and a second item with the same fixed name (for example, two `unsalted
   butter` rows whose units can't add) are left out. A name fix makes `fresh mint leaves` a twin of `mint`, so it's
   left out too. Other rows keep their order.
+- **Recipe text:** a two-section recipe renders section headings for ingredients and directions; an untitled
+  single section renders none; an active variation and a scale on the model don't change the text; learnings and
+  tags don't appear; a recipe with no source or notes has no Source or Notes lines.
 - **Formatting:** `1.08333` → `1 ⅛`, `0.4375` → `½`, `1/3` → `⅓`, `2/3` → `⅔`, `1.5` → `1 ½`, `3` → `3`. A
   consolidation of ¼ cup + ½ cup + ⅓ cup stores `quantityText` `1 ⅛` and `quantity` exactly 13/12.
 
 `YesChefTests` (app target), because `MenuLibraryModel` changes:
 - The default segment is `.dated`. Adding a menu switches to `.undated` and selects the new menu.
+- `AppSymbol`: a concept's rendering mode survives into `image`; `rendering(_:)` overrides it without changing the
+  static value.
 
 ## Verify
 
@@ -140,3 +190,4 @@ data pass.
   - On the Fresh list, the list name shows without pulling down. Rapid-add three items in a row.
   - Same As… on minced fresh mint shows it under Matching and not in the list.
   - Rebuild the Fresh list and confirm parsley reads `1 ⅛ cup` and mint `½ cup`.
+  - On the souvlaki, ⋯ › Share Recipe… to Messages and Notes; the text reads cleanly with sections and steps.

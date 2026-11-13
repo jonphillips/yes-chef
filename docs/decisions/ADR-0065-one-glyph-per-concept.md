@@ -124,3 +124,21 @@ adding a concept means updating both the table and the rule.
 - The Recipes tab, recipe-kind items, grocery sources and the recipe empty states change glyph on device, from
   `book.closed` / `fork.knife` to `richtext.page`.
 - Core enums lose some `systemImage` cases. The app owns that presentation.
+
+## Amendment 1 — A concept can carry a rendering mode; color stays at the call site (2026-11-13)
+
+Origin: Jon, 2026-11-13. He wanted to give a concept a treatment like `.symbolRenderingMode(.hierarchical)` in
+`AppSymbol` itself, since that's the one place that names each concept's look. He chose rendering mode only.
+
+- **A1 — Rendering mode belongs to the concept.** An `AppSymbol` can carry a rendering mode, and `image` applies it,
+  so `Label(_:symbol:)` and `Image(symbol:)` get it without call-site changes. The default is none, which keeps the
+  system's mode. Setting a concept's mode is a one-line edit to its `static let`.
+- **A2 — A call site can override it** with `symbol.rendering(_:)`, which returns a copy. `image` stays an `Image`,
+  because `Image.symbolRenderingMode(_:)` returns an `Image`.
+- **A3 — Color is not part of a concept.** A baked color would override system tinting: a selected sidebar row, a
+  disabled button and the toolbar tint would all keep it. It would also make `image` a `View`, which `Label`'s icon
+  slot can't take. Color stays a modifier at the call site.
+- **A4 — Custom symbols render monochrome under `.hierarchical`** until their SVGs get layer annotations. That's an
+  asset change, not part of A1.
+- **A5 — Share joins the vocabulary** as `.share` → `square.and.arrow.up`. It now appears on two surfaces: Share List
+  on groceries and Share Recipe… on recipe detail (D3's rule). The lint regex gains it.
