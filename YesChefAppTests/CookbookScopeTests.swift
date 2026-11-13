@@ -21,12 +21,11 @@ struct CookbookScopeTests {
       version: RecipeBundleCoding.currentVersion,
       recipe: Recipe(id: recipeID, title: "Mirror Recipe", dateCreated: now, dateModified: now)
     )
-    try mirror.apply(upserting: [bundle], deleting: [])
-
     try await withDependencies {
       try $0.bootstrapDatabase()
       $0.date.now = now
     } operation: {
+      try mirror.apply(upserting: [bundle], deleting: [])
       @Dependency(\.defaultDatabase) var libraryDatabase
       try await libraryDatabase.write { db in
         try Recipe.insert {
@@ -66,7 +65,6 @@ struct CookbookScopeTests {
       version: RecipeBundleCoding.currentVersion,
       recipe: Recipe(id: recipeID, title: "Family Pie", dateCreated: now, dateModified: now)
     )
-    try mirror.apply(upserting: [bundle], deleting: [])
     let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now)
 
     try await withDependencies {
@@ -74,6 +72,7 @@ struct CookbookScopeTests {
       $0.date.now = now
       $0.uuid = .incrementing
     } operation: {
+      try mirror.apply(upserting: [bundle], deleting: [])
       @Dependency(\.defaultDatabase) var libraryDatabase
       let copyModel = CookbookCopyModel()
       await copyModel.copyButtonTapped(context: context, sourceID: recipeID)
