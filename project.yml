@@ -80,6 +80,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIApplicationSupportsIndirectInputEvents: true
+        CKSharingSupported: true
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - $(YESCHEF_URL_SCHEME)
