@@ -207,14 +207,18 @@ final class CookbookSpikeModel {
     guard let zone = zones.first(where: { $0.zoneID.zoneName == CookbookSpikeConfiguration.zoneName }) else {
       throw CookbookSpikeError.cookbookZoneMissing
     }
-    let records = try await database.records(
-      matching: CKQuery(recordType: "CookbookRecipe", predicate: NSPredicate(value: true)),
+    // A zone-changes read, not a CKQuery: a query needs a queryable recordName index, which
+    // the Development schema doesn't create on its own.
+    let page = try await database.recordZoneChanges(
       inZoneWith: zone.zoneID,
+      since: nil,
       desiredKeys: ["payload"],
-      resultsLimit: 1
+      resultsLimit: 10
     )
-    guard let match = records.matchResults.first, case let .success(record) = match.1,
-          let asset = record["payload"] as? CKAsset, let fileURL = asset.fileURL else {
+    let recipeRecord = page.modificationResultsByID.values
+      .compactMap { try? $0.get().record }
+      .first { $0.recordType == "CookbookRecipe" }
+    guard let record = recipeRecord, let asset = record["payload"] as? CKAsset, let fileURL = asset.fileURL else {
       throw CookbookSpikeError.noPublishedRecipes
     }
     var bundle = try JSONDecoder().decode(RecipeBundleCoding.RecipeBundle.self, from: Data(contentsOf: fileURL))
@@ -242,7 +246,8 @@ final class CookbookSpikeModel {
         let page = try await database.recordZoneChanges(
           inZoneWith: zone.zoneID,
           since: token,
-          desiredKeys: [],
+          // All keys: a real viewer downloads each payload asset, so the timing must include it.
+          desiredKeys: nil,
           resultsLimit: 400
         )
         for result in page.modificationResultsByID.values {
