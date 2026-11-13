@@ -5,14 +5,38 @@ public struct MenuRowData: Identifiable, Equatable, Sendable {
   public var menu: Menu
   public var itemCount: Int
   public var placementCount: Int
+  public var latestPlacementDate: Date?
 
-  public init(menu: Menu, itemCount: Int = 0, placementCount: Int = 0) {
+  public init(menu: Menu, itemCount: Int = 0, placementCount: Int = 0, latestPlacementDate: Date? = nil) {
     self.menu = menu
     self.itemCount = itemCount
     self.placementCount = placementCount
+    self.latestPlacementDate = latestPlacementDate
   }
 
   public var id: Menu.ID { menu.id }
+}
+
+public enum MenuListSegment: String, CaseIterable, Hashable, Sendable {
+  case dated
+  case undated
+
+  public func rows(from rows: [MenuRowData]) -> [MenuRowData] {
+    rows
+      .filter { ($0.latestPlacementDate != nil) == (self == .dated) }
+      .sorted { lhs, rhs in
+        if self == .dated,
+           let lhsDate = lhs.latestPlacementDate,
+           let rhsDate = rhs.latestPlacementDate,
+           lhsDate != rhsDate
+        {
+          return lhsDate > rhsDate
+        }
+        let titleOrder = lhs.menu.title.localizedStandardCompare(rhs.menu.title)
+        if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
+        return lhs.id.uuidString < rhs.id.uuidString
+      }
+  }
 }
 
 public struct MenuDetailData: Equatable, Sendable {
@@ -131,7 +155,8 @@ public struct MenuListRequest: FetchKeyRequest {
         MenuRowData(
           menu: menu,
           itemCount: itemsByMenuID[menu.id]?.count ?? 0,
-          placementCount: placementsByMenuID[menu.id]?.count ?? 0
+          placementCount: placementsByMenuID[menu.id]?.count ?? 0,
+          latestPlacementDate: placementsByMenuID[menu.id]?.map(\.startDate).max()
         )
       }
       .sorted {

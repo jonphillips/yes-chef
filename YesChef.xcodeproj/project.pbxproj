@@ -73,6 +73,7 @@
 		4D72BD312BA97BFBE8164E15 /* RecipeCaptureReaderFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87478FA946EAC365096D2B2 /* RecipeCaptureReaderFeedback.swift */; };
 		50811533FBD0E69E18EF5F1E /* GroceryNameFixModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3B16990C326AF08B2DEA82 /* GroceryNameFixModel.swift */; };
 		50F8C8268BD864F2D22ADD11 /* CreateRecipeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3825239A440A94D8108B41C5 /* CreateRecipeModel.swift */; };
+		53B966379FDC86D51058A660 /* MenuLibraryDogfoodTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0998AA3BE4806E0935072914 /* MenuLibraryDogfoodTests.swift */; };
 		54C7C79CC2EBB0130F4953B3 /* FacetCoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9191D1F59D6B79E1E49A82B8 /* FacetCoverageView.swift */; };
 		54D6A2CD5836F57CBEE81879 /* RecipeDetailModel+Labels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE5A1F4C00B47C679035FCEA /* RecipeDetailModel+Labels.swift */; };
 		5556826F5F47C4461DD123F2 /* MenuDetailChatPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC10A57FB9A55D40CD97546E /* MenuDetailChatPresentation.swift */; };
@@ -253,6 +254,7 @@
 		071FE50DFC8E303A1C2F824E /* ServeWithRepairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServeWithRepairSheet.swift; sourceTree = "<group>"; };
 		07C439846D3B6561F2CFE399 /* RecipeChatWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeChatWorkspace.swift; sourceTree = "<group>"; };
 		07FEC345E664B62E662EA479 /* YesChefPackage */ = {isa = PBXFileReference; lastKnownFileType = folder; name = YesChefPackage; path = YesChefPackage; sourceTree = SOURCE_ROOT; };
+		0998AA3BE4806E0935072914 /* MenuLibraryDogfoodTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuLibraryDogfoodTests.swift; sourceTree = "<group>"; };
 		0BA20A25693DA197A722F319 /* GroceryDisplayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryDisplayModel.swift; sourceTree = "<group>"; };
 		0BA4CA05A4077E714D63D297 /* CategoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryModels.swift; sourceTree = "<group>"; };
 		0D2AA2B9A5B2A2F4EFDE5A0C /* AppExternalDatabaseChangeReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExternalDatabaseChangeReload.swift; sourceTree = "<group>"; };
@@ -521,6 +523,7 @@
 				17E669665E13FA2090694CB0 /* HandoffSectionRoutingTests.swift */,
 				9E9F0E4818A532AB62F41BA8 /* LearnedAreaAuditModelTests.swift */,
 				470AD3AA374CF056564E8361 /* MenuBringInModelTests.swift */,
+				0998AA3BE4806E0935072914 /* MenuLibraryDogfoodTests.swift */,
 				ABEEEF0B390CA946CDA6752B /* MenuPrepPlanModelTests.swift */,
 				A09330F46A0E8E28834FD02B /* MenuWideColumnLayoutTests.swift */,
 				C3893F864052C16388BABE48 /* MissingICloudRowsStoreTests.swift */,
@@ -922,6 +925,7 @@
 				36753CBE212E39908AA91B4E /* HandoffSectionRoutingTests.swift in Sources */,
 				3987101D8A2C769EC719BCDC /* LearnedAreaAuditModelTests.swift in Sources */,
 				058DCF2421E88012C7EDEB95 /* MenuBringInModelTests.swift in Sources */,
+				53B966379FDC86D51058A660 /* MenuLibraryDogfoodTests.swift in Sources */,
 				E014E5F098A77190AE997B54 /* MenuPrepPlanModelTests.swift in Sources */,
 				2332533F5D83A3EF69B7F960 /* MenuWideColumnLayoutTests.swift in Sources */,
 				AEC289EFB725BB6BF91258AB /* MissingICloudRowsStoreTests.swift in Sources */,

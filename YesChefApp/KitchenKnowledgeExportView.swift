@@ -14,7 +14,7 @@ struct KitchenKnowledgeExportView: View {
           if model.isExporting {
             Label("Exporting…", systemImage: "arrow.clockwise")
           } else {
-            Label("Export What I've Taught", systemImage: "square.and.arrow.up")
+            Label("Export What I've Taught", symbol: .share)
           }
         }
         .disabled(model.isExporting)

@@ -9,18 +9,41 @@ struct MenuListView: View {
   var body: some View {
     @Bindable var model = model
 
-    List(model.menuRows, selection: $model.selectedMenuID) { row in
-      MenuRowView(row: row)
-        .tag(row.id)
-        .swipeActions {
-          // The row remains until confirmation; a destructive role can cause an invalid List update.
-          Button {
-            model.deleteMenuButtonTapped(row)
-          } label: {
-            Label("Delete", symbol: .delete)
-          }
-          .tint(.red)
+    List(selection: $model.selectedMenuID) {
+      Section {
+        Picker("Menu Dates", selection: $model.menuListSegment) {
+          Text("Dated").tag(MenuListSegment.dated)
+          Text("Undated").tag(MenuListSegment.undated)
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+      }
+
+      if model.visibleMenuRows.isEmpty {
+        Section {
+          ContentUnavailableView {
+            Label(model.menuListSegment == .dated ? "No Dated Menus" : "No Undated Menus", symbol: .menu)
+          } description: {
+            if model.menuListSegment == .dated {
+              Text("Put a menu on the calendar to date it.")
+            }
+          }
+        }
+      } else {
+        ForEach(model.visibleMenuRows) { row in
+          MenuRowView(row: row)
+            .tag(row.id)
+            .swipeActions {
+              // The row remains until confirmation; a destructive role can cause an invalid List update.
+              Button {
+                model.deleteMenuButtonTapped(row)
+              } label: {
+                Label("Delete", symbol: .delete)
+              }
+              .tint(.red)
+            }
+        }
+      }
     }
     .navigationTitle("Menus")
     .toolbar(removing: .sidebarToggle)
@@ -142,7 +165,8 @@ struct MenuDetailView: View {
           onRecipeSelected: onRecipeSelected,
           regeneratePrepPlan: regeneratePrepPlan
         )
-        .navigationTitle(detail.menu.title)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
       } else {
         ContentUnavailableView {
           Label("Menu Not Found", symbol: .menu)
@@ -621,6 +645,9 @@ struct MenuDetailHeader: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
+      Text(detail.menu.title)
+        .font(.largeTitle.weight(.bold))
+
       Text(metadata)
         .font(.subheadline)
         .foregroundStyle(.secondary)

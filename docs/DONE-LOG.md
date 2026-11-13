@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-13 — Dogfood polish: menus, groceries, and recipe sharing (`effort/dogfood-polish-2026-11-13`)
+
+- **Result:** Added Dated and Undated menus, clearer menu detail and grocery entry, kitchen fraction display, Same As candidates, symbol rendering modes, and plain text recipe sharing.
+- **Verification:** scripts/check-drift.sh: 868 package tests pass; 20 drift checks and app build-for-testing pass. Generic iOS build and YesChefTests (147 tests) pass.
+- **Owed:** dogfood-polish-2026-11-13's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-12 — Consolidate List (`effort/grocery-consolidate-list`)
 
 - **Result:** Shared grocery merge rules across recipe generation, Same As, and Consolidate List. Added the list action, alphabetical item sorting, and updated grocery help.
