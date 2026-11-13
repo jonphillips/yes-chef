@@ -12,7 +12,7 @@ recipe to their own stash."* The users are Jon, Wendy, and maybe the boys: a han
 Builds on: ADR-0003 (private libraries, transfer = copy; reaffirmed) · ADR-0070 D1 (household state never shared) ·
 [ADR-0050](ADR-0050-recipe-power-browser.md) (the browser being reused) ·
 [ADR-0049](ADR-0049-unified-labels-and-assisted-tagging.md) (labels) ·
-[ADR-0059](ADR-0059-yes-chef-dev-variant.md) (the Dev variant gets its own container) · guardrail #6 (the canonical
+[ADR-0059](ADR-0059-yes-chef-dev-variant.md) (D4: the Dev variant shares the container and uses its Development environment) · guardrail #6 (the canonical
 recipe-transfer bundle).
 
 ## Context
@@ -72,10 +72,13 @@ Each publisher writes one `CookbookRecipe` record per recipe into a `Cookbook` z
 `CookbookProfile` record (display name, recipe count, payload version). The zone is shared with a **zone-wide
 `CKShare`** whose public permission is none and whose participants are read-only.
 
-This lives in a **separate container**, `iCloud.com.jonphillips.yeschef.cookbook` (and a Dev twin per ADR-0059), not
+This lives in a **separate container**, `iCloud.com.jonphillips.yeschef.cookbook`, not
 the library's container. SQLiteData's `SyncEngine` runs `CKSyncEngine` over the library container's private and shared
 databases. A custom zone or an accepted share in that container would land in front of it, and this project has lost
 data to sync surprises before. A second container keeps the cookbook code where the sync engine can't see it.
+
+Both app variants list the cookbook container. Yes Chef Dev uses its Development environment, as ADR-0059 D4 does for
+the library container. A separate Dev container would have a schema that could never be deployed.
 
 Rejected:
 
