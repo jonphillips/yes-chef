@@ -17,86 +17,9 @@ private struct LegacyRecipeServeWithRow: Sendable {
   let dateModified: Date
 }
 
-extension DependencyValues {
-  public mutating func bootstrapDatabase() throws {
-    @Dependency(\.context) var context
-    let databasePath: String?
-    let syncMode: YesChefCloudSync.BootstrapMode
-    switch context {
-    case .live:
-      databasePath = try YesChefDatabaseStorage.prepareLiveSharedStore().path
-      syncMode = .configured(startImmediately: false)
-    case .preview, .test:
-      databasePath = nil
-      syncMode = .disabled
-    }
-    try bootstrapDatabase(path: databasePath, syncMode: syncMode)
-  }
-
-  public mutating func bootstrapDatabaseForShareExtension() throws {
-    @Dependency(\.context) var context
-    let databasePath: String?
-    let syncMode: YesChefCloudSync.BootstrapMode
-    switch context {
-    case .live:
-      databasePath = try YesChefDatabaseStorage.prepareLiveSharedStoreForExtension().path
-      syncMode = .configured(startImmediately: false)
-    case .preview, .test:
-      databasePath = nil
-      syncMode = .disabled
-    }
-    try bootstrapDatabase(
-      path: databasePath,
-      syncMode: syncMode
-    )
-  }
-
-  public mutating func bootstrapDatabaseForShareExtension(path: String?) throws {
-    try bootstrapDatabase(
-      path: path,
-      syncMode: .configured(startImmediately: false)
-    )
-  }
-
-  public mutating func bootstrapDatabase(path: String?) throws {
-    try bootstrapDatabase(path: path, syncMode: .disabled)
-  }
-
-  public mutating func bootstrapDatabase(
-    path: String?,
-    syncMode: YesChefCloudSync.BootstrapMode,
-    eraseDatabaseOnSchemaChange: Bool? = nil
-  ) throws {
-    var configuration = Configuration()
-    configuration.prepareDatabase { db in
-      try db.attachMetadatabase(containerIdentifier: YesChefCloudSync.containerIdentifier)
-      #if DEBUG
-        db.trace(options: .profile) { event in
-          guard case let .profile(statement, duration) = event,
-            statement.sql == "COMMIT TRANSACTION"
-          else { return }
-
-          AppLog.performance.log(
-            "sqlite-commit duration=\(duration, privacy: .public)s synchronizing=\(SyncEngine.isSynchronizing, privacy: .public)"
-          )
-        }
-      #endif
-    }
-
-    let database = try SQLiteData.defaultDatabase(path: path, configuration: configuration)
+public enum YesChefSchema {
+  public static func migrator() -> DatabaseMigrator {
     var migrator = DatabaseMigrator()
-    #if DEBUG
-      // Opt-in only. eraseDatabaseOnSchemaChange wipes the entire store whenever GRDB
-      // decides the on-disk schema differs from the migration-defined one — and
-      // SQLiteData's SyncEngine installs triggers on the synced tables at runtime, so
-      // that comparison drifts on an ordinary rebuild and nukes the dogfood library
-      // ("my database is gone"). Gate it behind an explicit launch argument: add
-      // -YesChefEraseDatabaseOnSchemaChange to the scheme only when you actually want a
-      // clean-slate dev DB, instead of firing on every DEBUG launch.
-      migrator.eraseDatabaseOnSchemaChange = eraseDatabaseOnSchemaChange
-        ?? ProcessInfo.processInfo.arguments.contains("-YesChefEraseDatabaseOnSchemaChange")
-    #endif
-
     migrator.registerMigration("Create MVP recipe library schema") { db in
       try #sql("""
         CREATE TABLE "recipes" (
@@ -1397,6 +1320,90 @@ extension DependencyValues {
         ) STRICT
         """).execute(db)
     }
+
+    return migrator
+  }
+}
+
+extension DependencyValues {
+  public mutating func bootstrapDatabase() throws {
+    @Dependency(\.context) var context
+    let databasePath: String?
+    let syncMode: YesChefCloudSync.BootstrapMode
+    switch context {
+    case .live:
+      databasePath = try YesChefDatabaseStorage.prepareLiveSharedStore().path
+      syncMode = .configured(startImmediately: false)
+    case .preview, .test:
+      databasePath = nil
+      syncMode = .disabled
+    }
+    try bootstrapDatabase(path: databasePath, syncMode: syncMode)
+  }
+
+  public mutating func bootstrapDatabaseForShareExtension() throws {
+    @Dependency(\.context) var context
+    let databasePath: String?
+    let syncMode: YesChefCloudSync.BootstrapMode
+    switch context {
+    case .live:
+      databasePath = try YesChefDatabaseStorage.prepareLiveSharedStoreForExtension().path
+      syncMode = .configured(startImmediately: false)
+    case .preview, .test:
+      databasePath = nil
+      syncMode = .disabled
+    }
+    try bootstrapDatabase(
+      path: databasePath,
+      syncMode: syncMode
+    )
+  }
+
+  public mutating func bootstrapDatabaseForShareExtension(path: String?) throws {
+    try bootstrapDatabase(
+      path: path,
+      syncMode: .configured(startImmediately: false)
+    )
+  }
+
+  public mutating func bootstrapDatabase(path: String?) throws {
+    try bootstrapDatabase(path: path, syncMode: .disabled)
+  }
+
+  public mutating func bootstrapDatabase(
+    path: String?,
+    syncMode: YesChefCloudSync.BootstrapMode,
+    eraseDatabaseOnSchemaChange: Bool? = nil
+  ) throws {
+    var configuration = Configuration()
+    configuration.prepareDatabase { db in
+      try db.attachMetadatabase(containerIdentifier: YesChefCloudSync.containerIdentifier)
+      #if DEBUG
+        db.trace(options: .profile) { event in
+          guard case let .profile(statement, duration) = event,
+            statement.sql == "COMMIT TRANSACTION"
+          else { return }
+
+          AppLog.performance.log(
+            "sqlite-commit duration=\(duration, privacy: .public)s synchronizing=\(SyncEngine.isSynchronizing, privacy: .public)"
+          )
+        }
+      #endif
+    }
+
+    let database = try SQLiteData.defaultDatabase(path: path, configuration: configuration)
+    var migrator = YesChefSchema.migrator()
+    #if DEBUG
+      // Opt-in only. eraseDatabaseOnSchemaChange wipes the entire store whenever GRDB
+      // decides the on-disk schema differs from the migration-defined one — and
+      // SQLiteData's SyncEngine installs triggers on the synced tables at runtime, so
+      // that comparison drifts on an ordinary rebuild and nukes the dogfood library
+      // ("my database is gone"). Gate it behind an explicit launch argument: add
+      // -YesChefEraseDatabaseOnSchemaChange to the scheme only when you actually want a
+      // clean-slate dev DB, instead of firing on every DEBUG launch.
+      migrator.eraseDatabaseOnSchemaChange = eraseDatabaseOnSchemaChange
+        ?? ProcessInfo.processInfo.arguments.contains("-YesChefEraseDatabaseOnSchemaChange")
+    #endif
 
     try migrator.migrate(database)
     try database.write { db in

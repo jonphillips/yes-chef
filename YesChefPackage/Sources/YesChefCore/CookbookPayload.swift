@@ -72,6 +72,10 @@ public enum CookbookPayload {
     }
   }
 
+  public static func bundle(for id: Recipe.ID, in db: Database) throws -> RecipeBundleCoding.RecipeBundle? {
+    try bundles(in: db).first { $0.recipe.id == id }
+  }
+
   public static func encodedPayload(_ bundle: RecipeBundleCoding.RecipeBundle) throws -> Data {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
