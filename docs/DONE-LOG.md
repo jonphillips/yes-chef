@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-13 — Family cookbooks · S2 mirror and read-only visiting (`effort/family-cookbooks-s2`)
+
+- **Result:** Added local cookbook mirrors, read-only recipe and Power Browser access, Copy to My Recipes, family cookbook browsing, and DEBUG file transport.
+- **Verification:** check-drift passed with 0 lint violations, 884 package tests, 20 vendor tests, and a successful app test build; generic iOS build passed; YesChefTests passed 149 tests in 33 suites.
+- **Owed:** family-cookbooks §S2's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-13 — Family cookbooks S1 — bundle v2 and copy-import (`effort/family-cookbooks-s1`)
 
 - **Result:** Added versioned cookbook payloads and transactional copy-import with identity remapping, preserved provenance, and link resolution.

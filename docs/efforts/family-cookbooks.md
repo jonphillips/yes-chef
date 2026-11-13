@@ -11,7 +11,7 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 
 - [x] **S0** — transport spike (this brief, below). Device pass cleared 2026-11-13; results in ADR-0071 § S0 result
 - [x] **S1** — bundle v2 and copy-import (this brief, below)
-- [ ] **S2** — mirror database and read-only visiting (this brief, below)
+- [x] **S2** — mirror database and read-only visiting (this brief, below)
 - [ ] **S3** — publish
 - [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook
 
