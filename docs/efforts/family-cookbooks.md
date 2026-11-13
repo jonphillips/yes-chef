@@ -92,7 +92,7 @@ All new code is in `YesChefApp/` under `#if DEBUG`. Release builds behave exactl
 
 ### Device pass (Jon, about 30 minutes)
 
-Before: in the developer portal, create container `iCloud.com.jonphillips.yeschef.cookbook` and tick it on both App
+Before (**done**, Jon, 2026-11-13): in the developer portal, create container `iCloud.com.jonphillips.yeschef.cookbook` and tick it on both App
 IDs (`com.jonphillips.yeschef` and `com.jonphillips.yeschef.dev`).
 
 Both devices run **Yes Chef Dev**, installed from Xcode, with library iCloud sync turned on. Dev has its own bundle
