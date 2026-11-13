@@ -776,7 +776,7 @@ private struct RecipeSortMenu: View {
   }
 }
 
-private struct RecipeFilterView: View {
+struct RecipeFilterView: View {
   let model: RecipeLibraryModel
 
   var body: some View {

@@ -58,13 +58,13 @@ final class CookbookLibraryModel {
     return context
   }
 
-  func exportCookbookFile() async throws -> URL {
+  func exportCookbookFile(ownerName: String) async throws -> URL {
     let bundles = try await libraryDatabase.read { try CookbookPayload.bundles(in: $0) }
     let payloads = try bundles.map(CookbookPayload.encodedPayload)
-    let file = CookbookFile(ownerName: Self.deviceOwnerName, generatedAt: now, payloads: payloads)
+    let file = CookbookFile(ownerName: ownerName, generatedAt: now, payloads: payloads)
     let data = try JSONEncoder().encode(file)
     let url = FileManager.default.temporaryDirectory
-      .appendingPathComponent("YesChef-\(Self.deviceOwnerName)-Cookbook")
+      .appendingPathComponent("YesChef-\(ownerName)-Cookbook")
       .appendingPathExtension("json")
     try data.write(to: url, options: .atomic)
     return url
@@ -121,15 +121,6 @@ final class CookbookLibraryModel {
     contexts.removeAll { $0.mirror.fileURL == context.mirror.fileURL || $0.ownerName.caseInsensitiveCompare(context.ownerName) == .orderedSame }
     contexts.append(context)
     contexts.sort { $0.ownerName.localizedCaseInsensitiveCompare($1.ownerName) == .orderedAscending }
-  }
-
-  private static var deviceOwnerName: String {
-    var name = UIDevice.current.name
-    for suffix in ["'s iPhone", "'s iPad", "'s Mac"] where name.hasSuffix(suffix) {
-      name.removeLast(suffix.count)
-      break
-    }
-    return name.isEmpty ? "My" : name
   }
 
 }
@@ -213,6 +204,7 @@ private struct CookbookRecipesView: View {
   }
 
   var body: some View {
+    @Bindable var recipes = models.recipes
     Group {
       switch surface {
       case .recipes:
@@ -244,6 +236,13 @@ private struct CookbookRecipesView: View {
         PowerBrowserView(model: models.powerBrowser, onRecipeSelected: onRecipeSelected)
       }
     }
+    // The library's filter sheet is hosted at the app root on the library's own model.
+    .sheet(isPresented: $recipes.destination.filterRecipes) {
+      NavigationStack {
+        RecipeFilterView(model: recipes)
+      }
+    }
+    .environment(\.recipeImageDatabase, context.mirror.database)
     .safeAreaInset(edge: .top, spacing: 0) {
       Text("\(context.ownerName)'s Recipes · read-only · loaded \(context.loadedAt.formatted(date: .abbreviated, time: .shortened))")
         .font(.caption.weight(.medium))

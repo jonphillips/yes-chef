@@ -31,33 +31,35 @@ struct AppMainLayout: View {
 
   var body: some View {
     TabView(selection: $selectedSection) {
+      // TabContentBuilder takes at most ten children; Group keeps the cookbook tab beside
+      // Power Browser without changing the existing tab order or sections.
       if UIDevice.current.userInterfaceIdiom == .phone {
         recipesTab
         groceriesTab
         mealCalendarTab
         menusTab
-        TabSection("More") {
-          fromChatTab
-          createRecipeTab
+        fromChatTab
+        createRecipeTab
+        Group {
           powerBrowserTab
           if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
-          browserTab
-          workbenchesTab
         }
+        browserTab
+        workbenchesTab
         settingsTab
       } else {
         recipesTab
+        Group {
+          powerBrowserTab
+          if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
+        }
         menusTab
         mealCalendarTab
         groceriesTab
-        TabSection("More") {
-          powerBrowserTab
-          if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
-          browserTab
-          workbenchesTab
-          fromChatTab
-          createRecipeTab
-        }
+        browserTab
+        workbenchesTab
+        fromChatTab
+        createRecipeTab
         settingsTab
       }
     }

@@ -31,6 +31,11 @@ struct SettingsView: View {
   @State private var isPresentingCookbookShare = false
   @State private var exportedCookbookURL: URL?
   @State private var cookbookFileLog = ""
+#if DEBUG
+  // UIDevice.name is the generic "iPad"/"iPhone" without an entitlement, and the owner name
+  // ends up in a copy's "Copied from …'s cookbook" source, so the exporter types it.
+  @AppStorage("CookbookFile.ownerName") private var cookbookOwnerName = ""
+#endif
   @Environment(\.scenePhase) private var scenePhase
 
   init(
@@ -451,10 +456,13 @@ struct SettingsView: View {
   }
 #if DEBUG
   @ViewBuilder private var cookbookFileTransportRows: some View {
+    TextField("Cookbook owner name", text: $cookbookOwnerName)
+      .textContentType(.givenName)
+
     Button {
       Task {
         do {
-          let url = try await cookbookLibraryModel.exportCookbookFile()
+          let url = try await cookbookLibraryModel.exportCookbookFile(ownerName: ownerName)
           exportedCookbookURL = url
           cookbookFileLog = "\(Date.now.formatted(date: .abbreviated, time: .shortened)) · Exported \(url.lastPathComponent)"
           isPresentingCookbookShare = true
@@ -465,6 +473,7 @@ struct SettingsView: View {
     } label: {
       Label("Export My Cookbook File", symbol: .share)
     }
+    .disabled(ownerName.isEmpty)
 
     Button {
       isPresentingCookbookImporter = true
@@ -478,6 +487,10 @@ struct SettingsView: View {
         .foregroundStyle(cookbookFileLog.localizedCaseInsensitiveContains("failed") ? .red : .secondary)
         .textSelection(.enabled)
     }
+  }
+
+  private var ownerName: String {
+    cookbookOwnerName.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   private func cookbookFileSelected(_ result: Result<URL, any Error>) {
