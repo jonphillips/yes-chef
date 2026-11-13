@@ -429,18 +429,8 @@ private struct RecipeFullScreenCover: View {
 
   var body: some View {
     NavigationStack {
-      RecipeDetailView(
-        recipeID: presentation.recipeID,
-        scaleContext: presentation.scaleContext,
-        workbenchID: presentation.workbenchID,
-        includingArchivedRecipe: presentation.includingArchivedRecipe,
-        libraryModel: recipeModel,
-        mealCalendarModel: mealCalendarModel,
-        groceryModel: groceryModel,
-        hostsHandoffReviews: true,
-        onRecipeSelected: onRecipeSelected
-      )
-      .id(presentation.id)
+      detailView
+        .id(presentation.id)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Done") {
@@ -460,6 +450,41 @@ private struct RecipeFullScreenCover: View {
       mealCalendarModel: mealCalendarModel
     )
     .recipeDetailDestinations(recipeModel: recipeModel)
+  }
+
+  @ViewBuilder private var detailView: some View {
+    let route: (RecipeDetailPresentation) -> Void = { next in
+      var next = next
+      next.scope = presentation.scope
+      onRecipeSelected(next)
+    }
+    switch presentation.scope {
+    case .mine:
+      makeDetailView(onRecipeSelected: route)
+    case let .cookbook(context):
+      withDependencies {
+        $0.defaultDatabase = context.mirror.database
+      } operation: {
+        makeDetailView(onRecipeSelected: route)
+      }
+    }
+  }
+
+  private func makeDetailView(
+    onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void
+  ) -> some View {
+    RecipeDetailView(
+      recipeID: presentation.recipeID,
+      scaleContext: presentation.scaleContext,
+      workbenchID: presentation.workbenchID,
+      includingArchivedRecipe: presentation.includingArchivedRecipe,
+      scope: presentation.scope,
+      libraryModel: recipeModel,
+      mealCalendarModel: mealCalendarModel,
+      groceryModel: groceryModel,
+      hostsHandoffReviews: true,
+      onRecipeSelected: onRecipeSelected
+    )
   }
 }
 

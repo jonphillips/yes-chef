@@ -1,26 +1,55 @@
 import SwiftUI
 import YesChefCore
 
+enum LibraryScope: Hashable {
+  case mine
+  case cookbook(CookbookContext)
+}
+
+struct CookbookContext: Hashable {
+  var ownerName: String
+  var mirror: CookbookMirror
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.ownerName == rhs.ownerName && lhs.mirror.fileURL == rhs.mirror.fileURL
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ownerName)
+    hasher.combine(mirror.fileURL)
+  }
+}
+
 struct RecipeDetailPresentation: Hashable, Identifiable {
   var recipeID: Recipe.ID
   var scaleContext: ScaleContext
   var workbenchID: Workbench.ID?
   var includingArchivedRecipe: Bool
+  var scope: LibraryScope
 
   init(
     recipeID: Recipe.ID,
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
-    includingArchivedRecipe: Bool = false
+    includingArchivedRecipe: Bool = false,
+    scope: LibraryScope = .mine
   ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
     self.workbenchID = workbenchID
     self.includingArchivedRecipe = includingArchivedRecipe
+    self.scope = scope
   }
 
   var id: String {
-    "\(recipeID.uuidString):\(scaleContext.id):\(workbenchID?.uuidString ?? ""):\(includingArchivedRecipe)"
+    "\(recipeID.uuidString):\(scaleContext.id):\(workbenchID?.uuidString ?? ""):\(includingArchivedRecipe):\(scopeID)"
+  }
+
+  private var scopeID: String {
+    switch scope {
+    case .mine: "mine"
+    case let .cookbook(context): "cookbook:\(context.mirror.fileURL.path)"
+    }
   }
 }
 

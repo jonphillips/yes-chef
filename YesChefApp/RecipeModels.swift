@@ -709,6 +709,7 @@ final class RecipeDetailModel {
   let scaleContext: ScaleContext
   let workbenchID: Workbench.ID?
   let includingArchivedRecipe: Bool
+  let scope: LibraryScope
 
   @ObservationIgnored
   @Dependency(\.date.now) var now
@@ -767,12 +768,14 @@ final class RecipeDetailModel {
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
     includingArchivedRecipe: Bool = false,
+    scope: LibraryScope = .mine,
     toastCenter: AppToastCenter? = nil
   ) {
     self.recipeID = recipeID
     self.scaleContext = scaleContext ?? .recipe(recipeID)
     self.workbenchID = workbenchID
     self.includingArchivedRecipe = includingArchivedRecipe
+    self.scope = scope
     self.toastCenter = toastCenter
     #if DEBUG
     if ProcessInfo.processInfo.arguments.contains("-YesChefDisableDetailFetchAnimation") {

@@ -16,6 +16,7 @@ struct RecipeDetailView: View {
   let libraryModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
+  let scope: LibraryScope
   let isFocusActive: Bool
   let hostsHandoffReviews: Bool
   let showsToolbar: Bool
@@ -27,6 +28,7 @@ struct RecipeDetailView: View {
     scaleContext: ScaleContext? = nil,
     workbenchID: Workbench.ID? = nil,
     includingArchivedRecipe: Bool = false,
+    scope: LibraryScope = .mine,
     libraryModel: RecipeLibraryModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
@@ -42,6 +44,7 @@ struct RecipeDetailView: View {
       scaleContext: scaleContext,
       workbenchID: workbenchID,
       includingArchivedRecipe: includingArchivedRecipe,
+      scope: scope,
       toastCenter: toastCenter
     )
     _model = State(
@@ -52,6 +55,7 @@ struct RecipeDetailView: View {
     self.libraryModel = libraryModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
+    self.scope = scope
     self.hostsHandoffReviews = hostsHandoffReviews
     self.showsToolbar = showsToolbar
     self.isFocusActive = isFocusActive
