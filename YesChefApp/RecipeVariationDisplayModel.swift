@@ -66,17 +66,23 @@ extension RecipeDetailModel {
 
   var displayDetail: RecipeDetailData? {
     guard let detail else { return nil }
-    guard let variation = detail.activeVariation else { return detail }
+    guard let variation = selectedVariation(in: detail) else { return detail }
     return (try? detail.resolved(applying: variation).detail) ?? detail
   }
 
   var activeVariationUnresolvedAnchors: [RecipeVariationUnresolvedAnchor] {
-    guard let detail, let variation = detail.activeVariation else { return [] }
+    guard let detail, let variation = selectedVariation(in: detail) else { return [] }
     return (try? detail.resolved(applying: variation).unresolvedAnchors) ?? []
   }
 
   var activeVariation: RecipeVariation? {
-    detail?.activeVariation
+    guard let detail else { return nil }
+    return selectedVariation(in: detail)
+  }
+
+  private func selectedVariation(in detail: RecipeDetailData) -> RecipeVariation? {
+    guard let selectedVariationID else { return nil }
+    return detail.variations.first { $0.id == selectedVariationID }
   }
 
   var relatedRecipes: [Recipe] {

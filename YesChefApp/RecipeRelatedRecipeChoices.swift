@@ -6,6 +6,7 @@ struct RecipeRelatedRecipeChoices: View {
   let model: RecipeDetailModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   var showsSectionTitle = true
+  var isReadOnly = false
 
   @State private var unlinkingRecipe: Recipe?
 
@@ -19,11 +20,13 @@ struct RecipeRelatedRecipeChoices: View {
             .font(.title3.bold())
         }
         Spacer()
-        Button("Link Recipe", systemImage: "link") {
-          model.linkRelatedRecipeButtonTapped()
+        if !isReadOnly {
+          Button("Link Recipe", systemImage: "link") {
+            model.linkRelatedRecipeButtonTapped()
+          }
+          .buttonStyle(.bordered)
+          .disabled(model.isLoadingRelatedRecipePicker)
         }
-        .buttonStyle(.bordered)
-        .disabled(model.isLoadingRelatedRecipePicker)
       }
 
       if relatedRecipes.isEmpty {
@@ -32,11 +35,11 @@ struct RecipeRelatedRecipeChoices: View {
           .foregroundStyle(.secondary)
       } else {
         ForEach(relatedRecipes) { recipe in
-          relatedRecipeRow(recipe)
+          relatedRecipeRow(recipe, isReadOnly: isReadOnly)
         }
       }
     }
-    .sheet(isPresented: $model.destination.relatedRecipePicker) {
+    .sheet(isPresented: isReadOnly ? .constant(false) : $model.destination.relatedRecipePicker) {
       RelatedRecipePicker(
         recipeRows: model.relatedRecipePickerRows,
         excludedRecipeIDs: Set(relatedRecipes.map(\.id)).union([model.recipeID]),
@@ -61,7 +64,7 @@ struct RecipeRelatedRecipeChoices: View {
     }
   }
 
-  private func relatedRecipeRow(_ recipe: Recipe) -> some View {
+  private func relatedRecipeRow(_ recipe: Recipe, isReadOnly: Bool) -> some View {
     HStack(alignment: .top, spacing: 8) {
       Button {
         onRecipeSelected(RecipeDetailPresentation(recipeID: recipe.id))
@@ -81,13 +84,17 @@ struct RecipeRelatedRecipeChoices: View {
       .accessibilityLabel(recipe.title)
     }
     .contextMenu {
-      Button("Unlink", role: .destructive) {
-        unlinkingRecipe = recipe
+      if !isReadOnly {
+        Button("Unlink", role: .destructive) {
+          unlinkingRecipe = recipe
+        }
       }
     }
     .swipeActions(edge: .trailing) {
-      Button("Unlink", systemImage: "link.slash", role: .destructive) {
-        unlinkingRecipe = recipe
+      if !isReadOnly {
+        Button("Unlink", systemImage: "link.slash", role: .destructive) {
+          unlinkingRecipe = recipe
+        }
       }
     }
     .padding(.vertical, 6)

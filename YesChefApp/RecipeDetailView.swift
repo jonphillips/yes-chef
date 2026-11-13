@@ -177,47 +177,51 @@ struct RecipeDetailView: View {
         }
       }
       ToolbarItemGroup(placement: .primaryAction) {
-        Button {
-          groceryModel.addRecipeButtonTapped(
-            recipeID: model.recipeID,
-            scaleContext: model.scaleContext
+        if model.scope == .mine {
+          Button {
+            groceryModel.addRecipeButtonTapped(
+              recipeID: model.recipeID,
+              scaleContext: model.scaleContext
+            )
+          } label: {
+            Label("Groceries", symbol: .addToGroceries)
+          }
+          Button {
+            mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Plan", symbol: .plan)
+          }
+          HandoffMenu(
+            handOff: {
+              if model.activeVariation == nil {
+                copyAdjustmentPrompt()
+              } else {
+                isConfirmingBaseRecipeHandoff = true
+              }
+            },
+            paste: {
+              let results = UIPasteboard.general.string.map { [$0] } ?? []
+              Task { await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID)) }
+            },
+            isAskActive: Binding(
+              get: { model.destination.chat != nil },
+              set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
+            )
           )
-        } label: {
-          Label("Groceries", symbol: .addToGroceries)
         }
-        Button {
-          mealCalendarModel.addRecipeToPlanButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Plan", symbol: .plan)
-        }
-        HandoffMenu(
-          handOff: {
-            if model.activeVariation == nil {
-              copyAdjustmentPrompt()
-            } else {
-              isConfirmingBaseRecipeHandoff = true
-            }
-          },
-          paste: {
-            let results = UIPasteboard.general.string.map { [$0] } ?? []
-            Task { await handoffTransport.pastedResultsReceived(results, source: .recipe(model.recipeID)) }
-          },
-          isAskActive: Binding(
-            get: { model.destination.chat != nil },
-            set: { if $0 != (model.destination.chat != nil) { model.askButtonTapped() } }
-          )
-        )
       }
       ToolbarItemGroup(placement: .secondaryAction) {
-        Button {
-          libraryModel.editButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Edit", symbol: .edit)
-        }
-        Button {
-          model.openWorkbenchButtonTapped()
-        } label: {
-          Label("Workbench", symbol: .workbench)
+        if model.scope == .mine {
+          Button {
+            libraryModel.editButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Edit", symbol: .edit)
+          }
+          Button {
+            model.openWorkbenchButtonTapped()
+          } label: {
+            Label("Workbench", symbol: .workbench)
+          }
         }
 
         if let shareText = model.shareText, let detail = model.detail {
@@ -226,22 +230,24 @@ struct RecipeDetailView: View {
           }
         }
 
-        if model.recipe?.originalSnapshot != nil {
+        if model.scope == .mine, model.recipe?.originalSnapshot != nil {
           Button {
             libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)
           } label: {
             Label("View Original", systemImage: "doc.text.magnifyingglass")
           }
         }
-        Button {
-          libraryModel.deleteButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Archive", systemImage: "archivebox")
-        }
-        Button(role: .destructive) {
-          libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
-        } label: {
-          Label("Delete…", symbol: .delete)
+        if model.scope == .mine {
+          Button {
+            libraryModel.deleteButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Archive", systemImage: "archivebox")
+          }
+          Button(role: .destructive) {
+            libraryModel.deleteArchivedRecipeButtonTapped(recipeID: model.recipeID)
+          } label: {
+            Label("Delete…", symbol: .delete)
+          }
         }
       }
     }
@@ -402,7 +408,8 @@ private struct RecipeReaderView: View {
           RecipePhotoGallery(
             photos: model.displayablePhotos,
             coverPhotoID: model.recipe?.coverPhotoID,
-            setCoverPhoto: { model.coverPhotoButtonTapped($0) }
+            setCoverPhoto: { model.coverPhotoButtonTapped($0) },
+            isReadOnly: model.scope != .mine
           )
             .padding()
         }
@@ -443,9 +450,9 @@ private struct RecipeReaderView: View {
       .presentationDetents([.medium, .large])
     }
     .keepsScreenAwakeWhilePresented()
-    .onChange(of: model.detail?.activeVariationID) {
+    .onChange(of: model.selectedVariationID) {
       #if DEBUG
-        let selection = model.detail?.activeVariationID?.uuidString ?? "base"
+        let selection = model.selectedVariationID?.uuidString ?? "base"
         AppLog.performance.log(
           "recipe-detail-view active-variation-delivered selection=\(selection, privacy: .public)"
         )
@@ -486,9 +493,10 @@ private struct RecipeReaderView: View {
       }
       RecipeVariationSelector(
         variations: model.variations,
-        activeVariationID: model.detail?.activeVariationID,
+        activeVariationID: model.selectedVariationID,
         select: model.activeVariationSelectionChanged,
-        manage: { isVariationManagerPresented = true }
+        manage: { isVariationManagerPresented = true },
+        allowsManagement: model.scope == .mine
       )
     }
   }
@@ -545,14 +553,16 @@ private struct RecipeReaderView: View {
         WrappingLabels(labels: categoryDisplayNames, symbol: .category)
       }
 
-      Button {
-        model.suggestLabelsButtonTapped()
-      } label: {
-        Label("Edit Tags", symbol: .tag)
+      if model.scope == .mine {
+        Button {
+          model.suggestLabelsButtonTapped()
+        } label: {
+          Label("Edit Tags", symbol: .tag)
+        }
+        .buttonStyle(.bordered)
       }
-      .buttonStyle(.bordered)
 
-      if model.adjustmentRestorePoint != nil {
+      if model.scope == .mine, model.adjustmentRestorePoint != nil {
         Button {
           model.undoLastAdjustmentButtonTapped()
         } label: {
@@ -578,16 +588,18 @@ private struct RecipeReaderView: View {
               .font(.caption)
               .recipeChip()
           }
-          Button {
-            model.suggestLabelsButtonTapped()
-          } label: {
-            Label("Edit Tags", symbol: .tag)
-              .font(.caption.weight(.medium))
-              .frame(minHeight: 36)
+          if model.scope == .mine {
+            Button {
+              model.suggestLabelsButtonTapped()
+            } label: {
+              Label("Edit Tags", symbol: .tag)
+                .font(.caption.weight(.medium))
+                .frame(minHeight: 36)
+            }
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
 
-          if model.adjustmentRestorePoint != nil {
+          if model.scope == .mine, model.adjustmentRestorePoint != nil {
             Button {
               model.undoLastAdjustmentButtonTapped()
             } label: {
@@ -706,7 +718,8 @@ private struct RecipeReaderView: View {
     case .playbook:
       RecipePlaybookView(
         model: model,
-        onRecipeSelected: onRecipeSelected
+        onRecipeSelected: onRecipeSelected,
+        isReadOnly: model.scope != .mine
       )
     }
   }
@@ -757,7 +770,8 @@ private struct RecipeReaderView: View {
 
             RecipePlaybookView(
               model: model,
-              onRecipeSelected: onRecipeSelected
+              onRecipeSelected: onRecipeSelected,
+              isReadOnly: model.scope != .mine
             )
           }
           .padding()
@@ -786,7 +800,7 @@ private struct RecipeReaderView: View {
       if !model.instructionGroups.isEmpty {
         instructions
       }
-      if !model.workbenchCandidateLinks.isEmpty {
+      if model.scope == .mine, !model.workbenchCandidateLinks.isEmpty {
         WorkbenchCandidateLinksView(links: model.workbenchCandidateLinks, onRecipeSelected: onRecipeSelected)
       }
     }
@@ -947,9 +961,10 @@ private extension RecipeReaderView {
 
       RecipeVariationSelector(
         variations: model.variations,
-        activeVariationID: model.detail?.activeVariationID,
+        activeVariationID: model.selectedVariationID,
         select: model.activeVariationSelectionChanged,
-        manage: { isVariationManagerPresented = true }
+        manage: { isVariationManagerPresented = true },
+        allowsManagement: model.scope == .mine
       )
     }
   }

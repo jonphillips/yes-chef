@@ -466,6 +466,7 @@ private struct RecipeFullScreenCover: View {
         $0.defaultDatabase = context.mirror.database
       } operation: {
         makeDetailView(onRecipeSelected: route)
+          .environment(\.recipeImageDatabase, context.mirror.database)
       }
     }
   }
@@ -562,19 +563,21 @@ struct RecipeListView: View {
               RecipeListRow(row: row, options: viewOptions)
                 .tag(row.recipe.id)
                 .swipeActions {
-                  Button {
-                    model.deleteButtonTapped(recipeID: row.recipe.id)
-                  } label: {
-                    Label("Archive", systemImage: "archivebox")
+                  if model.scope == .mine {
+                    Button {
+                      model.deleteButtonTapped(recipeID: row.recipe.id)
+                    } label: {
+                      Label("Archive", systemImage: "archivebox")
+                    }
+                    .tint(.red)
+                    // Keep the row until confirmation; destructive can invalidate the List update.
+                    Button {
+                      model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
+                    } label: {
+                      Label("Delete…", symbol: .delete)
+                    }
+                    .tint(.red)
                   }
-                  .tint(.red)
-                  // The row remains until confirmation; a destructive role can cause an invalid List update.
-                  Button {
-                    model.deleteArchivedRecipeButtonTapped(recipeID: row.recipe.id)
-                  } label: {
-                    Label("Delete…", symbol: .delete)
-                  }
-                  .tint(.red)
                 }
             }
           }
@@ -633,7 +636,7 @@ struct RecipeListView: View {
           showsSourceMetadata: $showsSourceMetadata,
           showsCategoryMetadata: $showsCategoryMetadata
         )
-        if model.isSelectingWorkbenchRecipes {
+        if model.scope == .mine, model.isSelectingWorkbenchRecipes {
           Button {
             model.cancelWorkbenchSelectionButtonTapped()
           } label: {
@@ -645,7 +648,7 @@ struct RecipeListView: View {
             Label("Workbench These", symbol: .workbench)
           }
           .disabled(model.selectedWorkbenchRecipeIDs.isEmpty)
-        } else {
+        } else if model.scope == .mine {
           Button {
             model.workbenchSelectionButtonTapped()
           } label: {
@@ -654,11 +657,13 @@ struct RecipeListView: View {
           .disabled(model.isImporting)
         }
       }
-      ToolbarItem(placement: .secondaryAction) {
-        Button {
-          onArchivedRecipesRequested()
-        } label: {
-          Label("Archived Recipes", systemImage: "archivebox")
+      if model.scope == .mine {
+        ToolbarItem(placement: .secondaryAction) {
+          Button {
+            onArchivedRecipesRequested()
+          } label: {
+            Label("Archived Recipes", systemImage: "archivebox")
+          }
         }
       }
     }

@@ -28,6 +28,7 @@ struct RecipeVariationSelector: View {
   let activeVariationID: RecipeVariation.ID?
   let select: (RecipeVariation.ID?) -> Void
   let manage: () -> Void
+  var allowsManagement = true
 
   @ViewBuilder
   var body: some View {
@@ -41,8 +42,10 @@ struct RecipeVariationSelector: View {
             choiceLabel(variation.name, isSelected: variation.id == activeVariationID)
           }
         }
-        Divider()
-        Button("Manage Variations", systemImage: "slider.horizontal.3", action: manage)
+        if allowsManagement {
+          Divider()
+          Button("Manage Variations", systemImage: "slider.horizontal.3", action: manage)
+        }
       } label: {
         HStack(spacing: 6) {
           Image(systemName: "square.stack.3d.up")

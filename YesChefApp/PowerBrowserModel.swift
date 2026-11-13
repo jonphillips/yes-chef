@@ -7,6 +7,12 @@ import YesChefCore
 @Observable
 @MainActor
 final class PowerBrowserModel {
+  let scope: LibraryScope
+
+  init(scope: LibraryScope = .mine) {
+    self.scope = scope
+  }
+
   private struct CachedEngine {
     var data: RecipeBrowserData
     var engine: RecipeBrowserEngine

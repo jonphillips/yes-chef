@@ -205,7 +205,6 @@ extension RecipeDetailModel {
 
   func clearChefItUpButtonTapped() {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
 
     do {
       try database.write { db in
@@ -418,7 +417,6 @@ extension RecipeDetailModel {
 
   private func commitMakeAheadPlan(_ plan: MakeAheadPlan) throws {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
 
     guard !plan.rendered().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw RecipeDetailError.emptyMakeAheadPlan
@@ -430,7 +428,6 @@ extension RecipeDetailModel {
 
   func commitMakeAheadText(_ text: String) throws {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
 
     let approvedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !approvedText.isEmpty else {
@@ -443,7 +440,6 @@ extension RecipeDetailModel {
 
   private func commitChefItUpPlan(_ plan: ChefItUpPlan) throws {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
 
     guard !plan.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw RecipeDetailError.emptyChefItUpPlan
@@ -455,7 +451,6 @@ extension RecipeDetailModel {
 
   func commitChefItUpText(_ text: String) throws {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
 
     let approvedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !approvedText.isEmpty else {
@@ -490,7 +485,6 @@ extension RecipeDetailModel {
 
   private func commitCapturedNote(_ note: HarvestedNote) throws {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
     @Dependency(\.uuid) var uuid
 
     let text = note.rendered().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -511,7 +505,6 @@ extension RecipeDetailModel {
 
   private func commitServeWithPlan(_ plan: ServeWithPlan) throws {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
     @Dependency(\.uuid) var uuid
 
     guard !plan.items.isEmpty else {
@@ -526,7 +519,6 @@ extension RecipeDetailModel {
 
   func commitServeWithText(_ text: String) throws {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
     @Dependency(\.uuid) var uuid
 
     let plan = ServeWithPlan().applyingEditableReviewText(text)
@@ -547,7 +539,6 @@ extension RecipeDetailModel {
 
   func clearServeWithButtonTapped() {
     @Dependency(\.date.now) var now
-    @Dependency(\.defaultDatabase) var database
 
     do {
       try database.write { db in

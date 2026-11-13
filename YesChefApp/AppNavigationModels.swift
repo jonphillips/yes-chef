@@ -1,3 +1,4 @@
+import Dependencies
 import SwiftUI
 import YesChefCore
 
@@ -17,6 +18,24 @@ struct CookbookContext: Hashable {
   func hash(into hasher: inout Hasher) {
     hasher.combine(ownerName)
     hasher.combine(mirror.fileURL)
+  }
+}
+
+struct CookbookLibraryModels {
+  let recipes: RecipeLibraryModel
+  let powerBrowser: PowerBrowserModel
+
+  init(context: CookbookContext) {
+    let models = withDependencies {
+      $0.defaultDatabase = context.mirror.database
+    } operation: {
+      (
+        RecipeLibraryModel(scope: .cookbook(context)),
+        PowerBrowserModel(scope: .cookbook(context))
+      )
+    }
+    recipes = models.0
+    powerBrowser = models.1
   }
 }
 

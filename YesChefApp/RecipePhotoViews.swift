@@ -53,6 +53,7 @@ struct RecipePhotoGallery: View {
   let photos: [RecipeDetailPhoto]
   let coverPhotoID: RecipePhoto.ID?
   let setCoverPhoto: (RecipePhoto.ID?) -> Void
+  var isReadOnly = false
 
   @State private var selectedPhotoID: RecipePhoto.ID?
   @State private var enlargedPhoto: RecipeDetailPhoto?
@@ -88,11 +89,13 @@ struct RecipePhotoGallery: View {
             .lineLimit(3)
         }
 
-        RecipePhotoCoverControls(
-          selectedPhotoID: selectedPhoto.id,
-          coverPhotoID: coverPhotoID,
-          setCoverPhoto: setCoverPhoto
-        )
+        if !isReadOnly {
+          RecipePhotoCoverControls(
+            selectedPhotoID: selectedPhoto.id,
+            coverPhotoID: coverPhotoID,
+            setCoverPhoto: setCoverPhoto
+          )
+        }
 
         if photos.count > 1 {
           ScrollView(.horizontal) {
