@@ -77,7 +77,7 @@ struct CookbookFoundationTests {
     var future = bundle
     future.version = RecipeBundleCoding.currentVersion + 1
     let file = CookbookFile(ownerName: "Jon", generatedAt: .distantPast, payloads: [
-      try JSONEncoder().encode(bundle), try JSONEncoder().encode(future)
+      try CookbookPayload.encodedPayload(bundle), try JSONEncoder().encode(future)
     ])
     let decoded = try JSONDecoder().decode(CookbookFile.self, from: JSONEncoder().encode(file))
     let result = try decoded.decodedPayloads()
