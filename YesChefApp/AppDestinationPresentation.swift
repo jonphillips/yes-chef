@@ -137,7 +137,11 @@ private struct GroceryDestinationsModifier: ViewModifier {
       }
       .sheet(item: gatedBinding($groceryModel.destination.sameAs, enabled: isPresentationEnabled), id: \.self) { itemID in
         NavigationStack {
-          SameAsPickerSheet(itemID: itemID, rows: groceryModel.selectedItemRows) { targetID in
+          SameAsPickerSheet(
+            itemID: itemID,
+            rows: groceryModel.selectedItemRows,
+            fixes: groceryModel.ingredientFixes
+          ) { targetID in
             groceryModel.confirmSameAsButtonTapped(itemID: itemID, targetItemID: targetID)
           }
         }

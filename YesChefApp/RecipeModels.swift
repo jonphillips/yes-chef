@@ -729,6 +729,9 @@ final class RecipeDetailModel {
   @ObservationIgnored var toastCenter: AppToastCenter?
   @ObservationIgnored
   @Fetch var detail: RecipeDetailData?
+  var shareText: String? {
+    detail.map(RecipePlainTextRenderer.render)
+  }
   @ObservationIgnored
   @Fetch var derivedLastCookedAt: Date?
   @ObservationIgnored

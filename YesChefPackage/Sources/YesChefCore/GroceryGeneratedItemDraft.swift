@@ -20,7 +20,7 @@ struct GroceryGeneratedItemDraft {
     } else if let quantity = line.quantity {
       let scaledQuantity = quantity * scale
       self.quantity = scaledQuantity
-      self.quantityText = scale == 1 ? line.groceryQuantityText : formatGroceryQuantity(scaledQuantity)
+      self.quantityText = formatGroceryQuantity(scaledQuantity)
     } else {
       self.quantity = nil
       self.quantityText = line.groceryQuantityText

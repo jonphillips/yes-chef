@@ -216,6 +216,12 @@ struct RecipeDetailView: View {
           Label("Workbench", symbol: .workbench)
         }
 
+        if let shareText = model.shareText, let detail = model.detail {
+          ShareLink(item: shareText, subject: Text(detail.recipe.title)) {
+            Label("Share Recipe…", symbol: .share)
+          }
+        }
+
         if model.recipe?.originalSnapshot != nil {
           Button {
             libraryModel.originalSnapshotButtonTapped(recipeID: model.recipeID)

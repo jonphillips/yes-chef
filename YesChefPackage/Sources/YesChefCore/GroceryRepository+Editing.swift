@@ -2,10 +2,13 @@ import Foundation
 import SQLiteData
 
 func formatGroceryQuantity(_ quantity: Double) -> String {
-  if quantity.rounded() == quantity {
-    return String(Int(quantity))
+  let kitchenQuantity = IngredientScaler.formattedQuantity(quantity)
+  let decimalSeparator = Locale.current.decimalSeparator ?? "."
+  if !kitchenQuantity.contains(decimalSeparator) {
+    return kitchenQuantity
   }
-  return String(format: "%g", quantity)
+  let roundedUpToEighth = ceil(quantity * 8) / 8
+  return IngredientScaler.formattedQuantity(roundedUpToEighth)
 }
 
 extension String {

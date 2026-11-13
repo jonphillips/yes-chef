@@ -249,7 +249,7 @@ extension RecipeCoreTests {
         let row = try #require(milkRows.first)
         expectNoDifference(milkRows.count, 1)
         expectNoDifference(row.item.quantity, 3.5)
-        expectNoDifference(row.item.quantityText, "3.5")
+        expectNoDifference(row.item.quantityText, "3 ½")
         expectNoDifference(row.item.unit, "cups")
         expectNoDifference(row.item.aisle, "Bakery")
         expectNoDifference(row.item.notes, nil)
@@ -744,7 +744,7 @@ extension RecipeCoreTests {
           try GroceryItemListRequest().fetch(db).first { $0.item.title == "milk" }
         )
         expectNoDifference(consolidatedRow.item.quantity, 8.5)
-        expectNoDifference(consolidatedRow.item.quantityText, "8.5")
+        expectNoDifference(consolidatedRow.item.quantityText, "8 ½")
         let wafflesSource = try #require(consolidatedRow.sources.first { $0.recipeID == secondRecipeID })
         try GroceryRepository.deleteSource(sourceID: wafflesSource.id, in: db, now: modifiedAt)
 
@@ -862,7 +862,7 @@ extension RecipeCoreTests {
         let rows = try GroceryItemListRequest().fetch(db)
         let milkRow = try #require(rows.first { $0.item.title == "milk" })
         expectNoDifference(milkRow.item.quantity, 1.5)
-        expectNoDifference(milkRow.item.quantityText, "1.5")
+        expectNoDifference(milkRow.item.quantityText, "1 ½")
         expectNoDifference(milkRow.item.dateModified, modifiedAt)
         expectNoDifference(milkRow.sources.map(\.recipeID), [secondRecipeID].map(Optional.some))
         expectNoDifference(rows.contains { $0.item.title == "eggs" }, false)

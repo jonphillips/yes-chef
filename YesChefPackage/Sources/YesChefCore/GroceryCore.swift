@@ -13,6 +13,22 @@ public struct GroceryItemRowData: Identifiable, Equatable, Sendable {
   public var id: GroceryItem.ID { item.id }
 }
 
+public enum GrocerySameAsCandidates {
+  public static func rows(
+    for itemID: GroceryItem.ID,
+    from rows: [GroceryItemRowData],
+    fixes: IngredientNameFixes
+  ) -> [GroceryItemRowData] {
+    guard let item = rows.first(where: { $0.id == itemID }) else { return [] }
+    let itemName = fixes.canonicalName(item.item.canonicalName ?? item.item.title)
+    return rows.filter { row in
+      guard row.id != itemID else { return false }
+      guard let itemName else { return true }
+      return fixes.canonicalName(row.item.canonicalName ?? row.item.title) != itemName
+    }
+  }
+}
+
 public struct GroceryListRowData: Identifiable, Equatable, Sendable {
   public var list: GroceryList
   public var itemCount: Int

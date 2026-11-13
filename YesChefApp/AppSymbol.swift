@@ -2,26 +2,53 @@ import SwiftUI
 import YesChefCore
 
 struct AppSymbol: Sendable, Hashable {
+  enum Rendering: Sendable, Hashable {
+    case monochrome
+    case hierarchical
+    case multicolor
+
+    var symbolRenderingMode: SymbolRenderingMode {
+      switch self {
+      case .monochrome: .monochrome
+      case .hierarchical: .hierarchical
+      case .multicolor: .multicolor
+      }
+    }
+  }
+
   private enum Storage: Sendable, Hashable {
     case system(String)
     case asset(ImageResource)
   }
 
   private let storage: Storage
+  private var renderingMode: Rendering?
 
-  init(_ systemName: String) {
+  init(_ systemName: String, rendering: Rendering? = nil) {
     self.storage = .system(systemName)
+    self.renderingMode = rendering
   }
 
-  init(_ resource: ImageResource) {
+  init(_ resource: ImageResource, rendering: Rendering? = nil) {
     self.storage = .asset(resource)
+    self.renderingMode = rendering
   }
 
   var image: Image {
+    let image: Image
     switch storage {
-    case let .system(name): Image(systemName: name)
-    case let .asset(resource): Image(resource)
+    case let .system(name): image = Image(systemName: name)
+    case let .asset(resource): image = Image(resource)
     }
+    return image.symbolRenderingMode(imageRenderingMode?.symbolRenderingMode)
+  }
+
+  var imageRenderingMode: Rendering? { renderingMode }
+
+  func rendering(_ mode: Rendering?) -> Self {
+    var copy = self
+    copy.renderingMode = mode
+    return copy
   }
 
   var systemName: String? {
@@ -55,6 +82,7 @@ struct AppSymbol: Sendable, Hashable {
   static let plan = Self("calendar.badge.plus")
   static let groceries = Self("cart")
   static let addToGroceries = Self("cart.badge.plus")
+  static let share = Self("square.and.arrow.up")
   static let workbench = Self("hammer")
   static let chatTarget = Self("target")
   static let help = Self("questionmark.circle")

@@ -68,6 +68,14 @@ struct GroceryDetailView: View {
             }
           }
 
+          Section {
+            GroceryRapidAddField(model: model)
+              .attentionCard()
+              .padding(.horizontal)
+              .padding(.vertical, 8)
+          }
+          .listRowBackground(Color.clear)
+
           if displaySections.isEmpty {
             Section {
               ContentUnavailableView {
@@ -100,16 +108,6 @@ struct GroceryDetailView: View {
         }
         // Dragging the list dismisses the keyboard so it stops covering the tab bar on iPhone.
         .scrollDismissesKeyboard(.immediately)
-        .safeAreaInset(edge: .top, spacing: 0) {
-          GroceryRapidAddField(model: model)
-            .attentionCard()
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(.bar)
-            .overlay(alignment: .bottom) {
-              Divider()
-            }
-        }
         .navigationTitle(selectedList.list.title)
         .toolbar {
           ToolbarItemGroup(placement: .primaryAction) {
@@ -208,7 +206,7 @@ private struct GroceryListActionsMenu: View {
   var body: some View {
     Menu {
       ShareLink(item: shareText, subject: Text(row.list.title)) {
-        Label("Share List", systemImage: "square.and.arrow.up")
+        Label("Share List", symbol: .share)
       }
 
       Button {

@@ -41,6 +41,7 @@ final class MenuLibraryModel {
     return presentation
   }
   var selectedMenuID: CoreMenu.ID?
+  var menuListSegment: MenuListSegment = .dated
   var errorMessage: String?
   var isShowingError = false
   @ObservationIgnored var toastCenter: AppToastCenter?
@@ -56,6 +57,10 @@ final class MenuLibraryModel {
       .sorted {
         $0.recipe.title.localizedStandardCompare($1.recipe.title) == .orderedAscending
       }
+  }
+
+  var visibleMenuRows: [MenuRowData] {
+    menuListSegment.rows(from: menuRows)
   }
 
   func reloadAfterExternalChange() async {
@@ -136,6 +141,7 @@ final class MenuLibraryModel {
           uuid: { uuid() }
         )
       }
+      menuListSegment = .undated
       selectedMenuID = menuID
       destination = nil
       return true

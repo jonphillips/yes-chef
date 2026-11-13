@@ -114,21 +114,38 @@ private struct IngredientNameFixEditor: View {
 struct SameAsPickerSheet: View {
   let itemID: GroceryItem.ID
   let rows: [GroceryItemRowData]
+  let fixes: IngredientNameFixes
   let onSelect: (GroceryItem.ID) -> Void
   @Environment(\.dismiss) private var dismiss
 
+  private var item: GroceryItemRowData? {
+    rows.first { $0.id == itemID }
+  }
+
+  private var candidates: [GroceryItemRowData] {
+    GrocerySameAsCandidates.rows(for: itemID, from: rows, fixes: fixes)
+  }
+
   var body: some View {
     List {
-      ForEach(rows.filter { $0.id != itemID }) { row in
-        Button {
-          onSelect(row.id)
-          dismiss()
-        } label: {
-          VStack(alignment: .leading, spacing: 4) {
-            Text(row.item.title)
-            if let aisle = row.item.aisle {
-              Text(aisle).font(.caption).foregroundStyle(.secondary)
+      if let item {
+        Section("Matching") {
+          SameAsGroceryRow(item: item.item)
+        }
+      }
+
+      if candidates.isEmpty {
+        ContentUnavailableView("Nothing Else to Match", systemImage: "arrow.left.arrow.right")
+      } else {
+        Section("Same As") {
+          ForEach(candidates) { row in
+            Button {
+              onSelect(row.id)
+              dismiss()
+            } label: {
+              SameAsGroceryRow(item: row.item)
             }
+            .buttonStyle(.plain)
           }
         }
       }
@@ -137,5 +154,34 @@ struct SameAsPickerSheet: View {
     .toolbar {
       ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
     }
+  }
+}
+
+private struct SameAsGroceryRow: View {
+  let item: GroceryItem
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(item.title)
+      if let detail {
+        Text(detail)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private var detail: String? {
+    let amount = [item.quantityText, item.unit]
+      .compactMap { value -> String? in
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+      }
+      .joined(separator: " ")
+    let aisle = item.aisle?.trimmingCharacters(in: .whitespacesAndNewlines)
+    return [amount.isEmpty ? nil : amount, aisle.flatMap { $0.isEmpty ? nil : "· \($0)" }]
+      .compactMap { $0 }
+      .joined(separator: " ")
   }
 }

@@ -5,7 +5,7 @@ Summary: Seven fixes: Menus Dated / Undated; menu title in the content; Same Asâ
 
 Origin: Jon, 2026-11-12 and 2026-11-13, dogfooding the Thanksgiving Week menu and its Advance / Fresh lists on the iPad
 and iPhone. One dispatch, one PR. Items 1â€“5 are layout and display fixes inside existing decisions. Item 6 is
-[ADR-0065 Amendment 1](../decisions/ADR-0065-one-glyph-per-concept.md#amendment-1--a-concept-can-carry-a-rendering-mode-color-stays-at-the-call-site-2026-11-13).
+[ADR-0065 Amendment 1](../../decisions/ADR-0065-one-glyph-per-concept.md#amendment-1--a-concept-can-carry-a-rendering-mode-color-stays-at-the-call-site-2026-11-13).
 Item 7 is a readable text copy, not ADR-0003's `.yeschef` transfer.
 
 ## Where things are (architect, 2026-11-13, `origin/main` 01c3b1c)
