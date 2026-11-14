@@ -60,8 +60,10 @@ struct CookbookPublishingTests {
 
   @Test func noOpPublishDoesNotLoadDisplayImageBytes() async throws {
     let now = Date(timeIntervalSince1970: 1_000)
-    let recipe = Recipe(id: UUID(), title: "Soup", dateCreated: now, dateModified: now)
-    let bundle = RecipeBundleCoding.RecipeBundle(version: RecipeBundleCoding.currentVersion, recipe: recipe)
+    let recipeID = UUID()
+    let photo = RecipePhoto(id: UUID(), recipeID: recipeID, imageDataReference: "cover", sortOrder: 0, dateCreated: now)
+    let recipe = Recipe(id: recipeID, title: "Soup", dateCreated: now, dateModified: now, coverPhotoID: photo.id)
+    let bundle = RecipeBundleCoding.RecipeBundle(version: RecipeBundleCoding.currentVersion, recipe: recipe, photos: [photo])
     let hash = try CookbookPayload.contentHash(bundle)
     let imageLoader = ImageLoadCounter()
     let client = CookbookPublishClient(
