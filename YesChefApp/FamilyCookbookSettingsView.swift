@@ -1,6 +1,7 @@
 #if DEBUG
 import CloudKit
 import SwiftUI
+import YesChefCore
 
 struct FamilyCookbookSettingsView: View {
   @Bindable var model: CookbookPublishModel
@@ -25,15 +26,18 @@ struct FamilyCookbookSettingsView: View {
           ForEach(model.participants) { participant in
             Text(participant.description)
           }
-          if let profile = model.publishedProfile {
+          if let profile = model.publishedProfile,
+            profile.payloadVersion >= RecipeBundleCoding.currentVersion,
+            let publishedAt = profile.publishedAt
+          {
             LabeledContent("Recipes", value: "\(profile.recipeCount)")
-            LabeledContent("Status", value: "Published \(profile.publishedAt.formatted(.relative(presentation: .named)))")
+            LabeledContent("Status", value: "Published \(publishedAt.formatted(.relative(presentation: .named)))")
           } else if let progress = model.progressText {
             LabeledContent("Status", value: progress)
           } else {
             LabeledContent("Status", value: "Not published yet")
           }
-          if let progress = model.progressText, model.publishedProfile != nil {
+          if let progress = model.progressText {
             Text(progress).foregroundStyle(.secondary)
           }
           Button("Publish Now", systemImage: "arrow.clockwise.icloud") {

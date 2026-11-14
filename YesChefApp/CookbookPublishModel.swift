@@ -2,6 +2,7 @@ import CloudKit
 import Dependencies
 import GRDB
 import Observation
+import SQLiteData
 import SwiftUI
 import YesChefCore
 
@@ -36,10 +37,11 @@ final class CookbookPublishModel {
   func start() {
     guard observation == nil else { return }
     let tables: [any DatabaseRegionConvertible] = [
-      Table("recipes"), Table("recipeSources"), Table("ingredientSections"), Table("ingredientLines"),
-      Table("instructionSections"), Table("instructionSteps"), Table("recipeNotes"), Table("recipePhotos"),
-      Table("categories"), Table("facets"), Table("recipeCategories"), Table("recipeServeWith"),
-      Table("recipeRelatedRecipes"), Table("recipeVariations"),
+      Table(Recipe.tableName), Table(RecipeSource.tableName), Table(IngredientSection.tableName),
+      Table(IngredientLine.tableName), Table(InstructionSection.tableName), Table(InstructionStep.tableName),
+      Table(RecipeNote.tableName), Table(RecipePhoto.tableName), Table(Category.tableName), Table(Facet.tableName),
+      Table(RecipeCategory.tableName), Table(RecipeServeWith.tableName), Table(RecipeRelatedRecipe.tableName),
+      Table(RecipeVariation.tableName),
     ]
     observation = DatabaseRegionObservation(tracking: tables).start(in: libraryDatabase) { [weak self] error in
       Task { @MainActor [weak self] in self?.errorMessage = "Cookbook library observation failed: \(error.localizedDescription)" }
@@ -59,7 +61,6 @@ final class CookbookPublishModel {
   }
 
   func shareMyRecipes() async {
-    errorMessage = nil
     let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty else {
       errorMessage = "Enter the name your family will see before sharing."
@@ -107,11 +108,7 @@ final class CookbookPublishModel {
       publishedProfile = try await client.fetchProfile()
       if let name = publishedProfile?.displayName { displayName = name }
       await publishNow()
-    } catch let error as CKError where error.code == .zoneNotFound {
-      didCheckZone = true
-      share = nil
     } catch {
-      didCheckZone = true
       errorMessage = error.localizedDescription
     }
   }
@@ -141,8 +138,11 @@ final class CookbookPublishModel {
   func publishNow() async {
     guard !isPublishing else { needsFollowUp = true; return }
     guard share != nil else { return }
+    guard !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      errorMessage = "Enter the name your family will see before sharing."
+      return
+    }
     isPublishing = true
-    errorMessage = nil
     defer { isPublishing = false }
     repeat {
       needsFollowUp = false
@@ -152,19 +152,33 @@ final class CookbookPublishModel {
 
   private func publishCurrentSnapshot() async {
     do {
-      let (bundles, displayImages) = try await libraryDatabase.read { db -> ([RecipeBundleCoding.RecipeBundle], [RecipePhoto.ID: Data]) in
-        let bundles = try CookbookPayload.bundles(in: db)
-        let photos = try RecipePhoto.fetchAll(db)
-        return (bundles, Dictionary(uniqueKeysWithValues: photos.compactMap { photo in
-          photo.displayData.map { (photo.id, $0) }
-        }))
-      }
+      let bundles = try await libraryDatabase.read { try CookbookPayload.bundles(in: $0) }
       progressText = "Preparing \(bundles.count) recipes"
-      try await CookbookPublisher.publish(
-        bundles: bundles, displayImages: displayImages, displayName: displayName,
-        client: client
+      let database = libraryDatabase
+      let outcome = try await CookbookPublisher.publish(
+        bundles: bundles,
+        displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+        client: client,
+        loadDisplayImages: { photoIDs in
+          guard !photoIDs.isEmpty else { return [:] }
+          let rows = try await database.read { db in
+            try RecipePhoto.where { $0.id.in(photoIDs) }
+              .select { CookbookDisplayImageRow.Columns(id: $0.id, displayData: $0.displayData) }
+              .fetchAll(db)
+          }
+          return Dictionary(uniqueKeysWithValues: rows.compactMap { row in
+            row.displayData.map { (row.id, $0) }
+          })
+        }
       ) { saved, total in
-        Task { @MainActor in self.progressText = "Publishing \(saved) of \(total)" }
+        await MainActor.run { self.progressText = "Publishing \(saved) of \(total)" }
+      }
+      guard outcome == .published else {
+        share = nil
+        participants = []
+        publishedProfile = nil
+        progressText = nil
+        return
       }
       publishedProfile = try await client.fetchProfile()
       if let name = publishedProfile?.displayName { displayName = name }
@@ -172,4 +186,10 @@ final class CookbookPublishModel {
       errorMessage = nil
     } catch { errorMessage = error.localizedDescription }
   }
+}
+
+@Selection
+private struct CookbookDisplayImageRow: Sendable {
+  let id: RecipePhoto.ID
+  let displayData: Data?
 }

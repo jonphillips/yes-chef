@@ -1,5 +1,4 @@
 import CloudKit
-import CryptoKit
 import Foundation
 
 public struct CookbookPublishRecipe: Equatable, Sendable {
@@ -7,13 +6,22 @@ public struct CookbookPublishRecipe: Equatable, Sendable {
   public var payload: Data
   public var contentHash: String
   public var payloadVersion: Int
+  public var displayPhotoID: RecipePhoto.ID?
   public var displayImage: Data?
 
-  public init(recordName: String, payload: Data, contentHash: String, payloadVersion: Int, displayImage: Data?) {
+  public init(
+    recordName: String,
+    payload: Data,
+    contentHash: String,
+    payloadVersion: Int,
+    displayPhotoID: RecipePhoto.ID? = nil,
+    displayImage: Data? = nil
+  ) {
     self.recordName = recordName
     self.payload = payload
     self.contentHash = contentHash
     self.payloadVersion = payloadVersion
+    self.displayPhotoID = displayPhotoID
     self.displayImage = displayImage
   }
 }
@@ -22,9 +30,9 @@ public struct CookbookPublishProfile: Equatable, Sendable {
   public var displayName: String
   public var recipeCount: Int
   public var payloadVersion: Int
-  public var publishedAt: Date
+  public var publishedAt: Date?
 
-  public init(displayName: String, recipeCount: Int, payloadVersion: Int, publishedAt: Date) {
+  public init(displayName: String, recipeCount: Int, payloadVersion: Int, publishedAt: Date?) {
     self.displayName = displayName
     self.recipeCount = recipeCount
     self.payloadVersion = payloadVersion
@@ -38,8 +46,7 @@ public struct CookbookPublishPlan: Equatable, Sendable {
 
   public static func make(
     bundles: [RecipeBundleCoding.RecipeBundle],
-    existingHashes: [String: String],
-    displayImages: [RecipePhoto.ID: Data] = [:]
+    existingHashes: [String: String]
   ) throws -> Self {
     let recipes = try bundles.map { bundle in
       let payload = try CookbookPayload.encodedPayload(bundle)
@@ -49,9 +56,9 @@ public struct CookbookPublishPlan: Equatable, Sendable {
       return CookbookPublishRecipe(
         recordName: bundle.recipe.id.uuidString,
         payload: payload,
-        contentHash: SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined(),
+        contentHash: CookbookPayload.contentHash(payload),
         payloadVersion: bundle.version,
-        displayImage: displayPhoto.flatMap { displayImages[$0.id] }
+        displayPhotoID: displayPhoto?.id
       )
     }.sorted { $0.recordName < $1.recordName }
     let currentNames = Set(recipes.map(\.recordName))
@@ -75,31 +82,37 @@ public struct CookbookParticipantRow: Equatable, Sendable, Identifiable {
       let name = participant.userIdentity.nameComponents.map {
         PersonNameComponentsFormatter.localizedString(from: $0, style: .default)
       }.flatMap { $0.isEmpty ? nil : $0 } ?? "Family member"
-      let status: String
-      switch participant.acceptanceStatus {
-      case .accepted: status = "accepted"
-      case .pending: status = "invited"
-      case .removed: status = "removed"
-      default: status = "unknown"
-      }
-      let permission: String
-      switch participant.permission {
-      case .readOnly: permission = "read-only"
-      case .readWrite: permission = "read-write"
-      case .none: permission = "no access"
-      default: permission = "unknown access"
-      }
       let participantID = participant.userIdentity.lookupInfo?.userRecordID?.recordName
         ?? "\(participant.role)-\(name)-\(index)"
       return Self(id: participantID,
-        name: name, invitationStatus: status, permission: permission)
+        name: name,
+        invitationStatus: invitationStatus(participant.acceptanceStatus),
+        permission: permission(participant.permission))
     }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+  }
+
+  public static func invitationStatus(_ status: CKShare.ParticipantAcceptanceStatus) -> String {
+    switch status {
+    case .accepted: "accepted"
+    case .pending: "invited"
+    case .removed: "removed"
+    default: "unknown"
+    }
+  }
+
+  public static func permission(_ permission: CKShare.ParticipantPermission) -> String {
+    switch permission {
+    case .readOnly: "read-only"
+    case .readWrite: "read-write"
+    case .none: "no access"
+    default: "unknown access"
+    }
   }
 }
 
 public struct CookbookPublishClient: Sendable {
   public var fetchRecipeHashes: @Sendable () async throws -> [String: String]
-  public var saveRecipes: @Sendable ([CookbookPublishRecipe], @Sendable (Int) -> Void) async throws -> Void
+  public var saveRecipes: @Sendable ([CookbookPublishRecipe], @Sendable (Int) async -> Void) async throws -> Void
   public var deleteRecipes: @Sendable ([String]) async throws -> Void
   public var fetchProfile: @Sendable () async throws -> CookbookPublishProfile?
   public var saveProfile: @Sendable (CookbookPublishProfile) async throws -> Void
@@ -109,7 +122,7 @@ public struct CookbookPublishClient: Sendable {
 
   public init(
     fetchRecipeHashes: @escaping @Sendable () async throws -> [String: String],
-    saveRecipes: @escaping @Sendable ([CookbookPublishRecipe], @Sendable (Int) -> Void) async throws -> Void,
+    saveRecipes: @escaping @Sendable ([CookbookPublishRecipe], @Sendable (Int) async -> Void) async throws -> Void,
     deleteRecipes: @escaping @Sendable ([String]) async throws -> Void,
     fetchProfile: @escaping @Sendable () async throws -> CookbookPublishProfile?,
     saveProfile: @escaping @Sendable (CookbookPublishProfile) async throws -> Void,
@@ -131,25 +144,63 @@ public struct CookbookPublishClient: Sendable {
 public enum CookbookPublisher {
   public static func publish(
     bundles: [RecipeBundleCoding.RecipeBundle],
-    displayImages: [RecipePhoto.ID: Data] = [:],
     displayName: String,
     publishedAt: Date = .now,
     client: CookbookPublishClient,
-    progress: @escaping @Sendable (Int, Int) -> Void
-  ) async throws {
+    loadDisplayImages: @escaping @Sendable ([RecipePhoto.ID]) async throws -> [RecipePhoto.ID: Data] = { _ in [:] },
+    progress: @escaping @Sendable (Int, Int) async -> Void
+  ) async throws -> CookbookPublishOutcome {
     let existing: [String: String]
     do { existing = try await client.fetchRecipeHashes() }
-    catch let error as CKError where error.code == .zoneNotFound { return }
-    let plan = try await Task.detached(priority: .utility) {
-      try CookbookPublishPlan.make(bundles: bundles, existingHashes: existing, displayImages: displayImages)
-    }.value
-    try await client.saveRecipes(plan.recipesToSave) { saved in
-      progress(saved, plan.recipesToSave.count)
+    catch {
+      if isZoneNotFound(error) { return .zoneMissing }
+      throw error
     }
-    try await client.deleteRecipes(plan.recordNamesToDelete)
-    try await client.saveProfile(CookbookPublishProfile(
-      displayName: displayName, recipeCount: bundles.count,
-      payloadVersion: RecipeBundleCoding.currentVersion, publishedAt: publishedAt
-    ))
+    do {
+      let plan = try await Task.detached(priority: .utility) {
+        try CookbookPublishPlan.make(bundles: bundles, existingHashes: existing)
+      }.value
+      let total = plan.recipesToSave.count
+      for start in stride(from: 0, to: total, by: 400) {
+        let end = min(start + 400, total)
+        var batch = Array(plan.recipesToSave[start..<end])
+        let photoIDs = batch.compactMap(\.displayPhotoID)
+        if !photoIDs.isEmpty {
+          let images = try await loadDisplayImages(photoIDs)
+          for index in batch.indices {
+            if let photoID = batch[index].displayPhotoID {
+              batch[index].displayImage = images[photoID]
+            }
+          }
+        }
+        try await client.saveRecipes(batch) { saved in
+          await progress(start + saved, total)
+        }
+      }
+      try await client.deleteRecipes(plan.recordNamesToDelete)
+      try await client.saveProfile(CookbookPublishProfile(
+        displayName: displayName, recipeCount: bundles.count,
+        payloadVersion: RecipeBundleCoding.currentVersion, publishedAt: publishedAt
+      ))
+      return .published
+    } catch {
+      if isZoneNotFound(error) { return .zoneMissing }
+      throw error
+    }
   }
+
+  private static func isZoneNotFound(_ error: Error) -> Bool {
+    guard let cloudError = error as? CKError else { return false }
+    if cloudError.code == .zoneNotFound { return true }
+    guard cloudError.code == .partialFailure,
+      let partialErrors = cloudError.partialErrorsByItemID?.values,
+      !partialErrors.isEmpty
+    else { return false }
+    return partialErrors.allSatisfy { ($0 as? CKError)?.code == .zoneNotFound }
+  }
+}
+
+public enum CookbookPublishOutcome: Equatable, Sendable {
+  case published
+  case zoneMissing
 }

@@ -57,6 +57,7 @@ public enum CookbookCloudKitClientFactory {
           do {
             result = try await database.modifyRecords(saving: records, deleting: [], savePolicy: .changedKeys, atomically: false)
           } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
+            if Self.isZoneNotFound(error) { throw error }
             throw Self.publishFailure(error, fallbackCount: batch.count)
           }
           let failures = result.saveResults.values.compactMap { result -> Error? in
@@ -64,10 +65,13 @@ public enum CookbookCloudKitClientFactory {
             return nil
           }
           guard failures.isEmpty else {
+            if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
+              throw first
+            }
             let detail = failures.first.map(describe) ?? "Unknown CloudKit error"
             throw CookbookPublishFailure.failedRecords(count: failures.count, firstError: detail)
           }
-          progress(min(start + batch.count, recipes.count))
+          await progress(min(start + batch.count, recipes.count))
         }
       },
       deleteRecipes: { names in
@@ -79,6 +83,7 @@ public enum CookbookCloudKitClientFactory {
           do {
             result = try await database.modifyRecords(saving: [], deleting: batch, savePolicy: .changedKeys, atomically: false)
           } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
+            if Self.isZoneNotFound(error) { throw error }
             throw Self.publishFailure(error, fallbackCount: batch.count)
           }
           let failures = result.deleteResults.values.compactMap { result -> Error? in
@@ -86,6 +91,9 @@ public enum CookbookCloudKitClientFactory {
             return nil
           }
           guard failures.isEmpty else {
+            if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
+              throw first
+            }
             throw CookbookPublishFailure.failedRecords(count: failures.count, firstError: failures.first.map(describe) ?? "Unknown CloudKit error")
           }
         }
@@ -93,12 +101,13 @@ public enum CookbookCloudKitClientFactory {
       fetchProfile: {
         do {
           let record = try await database.record(for: CKRecord.ID(recordName: "profile", zoneID: zoneID))
-          guard let displayName = record["displayName"] as? String,
-            let recipeCount = record["recipeCount"] as? Int,
-            let payloadVersion = record["payloadVersion"] as? Int,
-            let publishedAt = record["publishedAt"] as? Date
-          else { return nil }
-          return CookbookPublishProfile(displayName: displayName, recipeCount: recipeCount, payloadVersion: payloadVersion, publishedAt: publishedAt)
+          guard let displayName = record["displayName"] as? String else { return nil }
+          return CookbookPublishProfile(
+            displayName: displayName,
+            recipeCount: record["recipeCount"] as? Int ?? 0,
+            payloadVersion: record["payloadVersion"] as? Int ?? 0,
+            publishedAt: record["publishedAt"] as? Date
+          )
         } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
           return nil
         }
@@ -108,17 +117,30 @@ public enum CookbookCloudKitClientFactory {
         record["displayName"] = profile.displayName as CKRecordValue
         record["recipeCount"] = profile.recipeCount as CKRecordValue
         record["payloadVersion"] = profile.payloadVersion as CKRecordValue
-        record["publishedAt"] = profile.publishedAt as CKRecordValue
-        _ = try await database.save(record)
-      },
-      fetchShare: {
+        record["publishedAt"] = profile.publishedAt as CKRecordValue?
         do {
-          let record = try await database.record(for: CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID))
-          return record as? CKShare
-        } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
-          return nil
+          let result = try await database.modifyRecords(
+            saving: [record], deleting: [], savePolicy: .changedKeys, atomically: false
+          )
+          let failures = result.saveResults.values.compactMap { result -> Error? in
+            if case let .failure(error) = result { return error }
+            return nil
+          }
+          guard failures.isEmpty else {
+            if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
+              throw first
+            }
+            throw CookbookPublishFailure.failedRecords(
+              count: failures.count,
+              firstError: failures.first.map(Self.describe) ?? "Unknown CloudKit error"
+            )
+          }
+        } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
+          if Self.isZoneNotFound(error) { throw error }
+          throw Self.publishFailure(error, fallbackCount: 1)
         }
       },
+      fetchShare: { try await Self.fetchShare(in: database) },
       createOrFetchShare: { displayName in
         do {
           _ = try await database.recordZone(for: zoneID)
@@ -174,6 +196,14 @@ public enum CookbookCloudKitClientFactory {
       count: itemErrors.isEmpty ? fallbackCount : itemErrors.count,
       firstError: itemErrors.first.map(Self.describe) ?? Self.describe(error)
     )
+  }
+
+  private static func isZoneNotFound(_ error: CKError) -> Bool {
+    guard error.code == .partialFailure,
+      let errors = error.partialErrorsByItemID?.values,
+      !errors.isEmpty
+    else { return false }
+    return errors.allSatisfy { ($0 as? CKError)?.code == .zoneNotFound }
   }
 }
 
