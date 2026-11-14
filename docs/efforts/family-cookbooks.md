@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
 Status: Ready
-Summary: Browse family members' recipes read-only and copy one into yours. S0 (transport spike) passed and S1 (bundle v2 and copy-import) is done; S2 is the mirror database, read-only visiting and Copy to My Recipes, fed by a DEBUG payload file.
+Summary: Browse family members' recipes read-only and copy one into yours. S0–S2 are done, and S2's device pass found three gaps. S2b fixes the two left after the architect's Copy Anyway fix: the cookbook's filter and sort buttons, and showing where a copy came from. S3 then publishes your library to the cookbook zone.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
@@ -12,8 +12,9 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 - [x] **S0** — transport spike (this brief, below). Device pass cleared 2026-11-13; results in ADR-0071 § S0 result
 - [x] **S1** — bundle v2 and copy-import (this brief, below)
 - [x] **S2** — mirror database and read-only visiting (this brief, below)
-- [ ] **S3** — publish
-- [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook, an Open action on the copy toast (S2 ships the reader's button flipping to Open Mine), and applying payloads off the main actor (the S2 file load runs on it)
+- [ ] **S2b** — visiting fixes from the S2 device pass (this brief, below)
+- [ ] **S3** — publish (this brief, below)
+- [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook, an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516), and applying payloads off the main actor (the S2 file load runs on it)
 
 ## Where things are for S0 (architect, 2026-11-13, `origin/main` e5b3143)
 
@@ -401,3 +402,217 @@ Both devices run **Yes Chef Dev**, as in S0.
    own facets, and the source reading "Copied from Jon's cookbook". Back in the cookbook, the recipe shows
    **In My Recipes**, and **Copy Anyway** makes a second, independent copy.
 6. Edit Wendy's copy. Jon's cookbook entry doesn't change. The copy reaches Wendy's other device through normal sync.
+
+## S2b — Visiting fixes from the S2 device pass
+
+Jon's S2 device pass (2026-11-14) mostly worked and found three gaps. The architect fixed one in #516: the
+reader's button now always runs the copy, so **Copy Anyway** can be reached. This slice fixes the other two. A
+cookbook's Recipes view had no filter or sort buttons, and nothing showed that a copy came from Jon's cookbook.
+No schema change.
+
+### Where things are (architect, 2026-11-14, `origin/main` 206a635)
+
+- `YesChefApp/AppMainLayout.swift`: `cookbooksTab` (line 164) hosts `FamilyCookbooksView`. `RecipesTab` (line 224)
+  is the pattern to follow: a `NavigationSplitView` placed directly in the tab, with `RecipeListView` in the sidebar.
+  `RecipeListView` brings its own Filter, Sort and View Options toolbar (`RecipeLibraryView.swift` line 628) and
+  hides Workbench and Archived outside `.mine`.
+- `YesChefApp/CookbookLibrary.swift`: `FamilyCookbooksView` (line 138) is a `NavigationStack` of cookbooks that
+  **pushes** `CookbookRecipesView` (line 175). That view switches between a `NavigationSplitView` (Recipes) and
+  `PowerBrowserView`, which brings its own stack or split view (`PowerBrowserView.swift` line 14). It puts the
+  Recipes / Power Browser picker in a `.principal` toolbar outside both. SwiftUI doesn't support a split view
+  pushed inside a stack, and the sidebar's toolbar is dropped. That's the missing filter and sort.
+- `YesChefPackage/Sources/YesChefCore/RecipeRepository+CookbookCopy.swift` line 97 writes
+  `importedFrom: "Copied from \(ownerName)'s cookbook"` and `dateImported`. Nothing in `YesChefApp/` reads
+  `importedFrom` or `dateImported`.
+- `YesChefApp/RecipeReaderSupportingViews.swift`: `SourceMetadataView` (line 4). The reader uses it at
+  `RecipeDetailView.swift` lines 596, 615 and 697.
+
+### Build
+
+1. **The cookbook tab shows the cookbook at its root.** Drop the `NavigationStack` and the push.
+   `FamilyCookbooksView` holds the selected cookbook by owner name. It defaults to the first one, and falls back
+   to the first if the selected one disappears. It shows that cookbook directly in the tab:
+   - **Recipes:** the `NavigationSplitView` built the way `RecipesTab` builds it. The list column's toolbar is
+     `RecipeListView`'s own, so Filter, Sort and View Options appear exactly as they do in your Recipes tab.
+   - **Power Browser:** `PowerBrowserView` as it is.
+   - The header bar (the existing `safeAreaInset`, "Jon's Recipes · read-only · loaded <date>") also holds the
+     Recipes / Power Browser segmented control. When there's more than one cookbook, it also has a menu for
+     choosing one. Remove the `.principal` toolbar, so no toolbar is applied outside the split view or the Power
+     Browser's own navigation.
+   - Keep one `CookbookLibraryModels` per selected cookbook, made again when the selection changes. Keep the
+     `recipeImageDatabase` environment value and the filter sheet.
+2. **A copy shows where it came from.** In `YesChefCore`, `CookbookProvenance` is the only code that knows the
+   string's format. `importedFrom(ownerName:)` builds it, and the copy calls it in place of the literal.
+   `ownerName(importedFrom:)` reads it back and returns `nil` for any other value. `SourceMetadataView` shows
+   "Copied from Jon's cookbook · Nov 14, 2026" (from `dateImported`, abbreviated date, no time) when the source is
+   a cookbook copy. Other `importedFrom` values, such as "Paprika HTML" and "Web Recipe Capture", stay hidden
+   (Jon, 2026-11-14).
+
+### Keep
+
+- No schema change. The `importedFrom` string stays byte-identical, so copies made during the S2 device pass show
+  their line too.
+- Your own Recipes and Power Browser tabs are unchanged.
+- `CookbookCopyModel` and the reader's copy button stay as #516 left them.
+
+### Tests (package)
+
+- `CookbookProvenance` round-trips an owner name, including one with an apostrophe ("O'Brien"). It returns `nil` for
+  "Paprika HTML", "Web Recipe Capture", an empty string and `nil`.
+- Extend the S1 copy test: the copy's `importedFrom` reads back as the owner through `ownerName(importedFrom:)`.
+
+### Done when
+
+- `scripts/check-drift.sh` is green and the generic iOS build passes. The App change is view-only, so
+  `YesChefTests` isn't required (guardrail #9).
+- Closeout (ADR-0005 D16) runs with `--keep-brief`. It ticks S2b, appends the device pass below, and advances
+  `NEXT_UP.md` per ADR-0005 D12.
+
+### Device pass (Jon, about 10 minutes)
+
+Use Yes Chef Dev with Jon's cookbook still loaded from S2. Check the iPad, then the iPhone:
+
+1. **Family Cookbooks** opens straight to Jon's Recipes. Filter, Sort and View Options are in the list's toolbar.
+   Filter by a label and change the sort. The results match the same filter and sort in your own Recipes. Switch
+   to Power Browser and back.
+2. Open a recipe you've already copied. **In My Recipes** shows. **Copy to My Recipes** asks **Open Mine / Copy
+   Anyway**. Copy Anyway makes a second copy, and Open Mine opens the newest one.
+3. Open your copy. The source shows "Copied from Jon's cookbook" and the date, next to the original source.
+
+## S3 — Publish
+
+S3 gets your library into your cookbook zone and keeps it current: the publisher (D4) and Settings › Family
+Cookbook with Share My Recipes, sharing status and Publish Now. Viewers still load the S2 file until S4 fetches
+from the zone. Until S4 ships, the Settings screen appears only in Yes Chef Dev.
+
+### Where things are (architect, 2026-11-14, `origin/main` 206a635)
+
+- `YesChefApp/CookbookSpike.swift` (DEBUG, S0, disposable; take what works):
+  - `createShare` (line 105) makes the `Cookbook` zone and the zone-wide share.
+  - `publish(count:)` (line 135) saves in batches of 400 with `.changedKeys`, with a `payload` `CKAsset`, a
+    `contentHash` and a `profile` record named `"profile"`. Its hash is of *uncanonical* JSON, so S3's first
+    publish re-uploads everything. That's expected.
+  - `CookbookSharingController` (line 406) wraps `UICloudSharingController`, limited to private and read-only.
+  - The app and scene delegates (line 452) accept shares.
+- `YesChefPackage/Sources/YesChefCore/CookbookPayload.swift`: `bundles(in:)` (line 7) leaves out archived recipes,
+  and so does `bundle(for:in:)` (line 92). `encodedPayload` (line 132) is canonical, sorted JSON. `contentHash` is
+  at line 156. Bundles keep `thumbnailData` and drop `displayData` (line 80).
+- `Recipe.coverPhotoID` and `RecipePhoto.displayData` (`Models.swift` lines 30 and 860).
+- `YesChefApp/YesChef.entitlements` (Release) lists only the library container. `YesChef-Dev.entitlements` lists
+  both (S0).
+- `YesChefApp/SettingsViews.swift`: the Library section (line 70) and Developer section (line 77). `SettingsPane` is
+  at `AppNavigationModels.swift` line 161.
+- `YesChefApp/ChatAccessFolderClient.swift`: the precedent for a dependency client.
+- `YesChefPackage/Sources/YesChefCore/CloudSync.swift`: the library's `SyncEngine`. **Don't touch it.**
+
+### Build — core (`YesChefCore`, package tests)
+
+1. **Record shape**, defined in one place:
+   - `CookbookRecipe`, whose record name is the recipe ID's `uuidString`. Its fields are `payload` (`CKAsset` of
+     `encodedPayload`), `contentHash`, `payloadVersion` (Int), and `displayImage`. `displayImage` is a `CKAsset`
+     of the cover photo's `displayData`, or the first photo's by `sortOrder` if there's no cover. It's `nil` when
+     the recipe has no photo.
+   - `CookbookProfile`, record name `"profile"`: `displayName`, `recipeCount`, `payloadVersion` and
+     `publishedAt`.
+   - The hash covers the payload only. A new photo changes the payload's photo rows and thumbnail, so it uploads
+     again.
+2. **`CookbookPublishPlan`**, pure. It takes the library's bundles and the zone's `[recordName: contentHash]` and
+   returns:
+   - the records to save: recipes that are new or whose hash differs;
+   - the record names to delete: any `CookbookRecipe` name that isn't a current library recipe, which covers
+     archived and deleted recipes and the spike's leftovers.
+   The profile isn't part of the plan.
+3. **`CookbookPublisher`.** CloudKit sits behind a dependency client, so the plan and the run are tested without
+   a network. One run:
+   - Read every `CookbookRecipe`'s `contentHash` with a zone-changes fetch from a `nil` token and
+     `desiredKeys: ["contentHash"]`. That needs no query index.
+   - Build the bundles off the main actor and plan.
+   - Save in batches of 400 with `.changedKeys`. Set every field, including `nil`, so a removed display image is
+     cleared. Then delete, then save the profile.
+   - Report progress as `published n of total`.
+   Only one run happens at a time, and a trigger that arrives during a run causes one follow-up run.
+   - `zoneNotFound` means sharing is off: stop without an error.
+   - Per-record failures are counted and stop the run as an error that names the count and the first
+     `CKError`, by name. Quota exceeded is the same. No local "what I published" state is kept: the next run plans
+     again (D4).
+4. **`CookbookParticipants`.** It turns a `CKShare`'s participants into display rows: name, then "invited" or
+   "accepted", then "read-only" or "read-write", in words, never raw values (ADR-0071 § S0 result).
+
+### Build — app
+
+5. **When a device publishes.** A device publishes while the cookbook zone exists in its private database. It
+   checks once per launch and caches the answer for the session, so both of Jon's devices publish without any
+   per-device setup. A device that has never shared makes one zone lookup at launch and nothing more. A run
+   starts:
+   - at launch and on foreground;
+   - from **Publish Now**;
+   - 2 minutes after the last library write. Use GRDB's `DatabaseRegionObservation` over the tables `CookbookPayload`
+     reads. Writes that arrive through sync count too; the hash comparison makes a duplicate run a no-op.
+6. **Settings › Family Cookbook**: a new `SettingsPane`, `.familyCookbook`, in its own section. It's DEBUG-only
+   until S4.
+   - **Name shown to family**: a text field, required before sharing. It's stored in the `CookbookProfile`
+     record, and filled in from that record when the record exists.
+   - **Share My Recipes**: creates the zone and a zone-wide share if they're missing. The share is titled
+     "<name>'s Recipes", with public permission none. It reuses the S0 zone and share if they exist, presents
+     the sharing controller (private and read-only, as the spike does), and starts a publish.
+   - **Status**: participants as `CookbookParticipants` rows, the recipe count, and one of "Published 3 min ago"
+     (from the profile's `publishedAt`), "Publishing 1,200 of 2,223", or the error. Errors stay on screen until
+     the next run succeeds ([[no-dead-data]]: never quietly green).
+   - **Publish Now**.
+   - **Stop Sharing**: after a confirmation, deletes the zone, which removes the share and every record.
+   The model is `@Observable @MainActor`, and the view binds and delegates (guardrail #2).
+7. **Entitlement.** Add the cookbook container to `YesChef.entitlements` (Release), as S0 planned. Leave the share
+   extension alone.
+8. **Spike.** Remove the spike's Create Share, Publish N and Republish One, which are replaced. Keep Fetch Changes,
+   Reset Token, Try to Write, Delete My Cookbook, the share acceptance and the log. The device pass uses them on
+   Wendy's phone, and S4 replaces them.
+
+### Keep
+
+- No synced table, column or migration (D8). `CloudSync.swift` isn't touched. The publisher only reads the library.
+- No local publish state, and no change to the mirror or `CookbookCopyModel`.
+- Failures are loud, never swallowed.
+
+### Tests
+
+- **Package:**
+  - A new recipe is saved, and an unchanged hash is skipped.
+  - A changed hash is saved.
+  - An archived recipe and a deleted recipe are both deleted from the zone, and so are non-UUID record names
+    (spike leftovers). The profile is never deleted.
+  - Planning the same library twice is empty the second time.
+  - The record mapping round-trips the payload to the same bundle.
+  - `displayImage` uses the cover, falls back to the first photo, and is `nil` with no photos.
+  - The participant rows use words.
+- **App (`YesChefTests`)**, with a fake client:
+  - Publish Now reports progress and ends published.
+  - A partial failure shows an error with the count.
+  - With no zone, a launch trigger doesn't publish.
+  - Two triggers during a run cause exactly one follow-up run.
+
+### Done when
+
+- `scripts/check-drift.sh` is green, the generic iOS build passes, and `YesChefTests` passes on a simulator. This
+  slice adds App-layer models (guardrail #9).
+- The PR body lists the held op: deploy `CookbookRecipe` and `CookbookProfile`, with S3's fields, to the cookbook
+  container's **Production** schema before the first TestFlight build that shows Family Cookbook. The architect
+  files it under Held in `device-passes.md`.
+- Closeout (ADR-0005 D16) runs with `--keep-brief`. It ticks S3, appends the device pass below, and advances
+  `NEXT_UP.md` per ADR-0005 D12.
+
+### Device pass (Jon, with Wendy's phone for one step, about 30 minutes)
+
+All devices run Yes Chef Dev.
+
+1. **Jon's iPad:** Settings › Family Cookbook. Enter "Jon", then **Share My Recipes**. The S0 share is reused, and
+   Wendy shows as accepted and read-only.
+2. **Publish Now.** The status counts up and ends at "Published just now", with your recipe count. Note how long
+   the first publish takes, now with photos.
+3. **Publish Now** again. It finishes quickly and uploads nothing.
+4. Edit a recipe. Within about 2 minutes a publish of 1 runs. Archive a recipe: the count drops by one. Unarchive
+   it.
+5. **Jon's iPhone:** Family Cookbook shows the same name, participants and status with no setup. **Publish Now**
+   uploads nothing.
+6. **Wendy's phone:** Cookbook Spike › **Reset Token**, then **Fetch Changes**. The count is your recipes plus the
+   profile and the share record.
+7. Settings › Sync on both of Jon's devices shows no new errors.

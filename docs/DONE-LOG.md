@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-14 — Family cookbooks S2 device pass cleared, three gaps (`plan/family-cookbooks-s2b-s3`)
+
+- **Result:** Jon's S2 pass worked: file transfer, read-only browsing, the reader and copying. It found three gaps. The cookbook's Recipes view had no filter or sort buttons, because a split view was pushed inside a navigation stack. Copy Anyway couldn't be reached, because the button flipped to Open Mine; the architect fixed this in #516. Nothing showed that a copy came from the cookbook, because `importedFrom` is stored but never displayed. S2b fixes the other two, and its device gate re-checks all three. Jon chose to show only cookbook provenance, not other `importedFrom` values (ADR-0071 Amendment 3). The S2 line is gone from `device-passes.md`.
+- **Verification:** Jon's device pass, 2026-11-14.
+
+---
 ## 2026-11-13 — Family cookbooks · S2 mirror and read-only visiting (`effort/family-cookbooks-s2`)
 
 - **Result:** Added local cookbook mirrors, read-only recipe and Power Browser access, Copy to My Recipes, family cookbook browsing, and DEBUG file transport.
