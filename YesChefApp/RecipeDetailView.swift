@@ -240,19 +240,12 @@ struct RecipeDetailView: View {
             )
           )
         } else if case let .cookbook(context) = model.scope, let cookbookCopyModel {
-          let copyIDs = cookbookCopyModel.copyIDsBySource[model.recipeID] ?? []
+          // Always the copy action: with a copy already in your library it asks Open Mine / Copy Anyway
+          // (ADR-0071 D7). The header's In My Recipes label shows the copy exists.
           Button {
-            if copyIDs.isEmpty {
-              Task { await cookbookCopyModel.copyButtonTapped(context: context, sourceID: model.recipeID) }
-            } else {
-              Task {
-                if let recipeID = await cookbookCopyModel.newestCopy(of: copyIDs) {
-                  onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, scope: .mine))
-                }
-              }
-            }
+            Task { await cookbookCopyModel.copyButtonTapped(context: context, sourceID: model.recipeID) }
           } label: {
-            Label(copyIDs.isEmpty ? "Copy to My Recipes" : "Open Mine", systemImage: copyIDs.isEmpty ? "plus.circle" : "arrow.up.forward.square")
+            Label("Copy to My Recipes", systemImage: "plus.circle")
           }
           .task { await cookbookCopyModel.refreshCopyStatus(context: context, sourceID: model.recipeID) }
         }
