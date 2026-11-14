@@ -82,6 +82,38 @@ struct CookbookPublishingTests {
     #expect(CookbookRetry.delay(forRecordFailures: [CKError(.batchRequestFailed)]) == nil)
   }
 
+  @Test func unchangedPublishLeavesTheProfileAlone() async throws {
+    let now = Date(timeIntervalSince1970: 1_000)
+    let recipe = Recipe(id: UUID(), title: "Soup", dateCreated: now, dateModified: now)
+    let bundle = RecipeBundleCoding.RecipeBundle(version: RecipeBundleCoding.currentVersion, recipe: recipe)
+    let hash = try CookbookPayload.contentHash(bundle)
+    let profileSaves = ImageLoadCounter()
+    let client = CookbookPublishClient(
+      fetchRecipeHashes: { [recipe.id.uuidString: hash] },
+      saveRecipes: { _, _ in Issue.record("unchanged recipes should not be saved") },
+      deleteRecipes: { _ in },
+      fetchProfile: { nil },
+      saveProfile: { _ in await profileSaves.increment() },
+      fetchShare: { nil },
+      createOrFetchShare: { _ in CKShare(recordZoneID: CookbookCloudKitClientFactory.zoneID) },
+      deleteCookbook: {}
+    )
+    let current = CookbookPublishProfile(
+      displayName: "Jon", recipeCount: 1, payloadVersion: RecipeBundleCoding.currentVersion, publishedAt: now
+    )
+    let unchanged = try await CookbookPublisher.publish(
+      bundles: [bundle], displayName: "Jon", currentProfile: current, client: client, progress: { _, _ in }
+    )
+    #expect(unchanged == .unchanged)
+    #expect(await profileSaves.count == 0)
+
+    let renamed = try await CookbookPublisher.publish(
+      bundles: [bundle], displayName: "Jonathan", currentProfile: current, client: client, progress: { _, _ in }
+    )
+    #expect(renamed == .published)
+    #expect(await profileSaves.count == 1)
+  }
+
   @Test func noOpPublishDoesNotLoadDisplayImageBytes() async throws {
     let now = Date(timeIntervalSince1970: 1_000)
     let recipeID = UUID()

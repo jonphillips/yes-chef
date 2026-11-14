@@ -16,6 +16,7 @@ final class CookbookPublishModel {
   @ObservationIgnored private var isCheckingZone = false
   @ObservationIgnored private var didCheckZone = false
   @ObservationIgnored private var needsFollowUp = false
+  @ObservationIgnored private var lastRunFailed = false
 
   var displayName = ""
   private(set) var share: CKShare?
@@ -26,6 +27,7 @@ final class CookbookPublishModel {
   private(set) var publishedProfile: CookbookPublishProfile?
   private(set) var sharePresentationRequest = 0
   private(set) var isSharing = false
+  private(set) var lastCheckedAt: Date?
 
   init(client: CookbookPublishClient = CookbookCloudKitClientFactory.live()) {
     self.client = client
@@ -53,7 +55,17 @@ final class CookbookPublishModel {
   }
 
   func sceneBecameActive() {
-    Task { await checkZoneAndPublishIfNeeded() }
+    Task { await foregrounded() }
+  }
+
+  /// Foreground publishes only to retry a failed run. Edits made here or synced in reach the library observation,
+  /// whose debounced publish survives a trip to the background; launch covers what synced while the app was closed.
+  func foregrounded() async {
+    if !didCheckZone {
+      await checkZoneAndPublishIfNeeded()
+    } else if lastRunFailed {
+      await publishIfShared()
+    }
   }
 
   func shareButtonTapped() {
@@ -158,6 +170,7 @@ final class CookbookPublishModel {
       let outcome = try await CookbookPublisher.publish(
         bundles: bundles,
         displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+        currentProfile: publishedProfile,
         client: client,
         loadDisplayImages: { photoIDs in
           guard !photoIDs.isEmpty else { return [:] }
@@ -173,18 +186,25 @@ final class CookbookPublishModel {
       ) { saved, total in
         await MainActor.run { self.progressText = "Publishing \(saved) of \(total)" }
       }
-      guard outcome == .published else {
+      switch outcome {
+      case .zoneMissing:
         share = nil
         participants = []
         publishedProfile = nil
         progressText = nil
         return
+      case .published:
+        publishedProfile = try await client.fetchProfile()
+        if let name = publishedProfile?.displayName { displayName = name }
+      case .unchanged:
+        break
       }
-      publishedProfile = try await client.fetchProfile()
-      if let name = publishedProfile?.displayName { displayName = name }
+      lastCheckedAt = .now
+      lastRunFailed = false
       progressText = nil
       errorMessage = nil
     } catch {
+      lastRunFailed = true
       progressText = nil
       errorMessage = error.localizedDescription
     }

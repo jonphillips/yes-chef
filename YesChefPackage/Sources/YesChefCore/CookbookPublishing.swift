@@ -146,6 +146,7 @@ public enum CookbookPublisher {
   public static func publish(
     bundles: [RecipeBundleCoding.RecipeBundle],
     displayName: String,
+    currentProfile: CookbookPublishProfile? = nil,
     publishedAt: Date = .now,
     client: CookbookPublishClient,
     loadDisplayImages: @escaping @Sendable ([RecipePhoto.ID]) async throws -> [RecipePhoto.ID: Data] = { _ in [:] },
@@ -179,6 +180,14 @@ public enum CookbookPublisher {
         }
       }
       try await client.deleteRecipes(plan.recordNamesToDelete)
+      // A run that changed nothing leaves the profile alone, so `publishedAt` stays the last real publish and viewers
+      // don't fetch a profile change on every check.
+      if plan.recipesToSave.isEmpty, plan.recordNamesToDelete.isEmpty, let currentProfile,
+        currentProfile.publishedAt != nil, currentProfile.displayName == displayName,
+        currentProfile.recipeCount == bundles.count, currentProfile.payloadVersion == RecipeBundleCoding.currentVersion
+      {
+        return .unchanged
+      }
       try await client.saveProfile(CookbookPublishProfile(
         displayName: displayName, recipeCount: bundles.count,
         payloadVersion: RecipeBundleCoding.currentVersion, publishedAt: publishedAt
@@ -203,5 +212,6 @@ public enum CookbookPublisher {
 
 public enum CookbookPublishOutcome: Equatable, Sendable {
   case published
+  case unchanged
   case zoneMissing
 }

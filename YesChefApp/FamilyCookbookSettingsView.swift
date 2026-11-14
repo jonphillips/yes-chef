@@ -34,6 +34,9 @@ struct FamilyCookbookSettingsView: View {
             LabeledContent("Status", value: "Published \(publishedAt.formatted(.relative(presentation: .named)))")
             if let progress = model.progressText {
               Text(progress).foregroundStyle(.secondary)
+            } else if let checked = model.lastCheckedAt, model.errorMessage == nil {
+              Text("Up to date · checked \(checked.formatted(.relative(presentation: .named)))")
+                .foregroundStyle(.secondary)
             }
           } else if let progress = model.progressText {
             LabeledContent("Status", value: progress)

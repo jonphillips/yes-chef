@@ -70,6 +70,34 @@ struct CookbookPublishModelTests {
     }
   }
 
+  @Test func foregroundPublishesOnlyToRetryAFailedRun() async throws {
+    let now = Date(timeIntervalSince1970: 800)
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert { Recipe(id: UUID(), title: "Soup", dateCreated: now, dateModified: now) }.execute(db)
+      }
+      let healthy = CookbookPublishFake()
+      let model = CookbookPublishModel(client: healthy.client())
+      model.displayName = "Jon"
+      await model.checkZoneAndPublishIfNeeded()
+      #expect(await healthy.saveCallCount == 1)
+      await model.foregrounded()
+      #expect(await healthy.saveCallCount == 1)
+
+      let failing = CookbookPublishFake(saveFailure: .failedRecords(count: 1, firstError: "CKError networkFailure"))
+      let retrying = CookbookPublishModel(client: failing.client())
+      retrying.displayName = "Jon"
+      await retrying.checkZoneAndPublishIfNeeded()
+      #expect(await failing.saveCallCount == 1)
+      await retrying.foregrounded()
+      #expect(await failing.saveCallCount == 2)
+    }
+  }
+
   @Test func launchWithNoCookbookZoneDoesNotPublish() async throws {
     try await withDependencies {
       try $0.bootstrapDatabase()

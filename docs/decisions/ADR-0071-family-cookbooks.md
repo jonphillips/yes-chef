@@ -98,7 +98,7 @@ Rejected:
 recipe's payload (D5), hashes it, and compares against the `contentHash` field on the records already in its zone.
 It uploads only records whose hash differs and deletes records for recipes that are gone or archived. The zone is the
 state: there's no local "what did I publish" table, and any of the owner's devices can publish without coordinating
-(a save conflict just re-compares). The first publish of ~2000 recipes is the slow one; S0 measures it.
+(a save conflict just re-compares). The first publish of ~2000 recipes is the slow one; S0 measures it. *(S3 device pass, 2026-11-14, #519: foreground publishes only to retry a failed run. Edits, local or synced in, already reach the debounced publish, and a run that changes nothing leaves the profile and its `publishedAt` alone.)*
 
 **Viewer.** On opening a cookbook and on foreground, the app fetches zone changes from the shared database with a
 change token stored in the mirror, and applies them to the mirror in one write per batch. A recipe deleted by its
