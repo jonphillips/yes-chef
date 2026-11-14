@@ -222,4 +222,102 @@ struct CookbookMirrorTests {
     }
   }
 
+  @Test func failedPageLeavesExistingRowsAndChangeTokenUntouched() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer { try? mirror.deleteMirror() }
+    let now = Date(timeIntervalSince1970: 100)
+    let existing = Recipe(id: UUID(), title: "Existing", dateCreated: now, dateModified: now)
+    try withDependencies { $0.context = .live } operation: {
+      try mirror.apply(upserting: [.init(recipe: existing)], deleting: [])
+      try mirror.apply(page: CookbookMirrorPage(changeToken: Data("committed".utf8)))
+      let invalid = Recipe(id: UUID(), title: "Invalid", dateCreated: now, dateModified: now)
+      let orphan = IngredientLine(id: UUID(), recipeID: invalid.id, sectionID: UUID(), originalText: "salt", sortOrder: 0)
+      #expect(throws: (any Error).self) {
+        try mirror.apply(page: CookbookMirrorPage(
+          bundles: [.init(recipe: invalid, ingredientLines: [orphan])],
+          changeToken: Data("uncommitted".utf8)
+        ))
+      }
+      let recipes = try mirror.database.read { try Recipe.fetchAll($0) }
+      #expect(recipes == [existing])
+      #expect(try mirror.fetchState().changeToken == Data("committed".utf8))
+    }
+  }
+
+  @Test func skippedRecipeIsCountedThenClearedByDecodeOrDeletion() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer { try? mirror.deleteMirror() }
+    let recipeID = UUID()
+    try withDependencies { $0.context = .live } operation: {
+      try mirror.apply(page: CookbookMirrorPage(
+        skippedRecords: [recipeID.uuidString: RecipeBundleCoding.currentVersion + 1]
+      ))
+      #expect(try mirror.skippedRecordCount() == 1)
+      let recipe = Recipe(id: recipeID, title: "Now readable", dateCreated: .now, dateModified: .now)
+      try mirror.apply(page: CookbookMirrorPage(
+        bundles: [.init(recipe: recipe)], seenRecordNames: [recipeID.uuidString]
+      ))
+      #expect(try mirror.skippedRecordCount() == 0)
+      try mirror.apply(page: CookbookMirrorPage(skippedRecords: [recipeID.uuidString: 999]))
+      try mirror.apply(page: CookbookMirrorPage(deletedRecipeIDs: [recipeID]))
+      #expect(try mirror.skippedRecordCount() == 0)
+    }
+  }
+
+  @Test func lensReplacementKeepsUnresolvedReferencesAndCountsOnlyUndecodableLenses() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer { try? mirror.deleteMirror() }
+    let now = Date(timeIntervalSince1970: 100)
+    let oldLens = RecipeLens(
+      id: UUID(), name: "Old", baseQuery: try RecipeLensQueryCodec.encode(RecipeBrowserQuery()),
+      sortOrder: 0, dateCreated: now, dateModified: now
+    )
+    let hiddenFacet = Facet(id: UUID(), name: "Hidden", sortOrder: 0, hidden: true, dateCreated: now)
+    let hiddenCategory = Category(
+      id: UUID(), name: "Retired", facetID: hiddenFacet.id, hidden: true, sortOrder: 0, dateCreated: now
+    )
+    let lens = RecipeLens(
+      id: UUID(), name: "Unresolved but readable",
+      baseQuery: try RecipeLensQueryCodec.encode(RecipeBrowserQuery(facetSelections: [
+        .init(facetID: hiddenFacet.id, categoryIDs: [hiddenCategory.id])
+      ])), sortOrder: 0, dateCreated: now, dateModified: now
+    )
+    let shelf = RecipeLensShelf(
+      id: UUID(), lensID: lens.id, title: "Unresolved category", query: lens.baseQuery, sortOrder: 0
+    )
+    let badBase = RecipeLens(
+      id: UUID(), name: "Bad base", baseQuery: "{", sortOrder: 1, dateCreated: now, dateModified: now
+    )
+    let badShelfLens = RecipeLens(
+      id: UUID(), name: "Bad shelf", baseQuery: try RecipeLensQueryCodec.encode(RecipeBrowserQuery()),
+      sortOrder: 2, dateCreated: now, dateModified: now
+    )
+    let badShelf = RecipeLensShelf(
+      id: UUID(), lensID: badShelfLens.id, title: "Bad", query: "{", sortOrder: 0
+    )
+    try withDependencies { $0.context = .live } operation: {
+      try mirror.apply(page: CookbookMirrorPage(lensBundle: .init(
+        lenses: [oldLens], shelves: [], categories: [], facets: []
+      )))
+      try mirror.apply(page: CookbookMirrorPage(lensBundle: .init(
+        lenses: [lens, badBase, badShelfLens], shelves: [shelf, badShelf],
+        categories: [hiddenCategory], facets: [hiddenFacet]
+      )))
+      let saved = try mirror.database.read { db in
+        (try RecipeLens.fetchAll(db), try RecipeLensShelf.fetchAll(db), try Category.fetchAll(db), try Facet.fetchAll(db))
+      }
+      #expect(saved.0 == [lens])
+      #expect(saved.1 == [shelf])
+      #expect(saved.2 == [hiddenCategory])
+      #expect(saved.3 == [hiddenFacet])
+      #expect(try mirror.skippedRecordCount() == 2)
+    }
+  }
+
 }

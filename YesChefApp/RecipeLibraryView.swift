@@ -90,6 +90,7 @@ struct AppContainer: View {
     .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
         presentation: presentation,
+        cookbookLibraryModel: cookbookLibraryModel,
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
@@ -446,6 +447,7 @@ struct AppContainer: View {
 private struct RecipeFullScreenCover: View {
   @Environment(\.dismiss) private var dismiss
   let presentation: RecipeDetailPresentation
+  let cookbookLibraryModel: CookbookLibraryModel
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -490,7 +492,7 @@ private struct RecipeFullScreenCover: View {
         makeDetailView(onRecipeSelected: route)
           .environment(\.recipeImageDatabase, context.mirror.database)
           .environment(\.cookbookDisplayImageLoader, cookbookDisplayImageLoader(
-            mirror: context.mirror, zoneOwnerName: context.zoneOwnerName
+            fetchClient: cookbookLibraryModel.fetchClient, mirror: context.mirror, zoneOwnerName: context.zoneOwnerName
           ))
       }
     }

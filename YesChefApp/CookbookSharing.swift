@@ -9,9 +9,8 @@ extension Notification.Name {
 }
 
 func cookbookDisplayImageLoader(
-  mirror: CookbookMirror, zoneOwnerName: String
+  fetchClient: CookbookFetchClient, mirror: CookbookMirror, zoneOwnerName: String
 ) -> @Sendable (RecipePhoto.ID) async -> Data? {
-  let fetchClient = CookbookCloudKitClientFactory.fetchClient()
   return { photoID in
     guard let result = try? await mirror.database.read({ db -> (Recipe.ID, RecipePhoto.ID)? in
       guard let photo = try RecipePhoto.find(photoID).fetchOne(db),

@@ -159,7 +159,10 @@ public final class CookbookMirror: Sendable {
           let invalidLensNames = try Self.replaceLenses(lensBundle, in: db)
           try db.execute(sql: "DELETE FROM cookbookMirrorSkipped WHERE recordName = 'lenses' OR recordName LIKE 'lens-%'")
           for name in invalidLensNames {
-            try db.execute(sql: "INSERT OR REPLACE INTO cookbookMirrorSkipped(recordName, payloadVersion) VALUES (?, 1)", arguments: [name])
+            try db.execute(
+              sql: "INSERT OR REPLACE INTO cookbookMirrorSkipped(recordName, payloadVersion) VALUES (?, ?)",
+              arguments: [name, CookbookLensBundle.currentVersion]
+            )
           }
         } else if page.deletesLensRecord {
           _ = try Self.replaceLenses(CookbookLensBundle(lenses: [], shelves: [], categories: [], facets: []), in: db)
@@ -249,26 +252,16 @@ public final class CookbookMirror: Sendable {
     try RecipeLens.fetchAll(db).forEach { try RecipeLens.find($0.id).delete().execute(db) }
     for facet in bundle.facets { try Facet.upsert { facet }.execute(db) }
     for category in bundle.categories { try Category.upsert { category }.execute(db) }
-    let categories = Dictionary(uniqueKeysWithValues: bundle.categories.map { ($0.id, $0) })
-    let facets = Dictionary(uniqueKeysWithValues: bundle.facets.map { ($0.id, $0) })
-    func isResolvable(_ value: String) -> Bool {
-      guard let query = try? RecipeLensQueryCodec.decode(value) else { return false }
-      for selection in query.facetSelections {
-        guard let facet = facets[selection.facetID], !facet.hidden else { return false }
-        for id in selection.categoryIDs where categories[id]?.facetID != facet.id || categories[id]?.hidden != false { return false }
-      }
-      for id in query.looseLabelIDs where categories[id]?.facetID != nil || categories[id]?.hidden != false { return false }
-      return true
-    }
-    let invalidLensIDs = Set(bundle.lenses.filter { !isResolvable($0.baseQuery) }.map(\.id)
-      + bundle.shelves.filter { !isResolvable($0.query) }.map(\.lensID))
-    let valid = bundle.lenses.filter { isResolvable($0.baseQuery) }
+    func decodes(_ value: String) -> Bool { (try? RecipeLensQueryCodec.decode(value)) != nil }
+    let invalidLensIDs = Set(bundle.lenses.filter { !decodes($0.baseQuery) }.map(\.id)
+      + bundle.shelves.filter { !decodes($0.query) }.map(\.lensID))
+    let valid = bundle.lenses.filter { !invalidLensIDs.contains($0.id) && decodes($0.baseQuery) }
     let validIDs = Set(valid.map(\.id))
     for lens in valid { try RecipeLens.upsert { lens }.execute(db) }
-    for shelf in bundle.shelves where validIDs.contains(shelf.lensID) && isResolvable(shelf.query) {
+    for shelf in bundle.shelves where validIDs.contains(shelf.lensID) && decodes(shelf.query) {
       try RecipeLensShelf.upsert { shelf }.execute(db)
     }
-    return invalidLensIDs.map { "lens-\($0.uuidString)" }
+    return invalidLensIDs.sorted { $0.uuidString < $1.uuidString }.map { "lens-\($0.uuidString)" }
   }
 
   private static func upsert(

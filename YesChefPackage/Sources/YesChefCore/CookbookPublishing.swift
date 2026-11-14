@@ -42,6 +42,8 @@ public struct CookbookPublishProfile: Equatable, Sendable {
 }
 
 public struct CookbookLensBundle: Codable, Equatable, Sendable {
+  public static let currentVersion = 1
+
   public var lenses: [RecipeLens]
   public var shelves: [RecipeLensShelf]
   public var categories: [Category]
@@ -101,7 +103,7 @@ public struct CookbookPublishLenses: Equatable, Sendable {
   public var contentHash: String
   public var payloadVersion: Int
 
-  public init(payload: Data, contentHash: String, payloadVersion: Int = 1) {
+  public init(payload: Data, contentHash: String, payloadVersion: Int = CookbookLensBundle.currentVersion) {
     self.payload = payload
     self.contentHash = contentHash
     self.payloadVersion = payloadVersion
@@ -248,6 +250,20 @@ public struct CookbookFetchedPage: Sendable {
   }
 }
 
+public struct CookbookFetchProgress: Sendable {
+  public var fetched: Int
+  public var total: Int?
+  public var displayName: String?
+  public var isFullFetch: Bool
+
+  public init(fetched: Int, total: Int?, displayName: String?, isFullFetch: Bool) {
+    self.fetched = fetched
+    self.total = total
+    self.displayName = displayName
+    self.isFullFetch = isFullFetch
+  }
+}
+
 public struct CookbookFetchClient: Sendable {
   public var sharedZones: @Sendable () async throws -> [CKRecordZone.ID]
   public var fetchPage: @Sendable (CKRecordZone.ID, Data?) async throws -> CookbookFetchedPage
@@ -267,7 +283,7 @@ public struct CookbookFetchClient: Sendable {
 public enum CookbookFetcher {
   public static func fetch(
     zoneID: CKRecordZone.ID, mirror: CookbookMirror, client: CookbookFetchClient,
-    progress: @escaping @Sendable (Int, Int?) async -> Void = { _, _ in }
+    progress: @escaping @Sendable (CookbookFetchProgress) async -> Void = { _ in }
   ) async throws {
     do {
       try await fetchPages(zoneID: zoneID, mirror: mirror, client: client, progress: progress)
@@ -279,7 +295,7 @@ public enum CookbookFetcher {
 
   private static func fetchPages(
     zoneID: CKRecordZone.ID, mirror: CookbookMirror, client: CookbookFetchClient,
-    progress: @escaping @Sendable (Int, Int?) async -> Void
+    progress: @escaping @Sendable (CookbookFetchProgress) async -> Void
   ) async throws {
     var state = try mirror.fetchState()
     let fullFetch = state.changeToken == nil || state.payloadVersion < RecipeBundleCoding.currentVersion || state.fullFetchActive
@@ -314,10 +330,10 @@ public enum CookbookFetcher {
         case let .lenses(name, payload, version):
           seen.append(name)
           do {
-            guard version <= 1 else { skipped[name] = version; continue }
+            guard version <= CookbookLensBundle.currentVersion else { skipped[name] = version; continue }
             lenses = try JSONDecoder().decode(CookbookLensBundle.self, from: payload)
           }
-          catch { skipped[name] = version }
+          catch { throw error }
         case .ignored: break
         }
       }
@@ -327,11 +343,13 @@ public enum CookbookFetcher {
       deletesLenses = page.deletions.contains { $0.recordType == "CookbookLenses" }
       token = page.changeToken
       fetched += bundles.count
-      await progress(fetched, total)
       try mirror.apply(page: CookbookMirrorPage(
         bundles: bundles, deletedRecipeIDs: deleted, seenRecordNames: seen, profile: profile,
         lensBundle: lenses, deletesLensRecord: deletesLenses, skippedRecords: skipped, changeToken: token,
         startsFullFetch: startsFullFetch, finishesFullFetch: fullFetch && !page.moreComing
+      ))
+      await progress(CookbookFetchProgress(
+        fetched: fetched, total: total, displayName: profile?.displayName, isFullFetch: fullFetch
       ))
       startsFullFetch = false
       moreComing = page.moreComing

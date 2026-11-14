@@ -23,7 +23,7 @@ final class CookbookLibraryModel {
   var acceptanceErrorMessage: String?
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
-  @ObservationIgnored private let fetchClient: CookbookFetchClient
+  @ObservationIgnored let fetchClient: CookbookFetchClient
   @ObservationIgnored private var fetchTask: Task<Void, Never>?
   @ObservationIgnored private var needsFollowUp = false
   @ObservationIgnored private var notificationTask: Task<Void, Never>?
@@ -99,16 +99,32 @@ final class CookbookLibraryModel {
         let ownerID = zone.ownerName
         let entry = entries.first { $0.zoneOwnerName == ownerID }
         let id = entry?.id ?? uuid()
-        let mirror = try CookbookMirror(id: id, directory: directory)
         let existingContext = contexts.first { $0.zoneOwnerName == ownerID }
-        if existingContext == nil {
-          try store(CookbookContext(ownerName: ownerID, mirror: mirror, loadedAt: now, zoneOwnerName: ownerID))
+        let mirror: CookbookMirror
+        if let existingContext {
+          mirror = existingContext.mirror
+        } else {
+          mirror = try CookbookMirror(id: id, directory: directory)
         }
-        progress[ownerID] = "Fetching"
+        if existingContext == nil {
+          try store(CookbookContext(ownerName: "Family cookbook", mirror: mirror, loadedAt: now, zoneOwnerName: ownerID))
+        }
+        let mirrorState = try mirror.fetchState()
+        let expectsFullFetch = mirrorState.changeToken == nil
+          || mirrorState.payloadVersion < RecipeBundleCoding.currentVersion
+          || mirrorState.fullFetchActive
+        progress[ownerID] = expectsFullFetch ? "Fetching" : "Updating…"
         do {
-          try await CookbookFetcher.fetch(zoneID: zone, mirror: mirror, client: fetchClient) { [weak self] fetched, total in
+          try await CookbookFetcher.fetch(zoneID: zone, mirror: mirror, client: fetchClient) { [weak self] update in
             await MainActor.run {
-              self?.progress[ownerID] = total.map { "Fetching \(fetched) of \($0)" } ?? "Fetching \(fetched)"
+              guard let self else { return }
+              if update.isFullFetch {
+                self.progress[ownerID] = update.total.map { "Fetching \(update.fetched) of \($0)" }
+                  ?? "Fetching \(update.fetched)"
+              } else {
+                self.progress[ownerID] = "Updating…"
+              }
+              if let displayName = update.displayName { self.updateOwnerName(displayName, zoneOwnerName: ownerID) }
             }
           }
         } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
@@ -143,6 +159,15 @@ final class CookbookLibraryModel {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     try encoder.encode(entries).write(to: indexURL, options: .atomic)
+  }
+
+  private func updateOwnerName(_ ownerName: String, zoneOwnerName: String) {
+    guard var context = contexts.first(where: { $0.zoneOwnerName == zoneOwnerName }), context.ownerName != ownerName else {
+      return
+    }
+    context.ownerName = ownerName
+    do { try store(context) }
+    catch { errorMessage = error.localizedDescription }
   }
 
   private func store(_ context: CookbookContext) throws {
@@ -300,7 +325,9 @@ private struct CookbookRecipesView: View {
       }
     }
     .environment(\.recipeImageDatabase, context.mirror.database)
-    .environment(\.cookbookDisplayImageLoader, cookbookDisplayImageLoader(mirror: mirror, zoneOwnerName: context.zoneOwnerName))
+    .environment(\.cookbookDisplayImageLoader, cookbookDisplayImageLoader(
+      fetchClient: libraryModel.fetchClient, mirror: mirror, zoneOwnerName: context.zoneOwnerName
+    ))
   }
 }
 
@@ -353,7 +380,7 @@ private struct CookbookLibraryHeader: View {
   private var headerText: String {
     if let error = errorMessage { return error }
     if let progress = progressMessage { return "\(context.ownerName)'s Recipes · \(progress)" }
-    let updated = context.loadedAt.formatted(date: .abbreviated, time: .shortened)
+    let updated = context.loadedAt.formatted(.relative(presentation: .named))
     let skipped = context.skippedCount == 0 ? "" : " · \(context.skippedCount) need a newer Yes Chef"
     return "\(context.ownerName)'s Recipes · read-only · updated \(updated)\(skipped)"
   }
