@@ -25,4 +25,4 @@ discoverable"):
 
 ## Live
 
-- [Family cookbooks](family-cookbooks.md) — **Ready.** S0 (transport spike), S1 (bundle v2 and copy-import), and S2 (mirror database, read-only visiting and Copy to My Recipes) are done; S2b fixes the S2 device pass's gaps, then S3 publishes to the cookbook zone.
+- [Family cookbooks](family-cookbooks.md) — **Ready.** S0–S2b cover the transport spike, recipe bundles, read-only browsing, and copying recipes. S3 publishes to the cookbook zone. S4 accepts shares and fetches recipes.

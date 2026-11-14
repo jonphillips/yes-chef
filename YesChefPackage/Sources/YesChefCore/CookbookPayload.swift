@@ -2,6 +2,24 @@ import CryptoKit
 import Foundation
 import SQLiteData
 
+public enum CookbookProvenance {
+  private static let prefix = "Copied from "
+  private static let suffix = "'s cookbook"
+
+  public static func importedFrom(ownerName: String) -> String {
+    "\(prefix)\(ownerName)\(suffix)"
+  }
+
+  public static func ownerName(importedFrom value: String?) -> String? {
+    guard let value,
+      value.hasPrefix(prefix),
+      value.hasSuffix(suffix)
+    else { return nil }
+    let ownerName = String(value.dropFirst(prefix.count).dropLast(suffix.count))
+    return ownerName.isEmpty ? nil : ownerName
+  }
+}
+
 /// Intentionally omits full-size display images; those travel as separate assets.
 public enum CookbookPayload {
   public static func bundles(in db: Database) throws -> [RecipeBundleCoding.RecipeBundle] {

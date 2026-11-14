@@ -141,61 +141,77 @@ struct FamilyCookbooksView: View {
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  @State private var selectedOwnerName: String?
+
+  private var selectedContext: CookbookContext? {
+    model.contexts.first { $0.ownerName.caseInsensitiveCompare(selectedOwnerName ?? "") == .orderedSame }
+      ?? model.contexts.first
+  }
 
   var body: some View {
-    NavigationStack {
-      List(model.contexts, id: \.self) { context in
-        NavigationLink(value: context) {
-          Label("\(context.ownerName)'s Recipes", symbol: .libraryShelf)
-        }
-      }
-      .overlay {
-        if model.contexts.isEmpty {
-          ContentUnavailableView {
-            Label("No Family Cookbooks", symbol: .libraryShelf)
-          }
-        }
-      }
-      .navigationTitle("Family Cookbooks")
-      .navigationDestination(for: CookbookContext.self) { context in
-        let currentContext = model.contexts.first(where: { $0.ownerName.caseInsensitiveCompare(context.ownerName) == .orderedSame }) ?? context
+    Group {
+      if let context = selectedContext {
         CookbookRecipesView(
-          context: currentContext,
+          context: context,
+          contexts: model.contexts,
+          selectedOwnerName: Binding(
+            get: { selectedOwnerName ?? context.ownerName },
+            set: { selectedOwnerName = $0 }
+          ),
           copyModel: copyModel,
           mealCalendarModel: mealCalendarModel,
           groceryModel: groceryModel,
           onRecipeSelected: onRecipeSelected
         )
+        .id(context.ownerName)
+      } else {
+        ContentUnavailableView {
+          Label("No Family Cookbooks", symbol: .libraryShelf)
+        }
+        .navigationTitle("Family Cookbooks")
       }
+    }
+    .onChange(of: model.contexts.map(\.ownerName)) { _, ownerNames in
+      guard let selectedOwnerName,
+        !ownerNames.contains(where: { $0.caseInsensitiveCompare(selectedOwnerName) == .orderedSame })
+      else { return }
+      self.selectedOwnerName = ownerNames.first
     }
   }
 }
 
-private struct CookbookRecipesView: View {
-  private enum Surface: String, CaseIterable, Identifiable {
-    case recipes = "Recipes"
-    case powerBrowser = "Power Browser"
+private enum CookbookLibrarySurface: String, CaseIterable, Identifiable {
+  case recipes = "Recipes"
+  case powerBrowser = "Power Browser"
 
-    var id: Self { self }
-  }
+  var id: Self { self }
+}
+
+private struct CookbookRecipesView: View {
 
   let context: CookbookContext
+  let contexts: [CookbookContext]
+  @Binding var selectedOwnerName: String
   let copyModel: CookbookCopyModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   @State private var models: CookbookLibraryModels
-  @State private var surface = Surface.recipes
+  @State private var surface = CookbookLibrarySurface.recipes
   @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
 
   init(
     context: CookbookContext,
+    contexts: [CookbookContext],
+    selectedOwnerName: Binding<String>,
     copyModel: CookbookCopyModel,
     mealCalendarModel: MealCalendarModel,
     groceryModel: GroceryLibraryModel,
     onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void
   ) {
     self.context = context
+    self.contexts = contexts
+    _selectedOwnerName = selectedOwnerName
     self.copyModel = copyModel
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
@@ -205,37 +221,46 @@ private struct CookbookRecipesView: View {
 
   var body: some View {
     @Bindable var recipes = models.recipes
-    Group {
-      switch surface {
-      case .recipes:
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-          RecipeListView(model: models.recipes, onArchivedRecipesRequested: {})
-        } detail: {
-          if let recipe = models.recipes.selectedRecipe {
-            withDependencies {
-              $0.defaultDatabase = context.mirror.database
-            } operation: {
-              RecipeDetailView(
-                recipeID: recipe.id,
-                scope: .cookbook(context),
-                libraryModel: models.recipes,
-                mealCalendarModel: mealCalendarModel,
-                groceryModel: groceryModel,
-                cookbookCopyModel: copyModel,
-                onRecipeSelected: onRecipeSelected
-              )
-            }
-            .id(recipe.id)
-          } else {
-            ContentUnavailableView {
-              Label("Select a Recipe", symbol: .source)
+    VStack(spacing: 0) {
+      CookbookLibraryHeader(
+        context: context,
+        contexts: contexts,
+        selectedOwnerName: $selectedOwnerName,
+        surface: $surface
+      )
+      Group {
+        switch surface {
+        case .recipes:
+          NavigationSplitView(columnVisibility: $columnVisibility) {
+            RecipeListView(model: models.recipes, onArchivedRecipesRequested: {})
+          } detail: {
+            if let recipe = models.recipes.selectedRecipe {
+              withDependencies {
+                $0.defaultDatabase = context.mirror.database
+              } operation: {
+                RecipeDetailView(
+                  recipeID: recipe.id,
+                  scope: .cookbook(context),
+                  libraryModel: models.recipes,
+                  mealCalendarModel: mealCalendarModel,
+                  groceryModel: groceryModel,
+                  cookbookCopyModel: copyModel,
+                  onRecipeSelected: onRecipeSelected
+                )
+              }
+              .id(recipe.id)
+            } else {
+              ContentUnavailableView {
+                Label("Select a Recipe", symbol: .source)
+              }
             }
           }
+        case .powerBrowser:
+          PowerBrowserView(model: models.powerBrowser, onRecipeSelected: onRecipeSelected)
         }
-      case .powerBrowser:
-        PowerBrowserView(model: models.powerBrowser, onRecipeSelected: onRecipeSelected)
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     // The library's filter sheet is hosted at the app root on the library's own model.
     .sheet(isPresented: $recipes.destination.filterRecipes) {
       NavigationStack {
@@ -243,23 +268,50 @@ private struct CookbookRecipesView: View {
       }
     }
     .environment(\.recipeImageDatabase, context.mirror.database)
-    .safeAreaInset(edge: .top, spacing: 0) {
+  }
+}
+
+private struct CookbookLibraryHeader: View {
+  let context: CookbookContext
+  let contexts: [CookbookContext]
+  @Binding var selectedOwnerName: String
+  @Binding var surface: CookbookLibrarySurface
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
       Text("\(context.ownerName)'s Recipes · read-only · loaded \(context.loadedAt.formatted(date: .abbreviated, time: .shortened))")
         .font(.caption.weight(.medium))
         .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.bar)
-    }
-    .toolbar {
-      ToolbarItem(placement: .principal) {
+      HStack {
         Picker("Cookbook screen", selection: $surface) {
-          ForEach(Surface.allCases) { surface in Text(surface.rawValue).tag(surface) }
+          ForEach(CookbookLibrarySurface.allCases) { surface in Text(surface.rawValue).tag(surface) }
         }
         .pickerStyle(.segmented)
         .frame(maxWidth: 320)
+        if contexts.count > 1 {
+          Menu {
+            ForEach(contexts, id: \.ownerName) { cookbook in
+              Button {
+                selectedOwnerName = cookbook.ownerName
+              } label: {
+                if cookbook.ownerName == context.ownerName {
+                  Label(cookbook.ownerName, systemImage: "checkmark")
+                } else {
+                  Text(cookbook.ownerName)
+                }
+              }
+            }
+          } label: {
+            Label(context.ownerName, systemImage: "chevron.up.chevron.down")
+              .labelStyle(.titleAndIcon)
+              .font(.caption.weight(.medium))
+          }
+        }
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal)
+    .padding(.vertical, 8)
+    .background(.bar)
   }
 }

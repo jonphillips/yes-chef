@@ -10,6 +10,16 @@ import YesChefCore
 struct CookbookPayloadTests {
   private let now = Date(timeIntervalSince1970: 100)
 
+  @Test func cookbookProvenanceRoundTripsOwnerNames() {
+    for ownerName in ["Jon", "O'Brien"] {
+      let importedFrom = CookbookProvenance.importedFrom(ownerName: ownerName)
+      #expect(CookbookProvenance.ownerName(importedFrom: importedFrom) == ownerName)
+    }
+    for value in ["Paprika HTML", "Web Recipe Capture", "", nil] as [String?] {
+      #expect(CookbookProvenance.ownerName(importedFrom: value) == nil)
+    }
+  }
+
   @Test func compatibilityAndVersionGate() throws {
     let recipe = Recipe(id: UUID(), title: "Soup", dateCreated: now, dateModified: now)
     let v1 = RecipeBundleCoding.RecipeBundle(recipe: recipe)
@@ -85,7 +95,7 @@ struct CookbookPayloadTests {
       let copiedLine = try #require(try IngredientLine.where { $0.recipeID.eq(copy.recipeID) }.fetchAll(db).first { $0.sortOrder == 1 })
       #expect(copiedLine.id != lineID && copiedLine.sectionID != sectionID && copiedLine.originalText == line.originalText)
       let copiedSource = try #require(try RecipeSource.where { $0.recipeID.eq(copy.recipeID) }.fetchOne(db))
-      #expect(copiedSource.url == source.url && copiedSource.importedFrom == "Copied from Jon's cookbook")
+      #expect(copiedSource.url == source.url && CookbookProvenance.ownerName(importedFrom: copiedSource.importedFrom) == "Jon")
       let copiedNote = try #require(try RecipeNote.where { $0.recipeID.eq(copy.recipeID) }.fetchOne(db))
       #expect(copiedNote.noteType == .wine && copiedNote.pinned)
       let copiedPhoto = try #require(try RecipePhoto.where { $0.recipeID.eq(copy.recipeID) }.fetchOne(db))
