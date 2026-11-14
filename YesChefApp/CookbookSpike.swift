@@ -1,8 +1,6 @@
 #if DEBUG
 // ADR-0071 S0 spike, DEBUG-only; S3/S4 replace it.
 import CloudKit
-import CryptoKit
-import Dependencies
 import Foundation
 import Observation
 import SwiftUI
@@ -32,15 +30,11 @@ private enum CookbookSpikeLog {
 @Observable
 @MainActor
 final class CookbookSpikeModel {
-  @ObservationIgnored @Dependency(\.defaultDatabase) private var libraryDatabase
   @ObservationIgnored private let container = CKContainer(identifier: CookbookSpikeConfiguration.containerIdentifier)
   @ObservationIgnored private let defaults: UserDefaults
 
-  var publishCount = 2000
   private(set) var logLines: [String]
   private(set) var isWorking = false
-  private(set) var share: CKShare?
-  private(set) var sharePresentationRequest = 0
   var errorMessage: String?
 
   init(defaults: UserDefaults = .standard) {
@@ -48,23 +42,9 @@ final class CookbookSpikeModel {
     logLines = CookbookSpikeLog.lines(defaults: defaults)
   }
 
-  var shareContainer: CKContainer { container }
 
   func refreshLog() {
     logLines = CookbookSpikeLog.lines(defaults: defaults)
-  }
-
-  func createShareButtonTapped() {
-    run("Create Share") { try await self.createShare() }
-  }
-
-  func publishButtonTapped() {
-    let count = max(0, publishCount)
-    run("Publish \(count)") { try await self.publish(count: count) }
-  }
-
-  func republishOneButtonTapped() {
-    run("Republish One") { try await self.republishOne() }
   }
 
   func fetchChangesButtonTapped() {
@@ -100,132 +80,6 @@ final class CookbookSpikeModel {
         errorMessage = message
       }
     }
-  }
-
-  private func createShare() async throws {
-    let database = container.privateCloudDatabase
-    let zone: CKRecordZone
-    do {
-      zone = try await database.recordZone(for: CookbookSpikeConfiguration.zoneID)
-    } catch let error as CKError where error.code == .zoneNotFound {
-      zone = try await database.save(CKRecordZone(zoneID: CookbookSpikeConfiguration.zoneID))
-    }
-
-    let shareRecordID = CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zone.zoneID)
-    let record: CKRecord
-    do {
-      record = try await database.record(for: shareRecordID)
-    } catch let error as CKError where error.code == .unknownItem {
-      let newShare = CKShare(recordZoneID: zone.zoneID)
-      newShare[CKShare.SystemFieldKey.title] = "\(UIDevice.current.name)'s Recipes" as CKRecordValue
-      newShare.publicPermission = .none
-      record = try await database.save(newShare)
-    }
-    guard let share = record as? CKShare else {
-      throw CookbookSpikeError.unexpectedShareRecord
-    }
-    self.share = share
-    sharePresentationRequest += 1
-    let participantSummary = share.participants.map { participant in
-      "\(participant.role): \(participant.permission) (\(participant.acceptanceStatus))"
-    }.joined(separator: ", ")
-    appendLog("Share ready for zone \(zone.zoneID.zoneName); participants: \(participantSummary.isEmpty ? "none" : participantSummary)")
-  }
-
-  private func publish(count: Int) async throws {
-    let publishStartedAt = Date.now
-    let generatedAt = Date.now
-    let deviceName = UIDevice.current.name
-    let export = try await libraryDatabase.read { db in
-      try ChatAccessExportBuilder.build(in: db, generatedAt: generatedAt, device: deviceName)
-    }
-    guard !export.recipes.isEmpty || count == 0 else { throw CookbookSpikeError.noRecipes }
-
-    var records: [CKRecord] = []
-    records.reserveCapacity(count + 1)
-    defer {
-      for record in records {
-        if let asset = record["payload"] as? CKAsset, let fileURL = asset.fileURL {
-          try? FileManager.default.removeItem(at: fileURL)
-        }
-      }
-    }
-    for index in 0..<count {
-      let bundle = export.recipes[index % export.recipes.count]
-      let suffix = index < export.recipes.count ? "" : "-\(index / export.recipes.count + 1)"
-      let recordID = CKRecord.ID(recordName: "\(bundle.recipe.id.uuidString)\(suffix)", zoneID: CookbookSpikeConfiguration.zoneID)
-      records.append(try makeRecipeRecord(bundle, recordID: recordID))
-    }
-
-    let profile = CKRecord(
-      recordType: "CookbookProfile",
-      recordID: CKRecord.ID(recordName: "profile", zoneID: CookbookSpikeConfiguration.zoneID)
-    )
-    profile["displayName"] = UIDevice.current.name as CKRecordValue
-    profile["recipeCount"] = count as CKRecordValue
-    records.append(profile)
-
-    let database = container.privateCloudDatabase
-    for (batchIndex, start) in stride(from: 0, to: records.count, by: 400).enumerated() {
-      let batch = Array(records[start..<min(start + 400, records.count)])
-      let startedAt = Date.now
-      do {
-        let result = try await database.modifyRecords(
-          saving: batch,
-          deleting: [],
-          savePolicy: .changedKeys,
-          atomically: false
-        )
-        for saveResult in result.saveResults.values {
-          if case let .failure(error) = saveResult { throw error }
-        }
-      } catch {
-        appendLog("Batch \(batchIndex + 1) failed after \(Self.duration(Date.now.timeIntervalSince(startedAt))): \(Self.describe(error))")
-        throw error
-      }
-      let duration = Date.now.timeIntervalSince(startedAt)
-      appendLog("Batch \(batchIndex + 1): saved \(batch.count) records in \(Self.duration(duration))")
-    }
-    appendLog("Publish complete: \(count) recipes + profile in \(Self.duration(Date.now.timeIntervalSince(publishStartedAt))); source library has \(export.recipes.count) recipes")
-  }
-
-  private func makeRecipeRecord(_ bundle: RecipeBundleCoding.RecipeBundle, recordID: CKRecord.ID) throws -> CKRecord {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    let data = try encoder.encode(bundle)
-    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("cookbook-\(UUID().uuidString).json")
-    try data.write(to: fileURL, options: .atomic)
-    let record = CKRecord(recordType: "CookbookRecipe", recordID: recordID)
-    record["payload"] = CKAsset(fileURL: fileURL)
-    record["contentHash"] = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() as CKRecordValue
-    return record
-  }
-
-  private func republishOne() async throws {
-    let database = container.privateCloudDatabase
-    let zones = try await database.allRecordZones()
-    guard let zone = zones.first(where: { $0.zoneID.zoneName == CookbookSpikeConfiguration.zoneName }) else {
-      throw CookbookSpikeError.cookbookZoneMissing
-    }
-    // A zone-changes read, not a CKQuery: a query needs a queryable recordName index, which
-    // the Development schema doesn't create on its own.
-    let page = try await database.recordZoneChanges(
-      inZoneWith: zone.zoneID,
-      since: nil,
-      desiredKeys: ["payload"],
-      resultsLimit: 10
-    )
-    let recipeRecord = page.modificationResultsByID.values
-      .compactMap { try? $0.get().record }
-      .first { $0.recordType == "CookbookRecipe" }
-    guard let record = recipeRecord, let asset = record["payload"] as? CKAsset, let fileURL = asset.fileURL else {
-      throw CookbookSpikeError.noPublishedRecipes
-    }
-    var bundle = try JSONDecoder().decode(RecipeBundleCoding.RecipeBundle.self, from: Data(contentsOf: fileURL))
-    bundle.recipe.title += " [Republished]"
-    let updated = try makeRecipeRecord(bundle, recordID: record.recordID)
-    _ = try await database.modifyRecords(saving: [updated], deleting: [], savePolicy: .changedKeys, atomically: true)
-    appendLog("Republished \(record.recordID.recordName) with updated title and content hash")
   }
 
   private func fetchChanges() async throws {
@@ -285,7 +139,6 @@ final class CookbookSpikeModel {
 
   private func deleteCookbook() async throws {
     _ = try await container.privateCloudDatabase.deleteRecordZone(withID: CookbookSpikeConfiguration.zoneID)
-    share = nil
     appendLog("Deleted the private Cookbook zone and its share")
   }
 
@@ -322,18 +175,10 @@ final class CookbookSpikeModel {
 }
 
 private enum CookbookSpikeError: LocalizedError {
-  case unexpectedShareRecord
-  case noRecipes
-  case cookbookZoneMissing
-  case noPublishedRecipes
   case noSharedZones
 
   var errorDescription: String? {
     switch self {
-    case .unexpectedShareRecord: "CloudKit returned a record that wasn't a share."
-    case .noRecipes: "The library has no recipes to publish."
-    case .cookbookZoneMissing: "Create the Cookbook share before publishing."
-    case .noPublishedRecipes: "The Cookbook zone has no recipe record to republish."
     case .noSharedZones: "Accept a cookbook share before trying a write."
     }
   }
@@ -341,23 +186,10 @@ private enum CookbookSpikeError: LocalizedError {
 
 struct CookbookSpikeView: View {
   @State private var model = CookbookSpikeModel()
-  @State private var isShowingShareController = false
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     Form {
-      Section("Share") {
-        Button("Create Share") { model.createShareButtonTapped() }
-        if model.share != nil {
-          Button("Show Participants") { isShowingShareController = true }
-        }
-      }
-      Section("Publish") {
-        TextField("Recipe count", value: $model.publishCount, format: .number)
-          .keyboardType(.numberPad)
-        Button("Publish N") { model.publishButtonTapped() }
-        Button("Republish One") { model.republishOneButtonTapped() }
-      }
       Section("Fetch") {
         Button("Fetch Changes") { model.fetchChangesButtonTapped() }
         Button("Reset Token") { model.resetTokenButtonTapped() }
@@ -392,22 +224,16 @@ struct CookbookSpikeView: View {
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { model.refreshLog() }
     }
-    .onChange(of: model.sharePresentationRequest) { _, _ in
-      isShowingShareController = true
-    }
-    .sheet(isPresented: $isShowingShareController) {
-      if let share = model.share {
-        CookbookSharingController(share: share, container: model.shareContainer)
-      }
-    }
   }
 }
 
-private struct CookbookSharingController: UIViewControllerRepresentable {
+struct CookbookSharingController: UIViewControllerRepresentable {
   let share: CKShare
   let container: CKContainer
 
-  func makeCoordinator() -> Coordinator { Coordinator() }
+  func makeCoordinator() -> Coordinator {
+    Coordinator(title: share[CKShare.SystemFieldKey.title] as? String)
+  }
 
   func makeUIViewController(context: Context) -> UICloudSharingController {
     let controller = UICloudSharingController(share: share, container: container)
@@ -419,12 +245,16 @@ private struct CookbookSharingController: UIViewControllerRepresentable {
   func updateUIViewController(_ controller: UICloudSharingController, context: Context) {}
 
   final class Coordinator: NSObject, UICloudSharingControllerDelegate {
+    let title: String?
+
+    init(title: String?) { self.title = title }
+
     func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
       CookbookSpikeLog.append("Sharing controller failed: \(CookbookSpikeModel.describeForDelegate(error))")
     }
 
     func itemTitle(for csc: UICloudSharingController) -> String? {
-      "\(UIDevice.current.name)'s Recipes"
+      title
     }
 
     func cloudSharingController(_ csc: UICloudSharingController, share: CKShare, willSaveShareWithPreparationHandler handler: @escaping (CKShare?, (any Error)?) -> Void) {
