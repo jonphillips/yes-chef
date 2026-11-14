@@ -16,6 +16,7 @@ struct AppMainLayout: View {
   let menuModel: MenuLibraryModel
   let groceryModel: GroceryLibraryModel
   let cookbookLibraryModel: CookbookLibraryModel
+  let cookbookPublishModel: CookbookPublishModel
   let cookbookCopyModel: CookbookCopyModel
   let createRecipeModel: CreateRecipeModel
   let chatAccessInboxModel: ChatAccessInboxModel
@@ -203,6 +204,7 @@ struct AppMainLayout: View {
         recipeModel: recipeModel,
         groceryModel: groceryModel,
         cookbookLibraryModel: cookbookLibraryModel,
+        cookbookPublishModel: cookbookPublishModel,
         automaticBackupModel: automaticBackupModel,
         chatAccessExportModel: chatAccessExportModel,
         chatAccessInboxModel: chatAccessInboxModel,
@@ -363,6 +365,7 @@ private struct SettingsTab: View {
   let recipeModel: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
   let cookbookLibraryModel: CookbookLibraryModel
+  let cookbookPublishModel: CookbookPublishModel
   let automaticBackupModel: AutomaticBackupModel
   let chatAccessExportModel: ChatAccessExportModel
   let chatAccessInboxModel: ChatAccessInboxModel
@@ -373,13 +376,14 @@ private struct SettingsTab: View {
     if usesCompactTabLayout {
       // The More tab supplies the compact navigation context. Passing no pane binding keeps these
       // rows as NavigationLinks instead of changing a split-view selection with no compact push.
-      SettingsView(model: recipeModel, groceryModel: groceryModel, cookbookLibraryModel: cookbookLibraryModel, automaticBackupModel: automaticBackupModel, chatAccessExportModel: chatAccessExportModel, chatAccessInboxModel: chatAccessInboxModel)
+      SettingsView(model: recipeModel, groceryModel: groceryModel, cookbookLibraryModel: cookbookLibraryModel, cookbookPublishModel: cookbookPublishModel, automaticBackupModel: automaticBackupModel, chatAccessExportModel: chatAccessExportModel, chatAccessInboxModel: chatAccessInboxModel)
     } else {
       NavigationSplitView(columnVisibility: $columnVisibility) {
         SettingsView(
           model: recipeModel,
           groceryModel: groceryModel,
           cookbookLibraryModel: cookbookLibraryModel,
+          cookbookPublishModel: cookbookPublishModel,
           automaticBackupModel: automaticBackupModel,
           chatAccessExportModel: chatAccessExportModel,
           chatAccessInboxModel: chatAccessInboxModel,
@@ -389,7 +393,8 @@ private struct SettingsTab: View {
         SettingsDetailPane(
           selectedPane: selectedPane,
           model: recipeModel,
-          groceryModel: groceryModel
+          groceryModel: groceryModel,
+          cookbookPublishModel: cookbookPublishModel
         )
       }
     }

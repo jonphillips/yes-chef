@@ -169,6 +169,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 #if DEBUG
   case modelCallInventory
   case cookbookSpike
+  case familyCookbook
 #endif
 
   var id: Self { self }
@@ -185,6 +186,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 #if DEBUG
     case .modelCallInventory: "Model Calls"
     case .cookbookSpike: "Cookbook Spike"
+    case .familyCookbook: "Family Cookbook"
 #endif
     }
   }
@@ -201,6 +203,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 #if DEBUG
     case .modelCallInventory: AppSymbol("sparkles")
     case .cookbookSpike: AppSymbol("person.2")
+    case .familyCookbook: AppSymbol("books.vertical")
 #endif
     }
   }

@@ -40,9 +40,18 @@ Dev, on CloudKit Development.
 - **grocery-consolidate-list:** On the iPad Thanksgiving Advance list, tap List Actions › Consolidate List and confirm the three unsalted butters become one 14-tablespoon item showing all three recipes on long-press. Add one more recipe with butter and confirm it merges straight in. ([brief](efforts/archive/grocery-consolidate-list.md))
 - **dogfood-polish-2026-11-13:** On iPad and iPhone, check dated sorting and new menu selection; menu title scrolling; Fresh rapid-add visibility and focus; Same As labels; rounded grocery quantities; and recipe sharing to Messages and Notes. ([brief](efforts/archive/dogfood-polish-2026-11-13.md))
 - **family-cookbooks §S2b visiting fixes from the S2 device pass:** On iPad and iPhone, confirm the search field is clear below the cookbook header, exercise Filter, Sort and View Options, switch to Power Browser and back, and try Open Mine and Copy Anyway. On iPhone, check that a copy with a long source title shows its source link, full provenance and date. ([S2b device pass](efforts/family-cookbooks.md#s2b--visiting-fixes-from-the-s2-device-pass))
+- **family-cookbooks §S3 publish:** On iPad and iPhone, verify the S0 share is reused, participants are accepted and read-only, the first publish includes photos, repeat publish is a no-op, recipe edits and archive changes propagate within 2 minutes, the second device publishes nothing, Wendy can fetch the recipe count plus profile and share, and Sync shows no new errors. ([brief](efforts/family-cookbooks.md))
 
 ## Held
 
+- **family-cookbooks §S3 publish — the cookbook container in Release ([ADR-0071](decisions/ADR-0071-family-cookbooks.md), PR [#519](https://github.com/jonphillips/yes-chef/pull/519)).**
+  - Before the **next** TestFlight build of any kind, because Release now carries the entitlement and checks the zone at
+    launch: confirm the `com.jonphillips.yeschef` App ID lists `iCloud.com.jonphillips.yeschef.cookbook` (automatic
+    signing should add it when you archive).
+  - Before the first TestFlight build that shows Family Cookbook (S4 lifts the DEBUG gate): in CloudKit Console, deploy
+    `CookbookRecipe` (`payload`, `contentHash`, `payloadVersion`, `displayImage`) and `CookbookProfile` (`displayName`,
+    `recipeCount`, `payloadVersion`, `publishedAt`) from Development to Production. Run the S3 device pass first, so
+    Development has every field.
 - **Cockpit Find handoff — the two-app round trip ([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md), PRs [#322](https://github.com/jonphillips/yes-chef/pull/322) + [#325](https://github.com/jonphillips/yes-chef/pull/325)), no schema.** This is Cockpit's S-join, so it is owed **after Cockpit S-c2** (verdict drain) lands; until then, Yes
   Chef's half can only be seen in `AppLog.handoff`. On device:
   - Send a multi-recipe email from Cockpit; Create Recipe opens with its provenance.

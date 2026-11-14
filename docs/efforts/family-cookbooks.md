@@ -13,8 +13,8 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 - [x] **S1** — bundle v2 and copy-import (this brief, below)
 - [x] **S2** — mirror database and read-only visiting (this brief, below)
 - [x] **S2b** — visiting fixes from the S2 device pass (this brief, below)
-- [ ] **S3** — publish (this brief, below)
-- [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook, an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516), and applying payloads off the main actor (the S2 file load runs on it)
+- [x] **S3** — publish (this brief, below)
+- [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook, an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516), and applying payloads off the main actor (the S2 file load runs on it). Carries from S3: an owner device whose library is mid-initial-sync (a fresh install) publishes deletes for every recipe it hasn't received yet, and viewers would see them vanish until sync lands; gate publishing on the library's first sync finishing, or decide the churn is acceptable
 
 ## Where things are for S0 (architect, 2026-11-13, `origin/main` e5b3143)
 

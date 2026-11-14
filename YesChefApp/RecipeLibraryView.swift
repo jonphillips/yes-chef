@@ -16,6 +16,7 @@ struct AppContainer: View {
   @State private var toastCenter: AppToastCenter
   @State private var cookbookCopyModel: CookbookCopyModel
   @State private var cookbookLibraryModel: CookbookLibraryModel
+  @State private var cookbookPublishModel = CookbookPublishModel()
   @State private var recipeModel = RecipeLibraryModel()
   @State private var powerBrowserModel = PowerBrowserModel()
   @State private var createRecipeModel = CreateRecipeModel()
@@ -80,6 +81,7 @@ struct AppContainer: View {
       menuModel: menuModel,
       groceryModel: groceryModel,
       cookbookLibraryModel: cookbookLibraryModel,
+      cookbookPublishModel: cookbookPublishModel,
       cookbookCopyModel: cookbookCopyModel,
       createRecipeModel: createRecipeModel,
       chatAccessInboxModel: chatAccessInboxModel,
@@ -104,8 +106,12 @@ struct AppContainer: View {
       }
     }
     .task {
+      cookbookPublishModel.start()
       await syncActivityRecorder.scenePhaseChanged(isForeground: scenePhase == .active)
       if scenePhase == .active { await automaticBackupModel.runIfDue() }
+    }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active { cookbookPublishModel.sceneBecameActive() }
     }
     .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
