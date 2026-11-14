@@ -264,3 +264,14 @@ cookbook would never refresh after a fetch. The mirror uses one pool instead. Ev
 `PRAGMA query_only = 1`, and only the mirror's `apply` lifts it, inside a single serialized write. Any other write
 still throws, which is what D6 asked for. S2 also keeps the scale in memory in a cookbook, because the reader
 normally saves it. Cook mode in a cookbook moves to S4.
+
+## Amendment 3 — The S2 device pass: copy again, and show where a copy came from (2026-11-14)
+
+- **Copying again always asks.** D7 says copying a recipe you already have asks **Open Mine / Copy Anyway**. The
+  S2 brief also had the reader's button turn into **Open Mine**, which made Copy Anyway unreachable. The button
+  stays **Copy to My Recipes** and always asks when you have a copy. The header's **In My Recipes** shows that you
+  do (#516).
+- **A copy shows its provenance.** D7 records "Copied from Jon's cookbook" in `RecipeSource.importedFrom`, but no
+  screen showed `importedFrom`. The reader's source now shows that line and the copy date for cookbook copies only.
+  Other `importedFrom` values ("Paprika HTML", "Web Recipe Capture") are internal labels and stay hidden (Jon). One
+  core helper owns the string's format, so the display never guesses at a prefix. Still no schema change.
