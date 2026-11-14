@@ -30,7 +30,25 @@ public enum CookbookPayload {
     let instructionSections = try InstructionSection.fetchAll(db)
     let instructionSteps = try InstructionStep.fetchAll(db)
     let notes = try RecipeNote.fetchAll(db)
-    let photos = try RecipePhoto.fetchAll(db)
+    let photos = try RecipePhoto.select {
+      CookbookPayloadPhotoRow.Columns(
+        id: $0.id,
+        recipeID: $0.recipeID,
+        imageDataReference: $0.imageDataReference,
+        thumbnailData: $0.thumbnailData,
+        mediaType: $0.mediaType,
+        pixelWidth: $0.pixelWidth,
+        pixelHeight: $0.pixelHeight,
+        originalSourcePath: $0.originalSourcePath,
+        sourceURL: $0.sourceURL,
+        checksum: $0.checksum,
+        kind: $0.kind,
+        caption: $0.caption,
+        source: $0.source,
+        sortOrder: $0.sortOrder,
+        dateCreated: $0.dateCreated
+      )
+    }.fetchAll(db).map(\.photo)
     let categories = try Category.fetchAll(db)
     let facets = try Facet.fetchAll(db)
     let joins = try RecipeCategory.fetchAll(db)
@@ -172,6 +190,39 @@ public enum CookbookPayload {
   }
 
   public static func contentHash(_ bundle: RecipeBundleCoding.RecipeBundle) throws -> String {
-    try SHA256.hash(data: encodedPayload(bundle)).map { String(format: "%02x", $0) }.joined()
+    try contentHash(encodedPayload(bundle))
+  }
+
+  public static func contentHash(_ payload: Data) -> String {
+    SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+  }
+}
+
+@Selection
+private struct CookbookPayloadPhotoRow: Equatable, Sendable {
+  let id: RecipePhoto.ID
+  let recipeID: Recipe.ID
+  let imageDataReference: String
+  let thumbnailData: Data?
+  let mediaType: String?
+  let pixelWidth: Int?
+  let pixelHeight: Int?
+  let originalSourcePath: String?
+  let sourceURL: String?
+  let checksum: String?
+  let kind: RecipePhotoKind
+  let caption: String?
+  let source: PhotoSource
+  let sortOrder: Int
+  let dateCreated: Date
+
+  var photo: RecipePhoto {
+    RecipePhoto(
+      id: id, recipeID: recipeID, imageDataReference: imageDataReference,
+      thumbnailData: thumbnailData, mediaType: mediaType, pixelWidth: pixelWidth,
+      pixelHeight: pixelHeight, originalSourcePath: originalSourcePath,
+      sourceURL: sourceURL, checksum: checksum, kind: kind, caption: caption,
+      source: source, sortOrder: sortOrder, dateCreated: dateCreated
+    )
   }
 }

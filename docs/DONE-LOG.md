@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-14 — Family cookbook publishing (`effort/family-cookbooks-s3-publish`)
+
+- **Result:** Added incremental cookbook publishing with photo assets, participant status, automatic refresh, and Family Cookbook settings.
+- **Verification:** scripts/check-drift.sh passed (887 package tests); the generic iOS build passed; YesChefTests passed (153 tests).
+- **Owed:** family-cookbooks §S3 publish's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-14 — Family cookbooks S2b visiting fixes (`effort/family-cookbooks-s2b`)
 
 - **Result:** Family Cookbooks opens to Recipes with Filter, Sort and View Options and a visible search field below its header. Copied recipes show the cookbook owner and copy date on a wrapping line below the original source.

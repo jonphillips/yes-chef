@@ -11,6 +11,8 @@ and everything downstream move forward without waiting on it.
 **Parked briefs (ADR-0005 D10 archive sweep, 2026-10-30).** Designed but not scheduled. Each brief sits in
 `efforts/archive/`. Restore one to the root, restated `Designed` or `Ready`, in the plan PR that schedules it.
 
+- **Cookbook payload photo columns are hand-listed (2026-11-14, #519).** `CookbookPayloadPhotoRow` names every
+  `RecipePhoto` column but `displayData`; a new column silently misses cookbook payloads. Add it there, or add a guard.
 - **Top `safeAreaInset` bars may hide large titles (2026-11-13)** on Workbenches, Recipes, Browsers. Check on device.
 - **Ingredient parser splits inside a parenthetical (2026-11-12).** The Pumpkin Pie butter
   item's notes read "3/4 stick) cold unsalted butter, cut into 1/4-inch slices", so a line like "6 tablespoons

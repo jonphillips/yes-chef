@@ -7,6 +7,7 @@ struct SettingsView: View {
   let model: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
   let cookbookLibraryModel: CookbookLibraryModel
+  let cookbookPublishModel: CookbookPublishModel
   private let selectedPane: Binding<SettingsPane?>?
   @State private var syncHealth = SyncHealthModel()
   @State private var showingSyncDetail = false
@@ -42,6 +43,7 @@ struct SettingsView: View {
     model: RecipeLibraryModel,
     groceryModel: GroceryLibraryModel,
     cookbookLibraryModel: CookbookLibraryModel,
+    cookbookPublishModel: CookbookPublishModel,
     automaticBackupModel: AutomaticBackupModel,
     chatAccessExportModel: ChatAccessExportModel,
     chatAccessInboxModel: ChatAccessInboxModel,
@@ -50,6 +52,7 @@ struct SettingsView: View {
     self.model = model
     self.groceryModel = groceryModel
     self.cookbookLibraryModel = cookbookLibraryModel
+    self.cookbookPublishModel = cookbookPublishModel
     self.selectedPane = selectedPane
     self.automaticBackupModel = automaticBackupModel
     self.chatAccessExportModel = chatAccessExportModel
@@ -73,6 +76,12 @@ struct SettingsView: View {
         archivedRecipesRow
         facetCoverageRow
       }
+
+#if DEBUG
+      Section("Family Cookbook") {
+        familyCookbookRow
+      }
+#endif
 
       Section("Developer") {
         seedCoverageRow
@@ -542,6 +551,21 @@ struct SettingsView: View {
       }
     }
   }
+
+  @ViewBuilder private var familyCookbookRow: some View {
+    if let selectedPane {
+      Button { selectedPane.wrappedValue = .familyCookbook } label: {
+        SettingsPane.familyCookbook.label
+      }
+      .foregroundStyle(.primary)
+    } else {
+      NavigationLink {
+        FamilyCookbookSettingsView(model: cookbookPublishModel)
+      } label: {
+        SettingsPane.familyCookbook.label
+      }
+    }
+  }
 #endif
 }
 
@@ -600,6 +624,7 @@ struct SettingsDetailPane: View {
   let selectedPane: SettingsPane?
   let model: RecipeLibraryModel
   let groceryModel: GroceryLibraryModel
+  let cookbookPublishModel: CookbookPublishModel
 
   var body: some View {
     switch selectedPane {
@@ -635,6 +660,10 @@ struct SettingsDetailPane: View {
     case .cookbookSpike:
       NavigationStack {
         CookbookSpikeView()
+      }
+    case .familyCookbook:
+      NavigationStack {
+        FamilyCookbookSettingsView(model: cookbookPublishModel)
       }
 #endif
     case nil:
