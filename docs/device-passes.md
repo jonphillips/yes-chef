@@ -44,6 +44,14 @@ Dev, on CloudKit Development.
 
 ## Held
 
+- **family-cookbooks §S3 publish — the cookbook container in Release ([ADR-0071](decisions/ADR-0071-family-cookbooks.md), PR [#519](https://github.com/jonphillips/yes-chef/pull/519)).**
+  - Before the **next** TestFlight build of any kind, because Release now carries the entitlement and checks the zone at
+    launch: confirm the `com.jonphillips.yeschef` App ID lists `iCloud.com.jonphillips.yeschef.cookbook` (automatic
+    signing should add it when you archive).
+  - Before the first TestFlight build that shows Family Cookbook (S4 lifts the DEBUG gate): in CloudKit Console, deploy
+    `CookbookRecipe` (`payload`, `contentHash`, `payloadVersion`, `displayImage`) and `CookbookProfile` (`displayName`,
+    `recipeCount`, `payloadVersion`, `publishedAt`) from Development to Production. Run the S3 device pass first, so
+    Development has every field.
 - **Cockpit Find handoff — the two-app round trip ([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md), PRs [#322](https://github.com/jonphillips/yes-chef/pull/322) + [#325](https://github.com/jonphillips/yes-chef/pull/325)), no schema.** This is Cockpit's S-join, so it is owed **after Cockpit S-c2** (verdict drain) lands; until then, Yes
   Chef's half can only be seen in `AppLog.handoff`. On device:
   - Send a multi-recipe email from Cockpit; Create Recipe opens with its provenance.
