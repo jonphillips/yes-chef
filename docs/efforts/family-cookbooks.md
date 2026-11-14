@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
 Status: Ready
-Summary: Browse family members' recipes read-only and copy one into yours. S0–S2 are done, and S2's device pass found three gaps. S2b fixes the two left after the architect's Copy Anyway fix: the cookbook's filter and sort buttons, and showing where a copy came from. S3 then publishes your library to the cookbook zone.
+Summary: Browse family members' recipes read-only and copy one into yours. S3 publishes your library to the cookbook zone. S4 accepts shares and fetches the shared recipes.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
@@ -12,7 +12,7 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 - [x] **S0** — transport spike (this brief, below). Device pass cleared 2026-11-13; results in ADR-0071 § S0 result
 - [x] **S1** — bundle v2 and copy-import (this brief, below)
 - [x] **S2** — mirror database and read-only visiting (this brief, below)
-- [ ] **S2b** — visiting fixes from the S2 device pass (this brief, below)
+- [x] **S2b** — visiting fixes from the S2 device pass (this brief, below)
 - [ ] **S3** — publish (this brief, below)
 - [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook, an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516), and applying payloads off the main actor (the S2 file load runs on it)
 
@@ -435,10 +435,10 @@ No schema change.
    - **Recipes:** the `NavigationSplitView` built the way `RecipesTab` builds it. The list column's toolbar is
      `RecipeListView`'s own, so Filter, Sort and View Options appear exactly as they do in your Recipes tab.
    - **Power Browser:** `PowerBrowserView` as it is.
-   - The header bar (the existing `safeAreaInset`, "Jon's Recipes · read-only · loaded <date>") also holds the
-     Recipes / Power Browser segmented control. When there's more than one cookbook, it also has a menu for
-     choosing one. Remove the `.principal` toolbar, so no toolbar is applied outside the split view or the Power
-     Browser's own navigation.
+   - The header bar ("Jon's Recipes · read-only · loaded <date>") sits above the navigation view, leaving the
+     search field clear. It holds the Recipes / Power Browser segmented control and a cookbook menu when there's
+     more than one cookbook. Remove the `.principal` toolbar, so no toolbar is applied outside the split view or
+     the Power Browser's own navigation.
    - Keep one `CookbookLibraryModels` per selected cookbook, made again when the selection changes. Keep the
      `recipeImageDatabase` environment value and the filter sheet.
 2. **A copy shows where it came from.** In `YesChefCore`, `CookbookProvenance` is the only code that knows the
@@ -473,11 +473,13 @@ No schema change.
 Use Yes Chef Dev with Jon's cookbook still loaded from S2. Check the iPad, then the iPhone:
 
 1. **Family Cookbooks** opens straight to Jon's Recipes. Filter, Sort and View Options are in the list's toolbar.
-   Filter by a label and change the sort. The results match the same filter and sort in your own Recipes. Switch
-   to Power Browser and back.
+   Confirm the search field is fully visible below the cookbook header. Filter by a label and change the sort.
+   The results match the same filter and sort in your own Recipes. Switch to Power Browser and back.
 2. Open a recipe you've already copied. **In My Recipes** shows. **Copy to My Recipes** asks **Open Mine / Copy
    Anyway**. Copy Anyway makes a second copy, and Open Mine opens the newest one.
-3. Open your copy. The source shows "Copied from Jon's cookbook" and the date, next to the original source.
+3. Open your copy. Below the original source, look for "Copied from Jon's cookbook" and the date. On iPhone,
+   repeat with a recipe that has a long source title. Confirm the source link is still visible and the full
+   provenance and date are readable.
 
 ## S3 — Publish
 

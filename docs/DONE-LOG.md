@@ -11,8 +11,8 @@ Newest first.
 ---
 ## 2026-11-14 — Family cookbooks S2b visiting fixes (`effort/family-cookbooks-s2b`)
 
-- **Result:** Cookbook browsing now opens directly on Recipes with the library filter, sort and view options; cookbook copies show their owner and import date beside the source. No schema change.
-- **Verification:** scripts/check-drift.sh passed (885 + 20 package tests; app test target compiled and linked). Generic iOS build passed.
+- **Result:** Family Cookbooks opens to Recipes with Filter, Sort and View Options and a visible search field below its header. Copied recipes show the cookbook owner and copy date on a wrapping line below the original source.
+- **Verification:** scripts/check-drift.sh passed (885 Core tests with 3 known issues and 20 MCP tests). The app test target compiled and linked. The generic iOS build passed.
 - **Owed:** family-cookbooks §S2b visiting fixes from the S2 device pass's device gate, in [device-passes.md](device-passes.md).
 
 ---

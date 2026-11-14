@@ -5,26 +5,29 @@ struct SourceMetadataView: View {
   let source: RecipeSource
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Image(symbol: .source)
-        .foregroundStyle(.secondary)
-      if let urlString = source.url, let url = URL(string: urlString) {
-        Link(source.displayName, destination: url)
-      } else {
-        Text(source.displayName)
-      }
-      if let detail = source.compactDetail {
-        Text(detail)
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Image(symbol: .source)
           .foregroundStyle(.secondary)
+        if let urlString = source.url, let url = URL(string: urlString) {
+          Link(source.displayName, destination: url)
+        } else {
+          Text(source.displayName)
+        }
+        if let detail = source.compactDetail {
+          Text(detail)
+            .foregroundStyle(.secondary)
+        }
       }
+      .lineLimit(1)
       if let ownerName = CookbookProvenance.ownerName(importedFrom: source.importedFrom),
         let importedAt = source.dateImported
       {
         Text("Copied from \(ownerName)'s cookbook · \(importedAt.formatted(date: .abbreviated, time: .omitted))")
           .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
       }
     }
-    .lineLimit(1)
     .font(.caption)
   }
 }
