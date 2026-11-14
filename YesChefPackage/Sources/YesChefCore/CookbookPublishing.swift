@@ -268,15 +268,18 @@ public struct CookbookFetchClient: Sendable {
   public var sharedZones: @Sendable () async throws -> [CKRecordZone.ID]
   public var fetchPage: @Sendable (CKRecordZone.ID, Data?) async throws -> CookbookFetchedPage
   public var fetchDisplayImage: @Sendable (CKRecordZone.ID, String) async throws -> Data
+  public var fetchProfile: @Sendable (CKRecordZone.ID) async throws -> CookbookPublishProfile?
 
   public init(
     sharedZones: @escaping @Sendable () async throws -> [CKRecordZone.ID],
     fetchPage: @escaping @Sendable (CKRecordZone.ID, Data?) async throws -> CookbookFetchedPage,
-    fetchDisplayImage: @escaping @Sendable (CKRecordZone.ID, String) async throws -> Data
+    fetchDisplayImage: @escaping @Sendable (CKRecordZone.ID, String) async throws -> Data,
+    fetchProfile: @escaping @Sendable (CKRecordZone.ID) async throws -> CookbookPublishProfile? = { _ in nil }
   ) {
     self.sharedZones = sharedZones
     self.fetchPage = fetchPage
     self.fetchDisplayImage = fetchDisplayImage
+    self.fetchProfile = fetchProfile
   }
 }
 
@@ -305,6 +308,13 @@ public enum CookbookFetcher {
     var startsFullFetch = fullFetch && !state.fullFetchActive
     var fetched = 0
     var total = state.recipeCount
+    // The publisher saves the profile last, so a full fetch would otherwise learn the name and total on its last page.
+    if fullFetch, let profile = try await retrying({ try await client.fetchProfile(zoneID) }) {
+      total = profile.recipeCount
+      await progress(CookbookFetchProgress(
+        fetched: 0, total: total, displayName: profile.displayName, isFullFetch: true
+      ))
+    }
     var moreComing = true
     while moreComing {
       let pageToken = token

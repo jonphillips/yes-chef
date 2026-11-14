@@ -68,6 +68,20 @@ public enum CookbookCloudKitClientFactory {
           throw CookbookFetchError.missingDisplayImage(recordName)
         }
         return try Data(contentsOf: url)
+      },
+      fetchProfile: { zoneID in
+        do {
+          let record = try await retrying {
+            try await database.record(for: CKRecord.ID(recordName: "profile", zoneID: zoneID))
+          }
+          guard let displayName = record["displayName"] as? String else { return nil }
+          return CookbookPublishProfile(
+            displayName: displayName, recipeCount: record["recipeCount"] as? Int ?? 0,
+            payloadVersion: record["payloadVersion"] as? Int ?? 0, publishedAt: record["publishedAt"] as? Date
+          )
+        } catch let error as CKError where error.code == .unknownItem {
+          return nil
+        }
       }
     )
   }

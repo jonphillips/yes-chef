@@ -90,6 +90,7 @@ struct CookbookPublishingTests {
       #expect(await requests.values == [nil, Data("fresh".utf8)])
       #expect(await progress.values.map(\.isFullFetch) == [false])
       #expect(try mirror.fetchState().changeToken == Data("incremental".utf8))
+      #expect(try mirror.fetchState().changeToken == Data("incremental".utf8))
     }
   }
 
@@ -124,6 +125,40 @@ struct CookbookPublishingTests {
       }
       #expect(try mirror.fetchState().changeToken == Data("future".utf8))
       #expect(try mirror.skippedRecordCount() == 1)
+    }
+  }
+
+  @Test func fullFetchReportsTheProfileBeforeTheFirstPage() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer { try? mirror.deleteMirror() }
+    let now = Date(timeIntervalSince1970: 1_000)
+    let profile = CookbookPublishProfile(displayName: "Jon", recipeCount: 2_190, payloadVersion: 2, publishedAt: now)
+    let progress = CookbookFetchProgressRecorder()
+    let pages = CookbookFetchPageStub(pages: [
+      CookbookFetchedPage(records: [], deletions: [], changeToken: Data("full-1".utf8), moreComing: true),
+      CookbookFetchedPage(records: [.profile(profile)], deletions: [], changeToken: Data("full-2".utf8), moreComing: false),
+      CookbookFetchedPage(records: [], deletions: [], changeToken: Data("incremental".utf8), moreComing: false),
+    ])
+    let zone = CKRecordZone.ID(zoneName: "Cookbook", ownerName: "family-owner")
+    let client = CookbookFetchClient(
+      sharedZones: { [zone] },
+      fetchPage: { _, _ in try await pages.next() },
+      fetchDisplayImage: { _, _ in Data() },
+      fetchProfile: { _ in profile }
+    )
+    try await withDependencies { $0.context = .live; $0.date.now = now } operation: {
+      try await CookbookFetcher.fetch(zoneID: zone, mirror: mirror, client: client) { await progress.append($0) }
+      let first = try #require(await progress.values.first)
+      #expect(first.fetched == 0)
+      #expect(first.total == 2_190)
+      #expect(first.displayName == "Jon")
+      #expect(first.isFullFetch)
+
+      await progress.reset()
+      try await CookbookFetcher.fetch(zoneID: zone, mirror: mirror, client: client) { await progress.append($0) }
+      #expect(await progress.values.map(\.isFullFetch) == [false])
     }
   }
 
