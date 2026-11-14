@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-14 — Family cookbooks S4 — Accept, fetch and lenses (`effort/family-cookbooks-s4`)
+
+- **Result:** Replaced the file and debug-only cookbook transport with accepted CloudKit shares, incremental recipe and Lens fetching, mirror state, full image loading, and release Family Cookbook browsing. Added owner-Lens publishing and guarded cookbook-scope writes.
+- **Verification:** scripts/check-drift.sh passed (895 core tests, 20 script tests, SwiftLint, and app test-target build); generic iOS build passed; YesChefTests passed (158 tests in 35 suites).
+- **Owed:** family-cookbooks §S4 accept, fetch and lenses's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-14 — Family cookbooks S2b and S3 device passes cleared; S4 adds Lenses (`plan/family-cookbooks-s4`)
 
 - **Result:** Jon's S3 pass published his whole library, 2,190 recipes with photos, to the cookbook zone; Wendy shows as accepted and read-only. The pass found four problems, which the architect fixed in #519 before it merged. A request of 400 recipes with photos failed as a whole ("Atomic failure"), so a batch CloudKit rejects is now split and saved in halves. A 429 rate limit failed the publish, so every CloudKit call now waits as long as CloudKit asks. Every return to the app ran a full publish, so foreground now only retries a failed run, and a run with nothing to upload leaves the profile alone (ADR-0071 D4 note). The owner's own row showed as an unnamed participant, so it's left out. Jon chose to ship all of his Lenses with the cookbook, view-only and not copyable (ADR-0071 Amendment 4); that's in S4, and the S2 visiting polish moves to S5. Jon's S2b pass also cleared. The S2b and S3 lines are gone from `device-passes.md`, and the Held entry now includes `CookbookLenses`.

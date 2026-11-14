@@ -14,7 +14,7 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 - [x] **S2** — mirror database and read-only visiting (this brief, below)
 - [x] **S2b** — visiting fixes from the S2 device pass (this brief, below)
 - [x] **S3** — publish (this brief, below)
-- [ ] **S4** — accept, fetch and lenses (this brief, below)
+- [x] **S4** — accept, fetch and lenses (this brief, below)
 - [ ] **S5** — visiting polish, carried from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, cook mode in a cookbook, and an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516). Briefed after S4's device pass
 
 ## Where things are for S0 (architect, 2026-11-13, `origin/main` e5b3143)

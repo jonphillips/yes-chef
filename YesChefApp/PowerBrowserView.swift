@@ -352,7 +352,6 @@ private struct PowerBrowserLensToolbar: ToolbarContent {
   let model: PowerBrowserModel
 
   var body: some ToolbarContent {
-    if model.scope == .mine {
     ToolbarItem(placement: .principal) {
       Picker("Recipe Lens", selection: Binding(
         get: { model.selectedLensID },
@@ -363,6 +362,7 @@ private struct PowerBrowserLensToolbar: ToolbarContent {
       }
       .pickerStyle(.menu)
     }
+    if model.scope == .mine {
     ToolbarItem(placement: .primaryAction) {
       if model.isEditingSavedQuery {
         Button("Save query") { model.saveQueryEditsButtonTapped() }

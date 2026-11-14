@@ -1,8 +1,8 @@
+import CloudKit
 import Dependencies
 import Foundation
 import Observation
 import SwiftUI
-import UIKit
 import YesChefCore
 
 @Observable
@@ -12,38 +12,54 @@ final class CookbookLibraryModel {
     var id: UUID
     var ownerName: String
     var loadedAt: Date
+    var zoneOwnerName: String?
   }
 
   private(set) var entries: [Entry] = []
   private(set) var contexts: [CookbookContext] = []
-  @ObservationIgnored @Dependency(\.defaultDatabase) private var libraryDatabase
+  private(set) var isFetching = false
+  private(set) var progress: [String: String] = [:]
+  private(set) var errorMessage: String?
+  var acceptanceErrorMessage: String?
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
+  @ObservationIgnored private let fetchClient: CookbookFetchClient
+  @ObservationIgnored private var fetchTask: Task<Void, Never>?
+  @ObservationIgnored private var needsFollowUp = false
+  @ObservationIgnored private var notificationTask: Task<Void, Never>?
   private let directory: URL
   private let indexURL: URL
 
-  struct LoadResult {
-    var appliedCount: Int
-    var newerVersionSkippedCount: Int
-    var elapsedSeconds: Double
-  }
-
-  init() {
-    let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    directory = support.appendingPathComponent("Cookbooks", isDirectory: true)
-    indexURL = directory.appendingPathComponent("index.json")
+  init(
+    fetchClient: CookbookFetchClient = CookbookCloudKitClientFactory.fetchClient(),
+    directory: URL? = nil
+  ) {
+    self.fetchClient = fetchClient
+    let support = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    let cookbookDirectory = support.appendingPathComponent("Cookbooks", isDirectory: true)
+    self.directory = cookbookDirectory
+    self.indexURL = cookbookDirectory.appendingPathComponent("index.json")
     do {
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(at: cookbookDirectory, withIntermediateDirectories: true)
       var values = URLResourceValues()
       values.isExcludedFromBackup = true
-      var folder = directory
+      var folder = cookbookDirectory
       try folder.setResourceValues(values)
       if let data = try? Data(contentsOf: indexURL) {
         entries = try JSONDecoder().decode([Entry].self, from: data)
       }
+      if entries.contains(where: { $0.zoneOwnerName == nil }) {
+        for entry in entries {
+          try? CookbookMirror(id: entry.id, directory: cookbookDirectory).deleteMirror()
+        }
+        entries = []
+        contexts = []
+        try persist()
+      }
       contexts = entries.compactMap { entry in
-        guard let mirror = try? CookbookMirror(id: entry.id, directory: directory) else { return nil }
-        return CookbookContext(ownerName: entry.ownerName, mirror: mirror, loadedAt: entry.loadedAt)
+        guard let mirror = try? CookbookMirror(id: entry.id, directory: cookbookDirectory) else { return nil }
+        return CookbookContext(ownerName: entry.ownerName, mirror: mirror, loadedAt: entry.loadedAt,
+          zoneOwnerName: entry.zoneOwnerName ?? "")
       }
     } catch {
       entries = []
@@ -51,58 +67,76 @@ final class CookbookLibraryModel {
     }
   }
 
-  func register(id: UUID, ownerName: String, loadedAt: Date) throws -> CookbookContext {
-    let mirror = try CookbookMirror(id: id, directory: directory)
-    let context = CookbookContext(ownerName: ownerName, mirror: mirror, loadedAt: loadedAt)
-    try store(context)
-    return context
-  }
-
-  func exportCookbookFile(ownerName: String) async throws -> URL {
-    let bundles = try await libraryDatabase.read { try CookbookPayload.bundles(in: $0) }
-    let payloads = try bundles.map(CookbookPayload.encodedPayload)
-    let file = CookbookFile(ownerName: ownerName, generatedAt: now, payloads: payloads)
-    let data = try JSONEncoder().encode(file)
-    let url = FileManager.default.temporaryDirectory
-      .appendingPathComponent("YesChef-\(ownerName)-Cookbook")
-      .appendingPathExtension("json")
-    try data.write(to: url, options: .atomic)
-    return url
-  }
-
-  func loadCookbookFile(at url: URL) async throws -> LoadResult {
-    let startedAt = Date()
-    let didAccess = url.startAccessingSecurityScopedResource()
-    defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-    let file = try JSONDecoder().decode(CookbookFile.self, from: Data(contentsOf: url))
-    let decoded = try file.decodedPayloads()
-    let existingEntry = entries.first { $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }
-    let id = existingEntry?.id ?? uuid()
-    if let existing = contexts.first(where: { $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }) {
-      let currentIDs = try await existing.mirror.database.read { try Recipe.fetchAll($0).map(\.id) }
-      let incomingIDs = Set(decoded.bundles.map { $0.recipe.id })
-      try existing.mirror.apply(
-        upserting: decoded.bundles,
-        deleting: currentIDs.filter { !incomingIDs.contains($0) }
-      )
-      let context = CookbookContext(ownerName: file.ownerName, mirror: existing.mirror, loadedAt: file.generatedAt)
-      try store(context)
-    } else {
-      if existingEntry != nil {
-      let stale = try CookbookMirror(id: id, directory: directory)
-      try stale.deleteMirror()
+  func start() {
+    guard notificationTask == nil else { return }
+    notificationTask = Task { [weak self] in
+      for await notification in NotificationCenter.default.notifications(named: .cookbookShareAccepted) {
+        guard let self else { return }
+        await self.fetchCookbooks()
+        if let message = notification.userInfo?["error"] as? String { self.acceptanceErrorMessage = message }
       }
-      entries.removeAll { $0.id == id || $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }
-      contexts.removeAll { $0.ownerName.caseInsensitiveCompare(file.ownerName) == .orderedSame }
-      let mirror = try CookbookMirror(id: id, directory: directory)
-      try mirror.apply(upserting: decoded.bundles, deleting: [])
-      try store(CookbookContext(ownerName: file.ownerName, mirror: mirror, loadedAt: file.generatedAt))
     }
-    return LoadResult(
-      appliedCount: decoded.bundles.count,
-      newerVersionSkippedCount: decoded.newerVersionCount,
-      elapsedSeconds: Date().timeIntervalSince(startedAt)
-    )
+    Task { await fetchCookbooks() }
+  }
+
+  func sceneBecameActive() { Task { await fetchCookbooks() } }
+
+  func fetchCookbooks() async {
+    guard fetchTask == nil else { needsFollowUp = true; return }
+    fetchTask = Task { [weak self] in await self?.runFetches() }
+    await fetchTask?.value
+    fetchTask = nil
+    if needsFollowUp { needsFollowUp = false; await fetchCookbooks() }
+  }
+
+  private func runFetches() async {
+    isFetching = true
+    defer { isFetching = false }
+    do {
+      let zones = try await fetchClient.sharedZones()
+      var zoneOwners = Set(zones.map(\.ownerName))
+      for zone in zones {
+        let ownerID = zone.ownerName
+        let entry = entries.first { $0.zoneOwnerName == ownerID }
+        let id = entry?.id ?? uuid()
+        let mirror = try CookbookMirror(id: id, directory: directory)
+        let existingContext = contexts.first { $0.zoneOwnerName == ownerID }
+        if existingContext == nil {
+          try store(CookbookContext(ownerName: ownerID, mirror: mirror, loadedAt: now, zoneOwnerName: ownerID))
+        }
+        progress[ownerID] = "Fetching"
+        do {
+          try await CookbookFetcher.fetch(zoneID: zone, mirror: mirror, client: fetchClient) { [weak self] fetched, total in
+            await MainActor.run {
+              self?.progress[ownerID] = total.map { "Fetching \(fetched) of \($0)" } ?? "Fetching \(fetched)"
+            }
+          }
+        } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
+          try mirror.deleteMirror()
+          zoneOwners.remove(ownerID)
+          progress.removeValue(forKey: ownerID)
+          continue
+        }
+        let state = try mirror.fetchState()
+        let context = CookbookContext(
+          ownerName: state.displayName ?? existingContext?.ownerName ?? ownerID,
+          mirror: mirror, loadedAt: state.fetchedAt ?? now, zoneOwnerName: ownerID,
+          recipeCount: state.recipeCount, skippedCount: try mirror.skippedRecordCount()
+        )
+        try store(context)
+        progress.removeValue(forKey: ownerID)
+      }
+      let removed = entries.filter { !zoneOwners.contains($0.zoneOwnerName ?? "") }
+      for entry in removed {
+        if let context = contexts.first(where: { $0.zoneOwnerName == entry.zoneOwnerName }) { try context.mirror.deleteMirror() }
+      }
+      entries.removeAll { !zoneOwners.contains($0.zoneOwnerName ?? "") }
+      contexts.removeAll { !zoneOwners.contains($0.zoneOwnerName) }
+      try persist()
+      errorMessage = nil
+    } catch {
+      errorMessage = error.localizedDescription
+    }
   }
 
   private func persist() throws {
@@ -115,24 +149,14 @@ final class CookbookLibraryModel {
     guard let id = UUID(uuidString: context.mirror.fileURL.deletingPathExtension().lastPathComponent) else {
       throw CocoaError(.fileReadCorruptFile)
     }
-    entries.removeAll { $0.id == id || $0.ownerName.caseInsensitiveCompare(context.ownerName) == .orderedSame }
-    entries.append(Entry(id: id, ownerName: context.ownerName, loadedAt: context.loadedAt))
+    entries.removeAll { $0.id == id || $0.zoneOwnerName == context.zoneOwnerName }
+    entries.append(Entry(id: id, ownerName: context.ownerName, loadedAt: context.loadedAt, zoneOwnerName: context.zoneOwnerName))
     try persist()
-    contexts.removeAll { $0.mirror.fileURL == context.mirror.fileURL || $0.ownerName.caseInsensitiveCompare(context.ownerName) == .orderedSame }
+    contexts.removeAll { $0.mirror.fileURL == context.mirror.fileURL || $0.zoneOwnerName == context.zoneOwnerName }
     contexts.append(context)
     contexts.sort { $0.ownerName.localizedCaseInsensitiveCompare($1.ownerName) == .orderedAscending }
   }
 
-}
-
-struct CookbookShareSheet: UIViewControllerRepresentable {
-  let url: URL
-
-  func makeUIViewController(context: Context) -> UIActivityViewController {
-    UIActivityViewController(activityItems: [url], applicationActivities: nil)
-  }
-
-  func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 struct FamilyCookbooksView: View {
@@ -144,7 +168,7 @@ struct FamilyCookbooksView: View {
   @State private var selectedOwnerName: String?
 
   private var selectedContext: CookbookContext? {
-    model.contexts.first { $0.ownerName.caseInsensitiveCompare(selectedOwnerName ?? "") == .orderedSame }
+    model.contexts.first { $0.zoneOwnerName == (selectedOwnerName ?? "") }
       ?? model.contexts.first
   }
 
@@ -154,8 +178,9 @@ struct FamilyCookbooksView: View {
         CookbookRecipesView(
           context: context,
           contexts: model.contexts,
+          libraryModel: model,
           selectedOwnerName: Binding(
-            get: { selectedOwnerName ?? context.ownerName },
+            get: { selectedOwnerName ?? context.zoneOwnerName },
             set: { selectedOwnerName = $0 }
           ),
           copyModel: copyModel,
@@ -163,7 +188,7 @@ struct FamilyCookbooksView: View {
           groceryModel: groceryModel,
           onRecipeSelected: onRecipeSelected
         )
-        .id(context.ownerName)
+        .id(context.zoneOwnerName)
       } else {
         ContentUnavailableView {
           Label("No Family Cookbooks", symbol: .libraryShelf)
@@ -171,9 +196,10 @@ struct FamilyCookbooksView: View {
         .navigationTitle("Family Cookbooks")
       }
     }
-    .onChange(of: model.contexts.map(\.ownerName)) { _, ownerNames in
+    .task { await model.fetchCookbooks() }
+    .onChange(of: model.contexts.map(\.zoneOwnerName)) { _, ownerNames in
       guard let selectedOwnerName,
-        !ownerNames.contains(where: { $0.caseInsensitiveCompare(selectedOwnerName) == .orderedSame })
+        !ownerNames.contains(selectedOwnerName)
       else { return }
       self.selectedOwnerName = ownerNames.first
     }
@@ -191,6 +217,7 @@ private struct CookbookRecipesView: View {
 
   let context: CookbookContext
   let contexts: [CookbookContext]
+  let libraryModel: CookbookLibraryModel
   @Binding var selectedOwnerName: String
   let copyModel: CookbookCopyModel
   let mealCalendarModel: MealCalendarModel
@@ -203,6 +230,7 @@ private struct CookbookRecipesView: View {
   init(
     context: CookbookContext,
     contexts: [CookbookContext],
+    libraryModel: CookbookLibraryModel,
     selectedOwnerName: Binding<String>,
     copyModel: CookbookCopyModel,
     mealCalendarModel: MealCalendarModel,
@@ -211,6 +239,7 @@ private struct CookbookRecipesView: View {
   ) {
     self.context = context
     self.contexts = contexts
+    self.libraryModel = libraryModel
     _selectedOwnerName = selectedOwnerName
     self.copyModel = copyModel
     self.mealCalendarModel = mealCalendarModel
@@ -221,10 +250,13 @@ private struct CookbookRecipesView: View {
 
   var body: some View {
     @Bindable var recipes = models.recipes
+    let mirror = context.mirror
     VStack(spacing: 0) {
       CookbookLibraryHeader(
         context: context,
         contexts: contexts,
+        errorMessage: libraryModel.errorMessage,
+        progressMessage: libraryModel.progress[context.zoneOwnerName],
         selectedOwnerName: $selectedOwnerName,
         surface: $surface
       )
@@ -268,18 +300,21 @@ private struct CookbookRecipesView: View {
       }
     }
     .environment(\.recipeImageDatabase, context.mirror.database)
+    .environment(\.cookbookDisplayImageLoader, cookbookDisplayImageLoader(mirror: mirror, zoneOwnerName: context.zoneOwnerName))
   }
 }
 
 private struct CookbookLibraryHeader: View {
   let context: CookbookContext
   let contexts: [CookbookContext]
+  let errorMessage: String?
+  let progressMessage: String?
   @Binding var selectedOwnerName: String
   @Binding var surface: CookbookLibrarySurface
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text("\(context.ownerName)'s Recipes · read-only · loaded \(context.loadedAt.formatted(date: .abbreviated, time: .shortened))")
+      Text(headerText)
         .font(.caption.weight(.medium))
         .foregroundStyle(.secondary)
       HStack {
@@ -290,11 +325,11 @@ private struct CookbookLibraryHeader: View {
         .frame(maxWidth: 320)
         if contexts.count > 1 {
           Menu {
-            ForEach(contexts, id: \.ownerName) { cookbook in
+            ForEach(contexts, id: \.zoneOwnerName) { cookbook in
               Button {
-                selectedOwnerName = cookbook.ownerName
+                selectedOwnerName = cookbook.zoneOwnerName
               } label: {
-                if cookbook.ownerName == context.ownerName {
+                if cookbook.zoneOwnerName == context.zoneOwnerName {
                   Label(cookbook.ownerName, systemImage: "checkmark")
                 } else {
                   Text(cookbook.ownerName)
@@ -313,5 +348,13 @@ private struct CookbookLibraryHeader: View {
     .padding(.horizontal)
     .padding(.vertical, 8)
     .background(.bar)
+  }
+
+  private var headerText: String {
+    if let error = errorMessage { return error }
+    if let progress = progressMessage { return "\(context.ownerName)'s Recipes · \(progress)" }
+    let updated = context.loadedAt.formatted(date: .abbreviated, time: .shortened)
+    let skipped = context.skippedCount == 0 ? "" : " · \(context.skippedCount) need a newer Yes Chef"
+    return "\(context.ownerName)'s Recipes · read-only · updated \(updated)\(skipped)"
   }
 }

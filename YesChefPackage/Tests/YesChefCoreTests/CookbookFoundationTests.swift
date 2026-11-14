@@ -71,20 +71,15 @@ struct CookbookFoundationTests {
     ])
   }
 
-  @Test func fileSkipsNewerPayloadsButRejectsMalformedData() throws {
+  @Test func payloadRejectsNewerVersionsAndMalformedData() throws {
     let recipe = Recipe(id: UUID(), title: "Soup", dateCreated: .distantPast, dateModified: .distantPast)
     let bundle = RecipeBundleCoding.RecipeBundle(recipe: recipe)
     var future = bundle
     future.version = RecipeBundleCoding.currentVersion + 1
-    let file = CookbookFile(ownerName: "Jon", generatedAt: .distantPast, payloads: [
-      try CookbookPayload.encodedPayload(bundle), try JSONEncoder().encode(future)
-    ])
-    let decoded = try JSONDecoder().decode(CookbookFile.self, from: JSONEncoder().encode(file))
-    let result = try decoded.decodedPayloads()
-    #expect(result.bundles == [bundle])
-    #expect(result.newerVersionCount == 1)
-    var malformed = file
-    malformed.payloads.append(Data("invalid".utf8))
-    #expect(throws: (any Error).self) { try malformed.decodedPayloads() }
+    #expect(try RecipeBundleCoding.decodePayload(CookbookPayload.encodedPayload(bundle)) == bundle)
+    #expect(throws: RecipeBundleCoding.PayloadError.newerVersion(RecipeBundleCoding.currentVersion + 1)) {
+      try RecipeBundleCoding.decodePayload(JSONEncoder().encode(future))
+    }
+    #expect(throws: (any Error).self) { try RecipeBundleCoding.decodePayload(Data("invalid".utf8)) }
   }
 }

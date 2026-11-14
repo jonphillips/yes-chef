@@ -95,4 +95,52 @@ struct CookbookScopeTests {
       #expect(await copyModel.newestCopy(of: matches) == copyIDs.first)
     }
   }
+
+  @Test
+  func cookbookLensCanBeSelectedAndEveryLensWriteIsBlocked() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 920_000_200)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer {
+      try? mirror.deleteMirror()
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let query = try RecipeLensQueryCodec.encode(RecipeBrowserQuery())
+    let lens = RecipeLens(id: UUID(), name: "Weeknight", baseQuery: query, sortOrder: 0, dateCreated: now, dateModified: now)
+    let shelf = RecipeLensShelf(id: UUID(), lensID: lens.id, title: "Quick", query: query, sortOrder: 0)
+    let lensBundle = CookbookLensBundle(lenses: [lens], shelves: [shelf], categories: [], facets: [])
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.defaultDatabase = mirror.database
+      $0.date.now = now
+    } operation: {
+      try mirror.apply(page: CookbookMirrorPage(lensBundle: lensBundle))
+      let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now, zoneOwnerName: "owner-zone")
+      let model = withDependencies { $0.defaultDatabase = mirror.database } operation: {
+        PowerBrowserModel(scope: .cookbook(context))
+      }
+      try await model.$lensLibrary.load()
+      #expect(model.lensLibrary.lenses == [lens])
+      model.lensSelectionChanged(lens.id)
+      #expect(model.selectedLens == lens)
+
+      model.editLensBaseQueryButtonTapped(lens)
+      model.saveQueryEditsButtonTapped()
+      model.deleteLensButtonTapped(lens)
+      model.saveLensButtonTapped(name: "Do not save")
+      #expect(model.addShelfButtonTapped(lensID: lens.id, title: "Do not add", query: RecipeBrowserQuery()) == nil)
+      model.renameLensButtonTapped(lens, name: "Do not rename")
+      model.deleteShelfButtonTapped(shelf)
+      model.renameShelfButtonTapped(shelf, title: "Do not rename")
+      model.reorderShelvesButtonTapped([], lensID: lens.id)
+      model.showsRemainderChanged(false, lens: lens)
+
+      let saved = try await mirror.database.read { db in
+        (try RecipeLens.fetchAll(db), try RecipeLensShelf.fetchAll(db))
+      }
+      #expect(saved.0 == [lens])
+      #expect(saved.1 == [shelf])
+    }
+  }
 }

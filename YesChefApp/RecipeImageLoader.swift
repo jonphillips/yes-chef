@@ -16,6 +16,17 @@ extension EnvironmentValues {
   }
 }
 
+private struct CookbookDisplayImageLoaderKey: EnvironmentKey {
+  static let defaultValue: (@Sendable (RecipePhoto.ID) async -> Data?)? = nil
+}
+
+extension EnvironmentValues {
+  var cookbookDisplayImageLoader: (@Sendable (RecipePhoto.ID) async -> Data?)? {
+    get { self[CookbookDisplayImageLoaderKey.self] }
+    set { self[CookbookDisplayImageLoaderKey.self] = newValue }
+  }
+}
+
 /// Reads a photo's full-resolution `displayData` on demand from the concurrent
 /// reader pool. The detail fetch no longer carries these bytes (ADR-0029 Amd2
 /// S5b), so hero/full-screen rendering hydrates them here — on a pool reader,
@@ -115,6 +126,7 @@ func downsampledRecipeImage(from data: Data, maxPixelSize: CGFloat) -> UIImage? 
 /// detail fetch never has to haul `displayData` through the observed model.
 struct RecipePhotoImage: View {
   @Environment(\.recipeImageDatabase) private var database
+  @Environment(\.cookbookDisplayImageLoader) private var cookbookImageLoader
   let photoID: UUID
   let checksum: String?
   let variant: RecipePhotoImageVariant
@@ -123,6 +135,7 @@ struct RecipePhotoImage: View {
   let thumbnailData: Data?
 
   @State private var decoded: (key: String, image: UIImage)?
+  @State private var fullImageLoadFailed = false
 
   private var cacheKey: String {
     RecipeImageCache.cacheKey(photoID: photoID, checksum: checksum, variant: variant)
@@ -130,17 +143,24 @@ struct RecipePhotoImage: View {
 
   var body: some View {
     let image = resolvedImage
-    Group {
-      if let image {
-        Image(uiImage: image)
-          .resizable()
-          .scaledToFit()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-      } else {
-        Image(systemName: "photo")
-          .font(.title)
+    VStack(spacing: 6) {
+      Group {
+        if let image {
+          Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+          Image(systemName: "photo")
+            .font(.title)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+      }
+      if fullImageLoadFailed {
+        Text("Full photo couldn’t load; showing the thumbnail.")
+          .font(.caption)
           .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
     .task(id: cacheKey) { await load() }
@@ -166,7 +186,19 @@ struct RecipePhotoImage: View {
         data = await RecipePhotoDisplayDataLoader.load(photoID: photoID, database: database)
       }
     case .hero, .fullScreen:
-      data = await RecipePhotoDisplayDataLoader.load(photoID: photoID, database: database) ?? thumbnailData
+      if let fullSize = await RecipePhotoDisplayDataLoader.load(photoID: photoID, database: database) {
+        data = fullSize
+      } else if let cookbookImageLoader {
+        if let fullSize = await cookbookImageLoader(photoID) {
+          fullImageLoadFailed = false
+          data = fullSize
+        } else {
+          fullImageLoadFailed = true
+          data = thumbnailData
+        }
+      } else {
+        data = thumbnailData
+      }
     }
     guard let data else { return }
 

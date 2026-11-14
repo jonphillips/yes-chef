@@ -23,8 +23,10 @@ struct RecipeLensShelvesView: View {
             } description: {
               Text(reasons.joined(separator: " "))
             } actions: {
-              Button("Fix") {
-                if let lens = model.selectedLens { model.editLensBaseQueryButtonTapped(lens) }
+              if model.scope == .mine {
+                Button("Fix") {
+                  if let lens = model.selectedLens { model.editLensBaseQueryButtonTapped(lens) }
+                }
               }
             }
             .frame(minHeight: 180)
@@ -39,7 +41,7 @@ struct RecipeLensShelvesView: View {
               } description: {
                 Text(reasons.joined(separator: " "))
               } actions: {
-                Button("Fix") { model.editLensButtonTapped() }
+                if model.scope == .mine { Button("Fix") { model.editLensButtonTapped() } }
               }
               .frame(minHeight: 180)
             case let .ready(ids):

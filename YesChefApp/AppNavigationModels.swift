@@ -18,13 +18,16 @@ struct CookbookContext: Hashable {
   var ownerName: String
   var mirror: CookbookMirror
   var loadedAt: Date = .now
+  var zoneOwnerName: String = ""
+  var recipeCount: Int?
+  var skippedCount = 0
 
   static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.ownerName == rhs.ownerName && lhs.mirror.fileURL == rhs.mirror.fileURL
+    lhs.zoneOwnerName == rhs.zoneOwnerName && lhs.mirror.fileURL == rhs.mirror.fileURL
   }
 
   func hash(into hasher: inout Hasher) {
-    hasher.combine(ownerName)
+    hasher.combine(zoneOwnerName)
     hasher.combine(mirror.fileURL)
   }
 }
@@ -166,10 +169,9 @@ enum SettingsPane: String, CaseIterable, Identifiable {
   case seedCoverage
   case kitchenKnowledgeExport
   case facetCoverage
+  case familyCookbook
 #if DEBUG
   case modelCallInventory
-  case cookbookSpike
-  case familyCookbook
 #endif
 
   var id: Self { self }
@@ -185,9 +187,8 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .facetCoverage: "Label Recipes"
 #if DEBUG
     case .modelCallInventory: "Model Calls"
-    case .cookbookSpike: "Cookbook Spike"
-    case .familyCookbook: "Family Cookbook"
 #endif
+    case .familyCookbook: "Family Cookbook"
     }
   }
 
@@ -202,9 +203,8 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case .facetCoverage: .tag
 #if DEBUG
     case .modelCallInventory: AppSymbol("sparkles")
-    case .cookbookSpike: AppSymbol("person.2")
-    case .familyCookbook: AppSymbol("books.vertical")
 #endif
+    case .familyCookbook: AppSymbol("books.vertical")
     }
   }
 

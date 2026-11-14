@@ -10,6 +10,68 @@ public enum CookbookCloudKitClientFactory {
   public static let containerIdentifier = "iCloud.com.jonphillips.yeschef.cookbook"
   public static let zoneID = CKRecordZone.ID(zoneName: "Cookbook", ownerName: CKCurrentUserDefaultName)
 
+  public static func fetchClient(container: CKContainer = CKContainer(identifier: containerIdentifier)) -> CookbookFetchClient {
+    let database = container.sharedCloudDatabase
+    return CookbookFetchClient(
+      sharedZones: {
+        try await retrying {
+          try await database.allRecordZones().map(\.zoneID)
+            .filter { $0.zoneName == "Cookbook" }
+        }
+      },
+      fetchPage: { zoneID, tokenData in
+        let token = try tokenData.flatMap {
+          try NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
+        }
+        let page = try await database.recordZoneChanges(
+          inZoneWith: zoneID, since: token,
+          desiredKeys: ["payload", "contentHash", "payloadVersion", "displayName", "recipeCount", "publishedAt"],
+          resultsLimit: 400
+        )
+        let records = try page.modificationResultsByID.values.map { result -> CookbookFetchedRecord in
+          let record = try result.get().record
+          switch record.recordType {
+          case "CookbookRecipe":
+            guard let asset = record["payload"] as? CKAsset, let url = asset.fileURL else {
+              throw CookbookFetchError.missingPayload(record.recordID.recordName)
+            }
+            return .recipe(
+              name: record.recordID.recordName, payload: try Data(contentsOf: url),
+              version: record["payloadVersion"] as? Int ?? 0
+            )
+          case "CookbookProfile":
+            guard let displayName = record["displayName"] as? String else { return .ignored }
+            return .profile(CookbookPublishProfile(
+              displayName: displayName, recipeCount: record["recipeCount"] as? Int ?? 0,
+              payloadVersion: record["payloadVersion"] as? Int ?? 0, publishedAt: record["publishedAt"] as? Date
+            ))
+          case "CookbookLenses":
+            guard let asset = record["payload"] as? CKAsset, let url = asset.fileURL else {
+              throw CookbookFetchError.missingPayload(record.recordID.recordName)
+            }
+            return .lenses(
+              name: record.recordID.recordName, payload: try Data(contentsOf: url),
+              version: record["payloadVersion"] as? Int ?? 0
+            )
+          default: return .ignored
+          }
+        }
+        let deletions = page.deletions.map { CookbookFetchedDeletion(recordName: $0.recordID.recordName, recordType: $0.recordType) }
+        let data = try NSKeyedArchiver.archivedData(withRootObject: page.changeToken, requiringSecureCoding: true)
+        return CookbookFetchedPage(records: records, deletions: deletions, changeToken: data, moreComing: page.moreComing)
+      },
+      fetchDisplayImage: { zoneID, recordName in
+        let record = try await retrying {
+          try await database.record(for: CKRecord.ID(recordName: recordName, zoneID: zoneID))
+        }
+        guard let asset = record["displayImage"] as? CKAsset, let url = asset.fileURL else {
+          throw CookbookFetchError.missingDisplayImage(recordName)
+        }
+        return try Data(contentsOf: url)
+      }
+    )
+  }
+
   public static func live(container: CKContainer = CKContainer(identifier: containerIdentifier)) -> CookbookPublishClient {
     let database = container.privateCloudDatabase
     return CookbookPublishClient(
@@ -26,7 +88,7 @@ public enum CookbookCloudKitClientFactory {
           }
           for result in page.modificationResultsByID.values {
             let record = try result.get().record
-            guard record.recordType == "CookbookRecipe" else { continue }
+            guard record.recordType == "CookbookRecipe" || record.recordType == "CookbookLenses" else { continue }
             hashes[record.recordID.recordName] = record["contentHash"] as? String ?? ""
           }
           token = page.changeToken
@@ -82,6 +144,19 @@ public enum CookbookCloudKitClientFactory {
           if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
             throw first
           }
+          throw CookbookPublishFailure.records(failures, fallbackCount: 1)
+        }
+      },
+      saveLenses: { lenses in
+        let url = try writeAsset(lenses.payload)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let record = CKRecord(recordType: "CookbookLenses", recordID: CKRecord.ID(recordName: "lenses", zoneID: zoneID))
+        record["payload"] = CKAsset(fileURL: url)
+        record["contentHash"] = lenses.contentHash as CKRecordValue
+        record["payloadVersion"] = lenses.payloadVersion as CKRecordValue
+        let failures = try await modify(in: database, saving: [record], deleting: [])
+        guard failures.isEmpty else {
+          if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first { throw first }
           throw CookbookPublishFailure.records(failures, fallbackCount: 1)
         }
       },
@@ -232,6 +307,18 @@ public enum CookbookCloudKitClientFactory {
       !errors.isEmpty
     else { return false }
     return errors.allSatisfy { ($0 as? CKError)?.code == .zoneNotFound }
+  }
+}
+
+private enum CookbookFetchError: LocalizedError {
+  case missingPayload(String)
+  case missingDisplayImage(String)
+
+  var errorDescription: String? {
+    switch self {
+    case let .missingPayload(name): "Cookbook record \(name) has no payload asset."
+    case let .missingDisplayImage(name): "Cookbook recipe \(name) has no full-size photo asset."
+    }
   }
 }
 

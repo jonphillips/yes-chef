@@ -125,6 +125,37 @@ struct CookbookMirrorTests {
       }
     }
   }
+
+  @Test func fullFetchCommitsPagesAndSweepsOnlyAfterTheLastPage() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer { try? mirror.deleteMirror() }
+    let now = Date(timeIntervalSince1970: 100)
+    let retained = (0..<2).map { Recipe(id: UUID(), title: "Keep \($0)", dateCreated: now, dateModified: now) }
+    let stale = Recipe(id: UUID(), title: "Stale", dateCreated: now, dateModified: now)
+    try withDependencies { $0.context = .live; $0.date.now = now } operation: {
+      try mirror.apply(upserting: (retained + [stale]).map { .init(recipe: $0) }, deleting: [])
+      try mirror.apply(page: CookbookMirrorPage(
+        bundles: [.init(recipe: retained[0])], seenRecordNames: [retained[0].id.uuidString],
+        changeToken: Data("page-1".utf8), startsFullFetch: true
+      ))
+      let count = try mirror.database.read { try Recipe.fetchCount($0) }
+      #expect(count == 3)
+      #expect(try mirror.fetchState().fullFetchActive)
+      let profile = CookbookPublishProfile(displayName: "Jon", recipeCount: 2, payloadVersion: 2, publishedAt: now)
+      try mirror.apply(page: CookbookMirrorPage(
+        bundles: [.init(recipe: retained[1])], seenRecordNames: [retained[1].id.uuidString],
+        profile: profile, changeToken: Data("page-2".utf8), finishesFullFetch: true
+      ))
+      let saved = try mirror.database.read { try Recipe.fetchAll($0).map(\.id) }
+      #expect(Set(saved) == Set(retained.map(\.id)))
+      #expect(try mirror.fetchState().changeToken == Data("page-2".utf8))
+      #expect(try mirror.fetchState().displayName == "Jon")
+      #expect(!(try mirror.fetchState().fullFetchActive))
+    }
+  }
+
   @Test func observerSeesAppliedChangesOnTheSamePool() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
