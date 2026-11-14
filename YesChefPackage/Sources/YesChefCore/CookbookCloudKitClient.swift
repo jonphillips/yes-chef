@@ -68,8 +68,7 @@ public enum CookbookCloudKitClientFactory {
             if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
               throw first
             }
-            let detail = failures.first.map(describe) ?? "Unknown CloudKit error"
-            throw CookbookPublishFailure.failedRecords(count: failures.count, firstError: detail)
+            throw CookbookPublishFailure.records(failures, fallbackCount: batch.count)
           }
           await progress(min(start + batch.count, recipes.count))
         }
@@ -94,7 +93,7 @@ public enum CookbookCloudKitClientFactory {
             if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
               throw first
             }
-            throw CookbookPublishFailure.failedRecords(count: failures.count, firstError: failures.first.map(describe) ?? "Unknown CloudKit error")
+            throw CookbookPublishFailure.records(failures, fallbackCount: batch.count)
           }
         }
       },
@@ -130,10 +129,7 @@ public enum CookbookCloudKitClientFactory {
             if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
               throw first
             }
-            throw CookbookPublishFailure.failedRecords(
-              count: failures.count,
-              firstError: failures.first.map(Self.describe) ?? "Unknown CloudKit error"
-            )
+            throw CookbookPublishFailure.records(failures, fallbackCount: 1)
           }
         } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
           if Self.isZoneNotFound(error) { throw error }
@@ -185,17 +181,9 @@ public enum CookbookCloudKitClientFactory {
     return url
   }
 
-  private static func describe(_ error: Error) -> String {
-    guard let error = error as? CKError else { return error.localizedDescription }
-    return "CKError \(error.code) (\(error.localizedDescription))"
-  }
-
   private static func publishFailure(_ error: CKError, fallbackCount: Int) -> CookbookPublishFailure {
     let itemErrors = error.partialErrorsByItemID?.values.map { $0 } ?? []
-    return .failedRecords(
-      count: itemErrors.isEmpty ? fallbackCount : itemErrors.count,
-      firstError: itemErrors.first.map(Self.describe) ?? Self.describe(error)
-    )
+    return .records(itemErrors.isEmpty ? [error] : itemErrors, fallbackCount: fallbackCount)
   }
 
   private static func isZoneNotFound(_ error: CKError) -> Bool {
@@ -216,7 +204,55 @@ public enum CookbookPublishFailure: LocalizedError, Equatable {
 
   public var errorDescription: String? {
     switch self {
-    case let .failedRecords(count, firstError): "\(count) CloudKit record(s) failed; first error: \(firstError)"
+    case let .failedRecords(count, firstError): "\(count) CloudKit record(s) failed; cause: \(firstError)"
+    }
+  }
+
+  /// When one record in a batch fails, CloudKit rejects the rest of its batch with `batchRequestFailed`, so the
+  /// cause is the first error that isn't that one. The count still covers every record that didn't save.
+  public static func records(_ errors: [any Error], fallbackCount: Int) -> Self {
+    let cause = errors.first { ($0 as? CKError)?.code != .batchRequestFailed } ?? errors.first
+    let rejectedWithIt = errors.count - 1
+    let detail = cause.map(describe) ?? "Unknown CloudKit error"
+    return .failedRecords(
+      count: errors.isEmpty ? fallbackCount : errors.count,
+      firstError: rejectedWithIt > 0 && (cause as? CKError)?.code != .batchRequestFailed
+        ? "\(detail); the other \(rejectedWithIt) were rejected with it"
+        : detail
+    )
+  }
+
+  public static func describe(_ error: any Error) -> String {
+    guard let error = error as? CKError else { return error.localizedDescription }
+    return "CKError \(name(error.code)) (\(error.localizedDescription))"
+  }
+
+  public static func name(_ code: CKError.Code) -> String {
+    switch code {
+    case .internalError: "internalError"
+    case .partialFailure: "partialFailure"
+    case .networkUnavailable: "networkUnavailable"
+    case .networkFailure: "networkFailure"
+    case .serviceUnavailable: "serviceUnavailable"
+    case .requestRateLimited: "requestRateLimited"
+    case .notAuthenticated: "notAuthenticated"
+    case .permissionFailure: "permissionFailure"
+    case .unknownItem: "unknownItem"
+    case .invalidArguments: "invalidArguments"
+    case .serverRecordChanged: "serverRecordChanged"
+    case .serverRejectedRequest: "serverRejectedRequest"
+    case .assetFileNotFound: "assetFileNotFound"
+    case .assetFileModified: "assetFileModified"
+    case .constraintViolation: "constraintViolation"
+    case .batchRequestFailed: "batchRequestFailed"
+    case .zoneBusy: "zoneBusy"
+    case .quotaExceeded: "quotaExceeded"
+    case .zoneNotFound: "zoneNotFound"
+    case .limitExceeded: "limitExceeded"
+    case .userDeletedZone: "userDeletedZone"
+    case .serverResponseLost: "serverResponseLost"
+    case .assetNotAvailable: "assetNotAvailable"
+    default: "code \(code.rawValue)"
     }
   }
 }

@@ -184,7 +184,10 @@ final class CookbookPublishModel {
       if let name = publishedProfile?.displayName { displayName = name }
       progressText = nil
       errorMessage = nil
-    } catch { errorMessage = error.localizedDescription }
+    } catch {
+      progressText = nil
+      errorMessage = error.localizedDescription
+    }
   }
 }
 

@@ -78,7 +78,8 @@ public struct CookbookParticipantRow: Equatable, Sendable, Identifiable {
   public var description: String { "\(name) · \(invitationStatus) · \(permission)" }
 
   public static func rows(from share: CKShare) -> [Self] {
-    share.participants.enumerated().map { index, participant in
+    // The owner is you, not family, and CloudKit gives your own identity no name.
+    share.participants.filter { $0.role != .owner }.enumerated().map { index, participant in
       let name = participant.userIdentity.nameComponents.map {
         PersonNameComponentsFormatter.localizedString(from: $0, style: .default)
       }.flatMap { $0.isEmpty ? nil : $0 } ?? "Family member"

@@ -58,6 +58,19 @@ struct CookbookPublishingTests {
     #expect(CookbookParticipantRow.permission(.readWrite) == "read-write")
   }
 
+  @Test func recordFailureNamesTheCauseNotTheBatchRejections() {
+    let batch = CKError(.batchRequestFailed)
+    let failure = CookbookPublishFailure.records([batch, CKError(.quotaExceeded), batch], fallbackCount: 400)
+    guard case let .failedRecords(count, cause) = failure else { return }
+    #expect(count == 3)
+    #expect(cause.hasPrefix("CKError quotaExceeded"))
+    #expect(cause.hasSuffix("the other 2 were rejected with it"))
+
+    let onlyBatch = CookbookPublishFailure.records([batch], fallbackCount: 1)
+    #expect(onlyBatch.errorDescription?.contains("CKError batchRequestFailed") == true)
+    #expect(CookbookPublishFailure.records([], fallbackCount: 7) == .failedRecords(count: 7, firstError: "Unknown CloudKit error"))
+  }
+
   @Test func noOpPublishDoesNotLoadDisplayImageBytes() async throws {
     let now = Date(timeIntervalSince1970: 1_000)
     let recipeID = UUID()
