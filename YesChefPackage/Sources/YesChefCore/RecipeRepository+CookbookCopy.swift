@@ -94,7 +94,7 @@ extension RecipeRepository {
     let source = bundle.source
     let newSource = RecipeSource(id: uuid(), recipeID: recipeID, name: source?.name, url: source?.url,
       author: source?.author, publicationName: source?.publicationName, bookTitle: source?.bookTitle,
-      pageNumber: source?.pageNumber, importedFrom: "Copied from \(ownerName)'s cookbook", dateImported: now,
+      pageNumber: source?.pageNumber, importedFrom: CookbookProvenance.importedFrom(ownerName: ownerName), dateImported: now,
       sourceNotes: source?.sourceNotes)
     try RecipeSource.insert { newSource }.execute(db)
     for row in bundle.ingredientSections {

@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-14 — Family cookbooks S2b visiting fixes (`effort/family-cookbooks-s2b`)
+
+- **Result:** Cookbook browsing now opens directly on Recipes with the library filter, sort and view options; cookbook copies show their owner and import date beside the source. No schema change.
+- **Verification:** scripts/check-drift.sh passed (885 + 20 package tests; app test target compiled and linked). Generic iOS build passed.
+- **Owed:** family-cookbooks §S2b visiting fixes from the S2 device pass's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-14 — Family cookbooks S2 device pass cleared, three gaps (`plan/family-cookbooks-s2b-s3`)
 
 - **Result:** Jon's S2 pass worked: file transfer, read-only browsing, the reader and copying. It found three gaps. The cookbook's Recipes view had no filter or sort buttons, because a split view was pushed inside a navigation stack. Copy Anyway couldn't be reached, because the button flipped to Open Mine; the architect fixed this in #516. Nothing showed that a copy came from the cookbook, because `importedFrom` is stored but never displayed. S2b fixes the other two, and its device gate re-checks all three. Jon chose to show only cookbook provenance, not other `importedFrom` values (ADR-0071 Amendment 3). The S2 line is gone from `device-passes.md`.

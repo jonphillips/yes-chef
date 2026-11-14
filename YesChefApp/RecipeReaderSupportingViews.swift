@@ -17,6 +17,12 @@ struct SourceMetadataView: View {
         Text(detail)
           .foregroundStyle(.secondary)
       }
+      if let ownerName = CookbookProvenance.ownerName(importedFrom: source.importedFrom),
+        let importedAt = source.dateImported
+      {
+        Text("Copied from \(ownerName)'s cookbook · \(importedAt.formatted(date: .abbreviated, time: .omitted))")
+          .foregroundStyle(.secondary)
+      }
     }
     .lineLimit(1)
     .font(.caption)
