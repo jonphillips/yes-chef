@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
 Status: Ready
-Summary: Browse family members' recipes read-only and copy one into yours. S3 publishes your library to the cookbook zone. S4 accepts shares and fetches the shared recipes.
+Summary: Browse family members' recipes read-only and copy one into yours. S3 publishes your library to the cookbook zone. S4 accepts shares, fetches the shared recipes and the owner's Lenses, and ships the feature outside DEBUG. S5 is visiting polish carried from S2.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
@@ -14,7 +14,8 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 - [x] **S2** — mirror database and read-only visiting (this brief, below)
 - [x] **S2b** — visiting fixes from the S2 device pass (this brief, below)
 - [x] **S3** — publish (this brief, below)
-- [ ] **S4** — accept and fetch. Carries from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, display images fetched on open, cook mode in a cookbook, an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516), and applying payloads off the main actor (the S2 file load runs on it). Carries from S3: an owner device whose library is mid-initial-sync (a fresh install) publishes deletes for every recipe it hasn't received yet, and viewers would see them vanish until sync lands; gate publishing on the library's first sync finishing, or decide the churn is acceptable
+- [ ] **S4** — accept, fetch and lenses (this brief, below)
+- [ ] **S5** — visiting polish, carried from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, cook mode in a cookbook, and an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516). Briefed after S4's device pass
 
 ## Where things are for S0 (architect, 2026-11-13, `origin/main` e5b3143)
 
@@ -618,3 +619,161 @@ All devices run Yes Chef Dev.
 6. **Wendy's phone:** Cookbook Spike › **Reset Token**, then **Fetch Changes**. The count is your recipes plus the
    profile and the share record.
 7. Settings › Sync on both of Jon's devices shows no new errors.
+
+## S4 — Accept, fetch and lenses
+
+S4 makes the feature work end to end. A viewer accepts an invitation, the app fetches the owner's zone into the
+mirror and keeps it current (D4's viewer), the owner's Lenses come with the recipes ([Amendment
+4](../decisions/ADR-0071-family-cookbooks.md#amendment-4--lenses-travel-with-the-cookbook-2026-11-14)), and the
+DEBUG gates come off. The S0 spike and the S2 file transport are retired. The visiting polish carried from S2 is S5.
+
+### Where things are (architect, 2026-11-14, PR #519 head 00d13de)
+
+- `YesChefApp/CookbookSpike.swift` (DEBUG, S0, disposable):
+  - `CookbookSpikeAppDelegate` (line 282) and `CookbookSpikeSceneDelegate` (line 295) accept shares from a cold
+    launch (`connectionOptions.cloudKitShareMetadata`, line 297) and while running (line 300).
+    `YesChefApp.swift` line 10 installs the adaptor, and `Info.plist` already has `CKSharingSupported`.
+  - `CookbookSharingController` (line 230) is used by S3's Family Cookbook screen. Keep it.
+  - `fetchChanges()` lists the shared database's zones and fetches changes with a token kept in `UserDefaults`.
+- `YesChefApp/CookbookLibrary.swift`: `CookbookLibraryModel` (line 10) keeps mirrors in an `index.json` keyed by the
+  owner's display name. `exportCookbookFile` (line 61) and `loadCookbookFile` (line 73) are the S2 file transport,
+  and Settings' DEBUG rows (`SettingsViews.swift` line 467) drive them. The header (line 274) says "loaded …".
+  `CookbookContext` is at `AppNavigationModels.swift` line 17. The tab shows only when there's a cookbook
+  (`AppMainLayout.swift` line 46).
+- `YesChefPackage/Sources/YesChefCore/CookbookMirror.swift`: `init` (line 10) deletes the file when its
+  `grdb_migrations` differ from the app's. `apply` (line 43) runs one transaction with `query_only` lifted, and
+  `pruneLabels` deletes every category and facet that no recipe uses.
+- `RecipeBundleCoding.decodePayload` (line 189) throws `newerVersion`. `CookbookFile.decodedPayloads` counts those.
+- S3's publisher: `CookbookPublishPlan.make` (`CookbookPublishing.swift` line 47) chooses the display photo at line
+  53. `CookbookPublishModel.start` (line 39) lists the observed tables. `CookbookCloudKitClient.swift` has the
+  zone-changes hash read, `CookbookRetry` (wait for `retryAfterSeconds`, then send again) and the batch split.
+- Lenses: `RecipeLens` and `RecipeLensShelf` (`RecipeLens.swift`). Queries are `RecipeLensQueryCodec` v1 envelopes
+  that hold category and facet IDs. `PowerBrowserModel.lensLibrary` (line 112) is a `@Fetch` on the model's
+  database, so a cookbook's browser already reads the mirror's lens tables, which are empty. `PowerBrowserLensToolbar`
+  (`PowerBrowserView.swift` line 351) hides the picker and every lens action outside `.mine`.
+  `RecipeLensShelvesView` is in `RecipeLensViews.swift`. Lens writes in `PowerBrowserLensModel.swift` guard
+  `scope == .mine`.
+- The library `SyncEngine`'s `isFetchingChanges` (as read in `SyncHealthModel.swift` line 122).
+
+### Build — core (`YesChefCore`, package tests)
+
+1. **The lens record.** `CookbookLensBundle` holds every `RecipeLens` and `RecipeLensShelf` row, plus the categories
+   (with their ancestors) and facets that the lens queries refer to. Encode it canonically, as `encodedPayload`
+   does. The record is `CookbookLenses`, named `"lenses"`, with `payload` (a `CKAsset`), `contentHash` and
+   `payloadVersion`. The publish plan saves it when its hash differs from the zone's and never deletes it. S3's hash read
+   keeps only `CookbookRecipe` records, so extend it to return this record's hash too, keyed apart from the
+   recipes so the plan never deletes it as a stale recipe. It's saved even with no lenses, so deleting your last Lens
+   reaches viewers.
+2. **Mirror state lives in the mirror file.** `CookbookMirror` creates two tables of its own, outside the app's
+   migrator:
+   - `cookbookMirrorState`, one row: the change token, the payload version the app understood when it fetched, and
+     the profile (`displayName`, `recipeCount`, `publishedAt`) with `fetchedAt`;
+   - `cookbookMirrorSkipped`: the record name and version of each record too new to read.
+   When the schema changes, `init` deletes the file, and the token goes with the rows it describes. Check that
+   `init`'s migration comparison still reads only `grdb_migrations`, so these tables don't trigger a wipe.
+3. **Applying a page.** `apply(page:)` writes one transaction per fetched page: upserts, deletions, profile, lenses,
+   skipped records and the new token together. A failed page rolls back with its token, so the next fetch resumes
+   from the last page that committed. It runs off the main actor.
+   - `CookbookRecipe`: decode the payload. A newer version goes into `cookbookMirrorSkipped` and is counted. Any
+     other decode failure fails the page.
+   - `CookbookProfile`: into the state row.
+   - `CookbookLenses`: replace the mirror's lens and shelf rows, and upsert the categories and facets they refer to.
+     The mirror is a cache, so replacing rows is fine; guardrail #4 is about synced rows. Leave out any Lens whose
+     base or shelf query doesn't decode at this version, and count it with the skipped records.
+   - Any other record type (the zone's share) is skipped and not counted.
+   - A deleted `CookbookRecipe` deletes the recipe and its skipped row.
+   - `pruneLabels` keeps every category and facet a lens query refers to, so a "Moles" shelf with no moles yet is
+     empty, not unresolved.
+4. **Full fetches sweep.** A fetch from a `nil` token deletes every mirror recipe it didn't see once it finishes. That
+   covers `changeTokenExpired` and a version upgrade. When the app understands a newer payload version than the
+   state row records, the token resets, so skipped records come back.
+5. **`CookbookFetcher`.** CloudKit sits behind a dependency client, as in S3. One run:
+   - lists the cookbook container's shared zones;
+   - fetches each zone's changes 400 per page, with `desiredKeys` leaving out `displayImage`;
+   - waits and sends again on `CookbookRetry` errors;
+   - reports `fetched n of total`, with the total from the profile once it's known.
+   A zone that has gone (`zoneNotFound`, `userDeletedZone`, or no longer listed) removes that cookbook and deletes
+   its mirror. Copies you made stay; they're yours.
+6. **One display-photo rule.** Move "the cover, or the first photo by `sortOrder`" into one core function. The
+   publisher and the viewer both use it, so the image fetched on open lands on the photo it was published for.
+
+### Build — app
+
+7. **Accepting.** Replace the spike's delegates with real ones, keeping both paths: cold launch and while running.
+   Accept with the cookbook container, then fetch that cookbook. A failed acceptance shows an alert that names the
+   error.
+8. **Cookbooks come from the shared zones** (D8). `CookbookLibraryModel` keys each cookbook by its zone's owner
+   (`zoneID.ownerName`), never by display name. The name comes from the profile. Each mirror's file is named for its
+   zone owner. On first launch, delete the mirrors the S2 file transport made; they're a cache. A fetch runs at
+   launch, when Family Cookbooks opens, and on foreground (D4). Only one run happens at a time, and a trigger during a
+   run causes one follow-up.
+9. **The header** reads "Jon's Recipes · read-only · updated 3 min ago" (from `fetchedAt`), "Fetching 800 of 2,190"
+   during a fetch, or the error, which stays until a fetch succeeds. When records were skipped it adds "12 recipes
+   need a newer Yes Chef" (D4). Browsing works on what has arrived during the first fetch.
+10. **The full image on open.** In `.cookbook` scope the reader fetches the recipe record's `displayImage` and
+    shows it, falling back to the thumbnail with a line saying the full photo couldn't load. Cache it in the mirror
+    photo's `displayData` through the mirror's guarded write.
+11. **Lenses in a cookbook.** The Lens picker shows in `.cookbook` scope, with the owner's Lenses, and their shelves
+    work. Edit Lens, Save as Lens, Save query and every shelf edit stay hidden. Lenses can't be copied (Jon,
+    2026-11-14). List each lens `database.write` reachable from a cookbook in the PR body, with its guard.
+12. **The publisher.** Add `recipeLenses` and `recipeLensShelves` to the observed tables. While the library's
+    `SyncEngine` is fetching changes, a run reschedules itself 2 minutes later instead of running. Otherwise a fresh
+    install, mid-initial-sync, deletes from the zone every recipe it hasn't received yet (S3 carry).
+13. **Retire.** Delete `CookbookSpike.swift` (move `CookbookSharingController` and the delegates out first), the
+    Settings Cookbook Spike row, and the S2 file transport: `CookbookFile`, `exportCookbookFile`,
+    `loadCookbookFile` and the DEBUG rows. Settings' `.familyCookbook` pane comes out of `#if DEBUG`.
+
+### Keep
+
+- No synced table, column or migration (D8), and `CloudSync.swift` isn't touched. The mirror's state tables exist
+  only in mirror files.
+- The mirror is a disposable cache. Only `apply` and the image cache write to it.
+- Lenses are view-only.
+- Failures are loud, never swallowed.
+
+### Tests
+
+- **Package:**
+  - A page applies upserts, deletions and the profile, and skips the share without counting it.
+  - A newer-version recipe is counted, and the count clears when the record later decodes or is deleted.
+  - A page that fails leaves the rows and the token unchanged.
+  - A full fetch deletes mirror recipes it didn't see. A newer understood version resets the token.
+  - The lens bundle round-trips. Applying it replaces the lens rows. A category that only a lens uses survives the
+    prune. A Lens with an undecodable query is left out and counted.
+  - The publish plan saves the lens record when its hash differs, skips it when it doesn't, and saves it with no
+    lenses.
+  - The publisher and viewer pick the same display photo.
+- **App (`YesChefTests`)**, with fake clients:
+  - Fetch runs one at a time with exactly one follow-up. A vanished zone removes the cookbook and its mirror. An
+    error stays until the next success.
+  - A publish while the library is fetching changes doesn't run, and runs once it's rescheduled.
+  - In `.cookbook` scope a Lens can be chosen, and each lens write is a no-op.
+
+### Done when
+
+- `scripts/check-drift.sh` is green, the generic iOS build passes, and `YesChefTests` passes on a simulator. This
+  slice changes App-layer models (guardrail #9).
+- The PR body lists the held op: deploy `CookbookLenses`, with `CookbookRecipe` and `CookbookProfile`, to the cookbook
+  container's **Production** schema before the first TestFlight build. S4 lifts the DEBUG gate, so that's the next
+  TestFlight build. The architect updates the Held entry in `device-passes.md`.
+- Closeout (ADR-0005 D16) runs with `--keep-brief`. It ticks S4, appends the device pass below, and advances
+  `NEXT_UP.md` per ADR-0005 D12.
+
+### Device pass (Jon and Wendy, about 40 minutes)
+
+All devices run Yes Chef Dev built from the PR.
+
+1. **Jon's iPad:** Publish Now publishes the Lenses record. The recipe count doesn't change.
+2. **Wendy's phone:** Settings no longer has Cookbook Spike or the cookbook-file rows. Family Cookbooks shows Jon's
+   cookbook without a new invitation, because the S0 share is still accepted. The first fetch counts up; note how
+   long it takes. Browse and copy a recipe.
+3. **Lenses:** in Jon's cookbook, the Power Browser's Lens picker lists Jon's Lenses, and the shelves fill. There's
+   no Edit Lens or Save as Lens.
+4. **Freshness:** Jon edits a title, archives a recipe, and edits a Lens's shelf. About 2 minutes later, Wendy
+   switches back to Yes Chef. The title, the archive (the recipe is gone) and the shelf all show.
+5. **Full photo:** open a recipe with a photo in Jon's cookbook; the full image replaces the thumbnail.
+6. **Accepting, both ways:** Jon removes Wendy in Family Cookbook › Share My Recipes. When Wendy next switches back,
+   the cookbook is gone and her copies stay. With Yes Chef force-quit, Jon re-invites her and she accepts from
+   Messages: the app launches into the cookbook. Then Jon removes and re-invites her again, and she accepts with
+   the app running.
+7. Settings › Sync on all three devices shows no new errors.
