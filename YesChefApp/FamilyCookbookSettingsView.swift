@@ -49,7 +49,7 @@ struct FamilyCookbookSettingsView: View {
         }
 
         if let error = model.errorMessage {
-          Text(error).foregroundStyle(.red)
+          Text(error).foregroundStyle(.red).textSelection(.enabled)
         }
       }
     }

@@ -32,45 +32,10 @@ public enum CookbookCloudKitClientFactory {
         return hashes
       },
       saveRecipes: { recipes, progress in
+        var saved = 0
         for start in stride(from: 0, to: recipes.count, by: 400) {
           let batch = Array(recipes[start..<min(start + 400, recipes.count)])
-          var temporaryFiles: [URL] = []
-          defer { temporaryFiles.forEach { try? FileManager.default.removeItem(at: $0) } }
-          let records = try batch.map { recipe -> CKRecord in
-            let id = CKRecord.ID(recordName: recipe.recordName, zoneID: zoneID)
-            let record = CKRecord(recordType: "CookbookRecipe", recordID: id)
-            let payloadURL = try writeAsset(recipe.payload)
-            temporaryFiles.append(payloadURL)
-            record["payload"] = CKAsset(fileURL: payloadURL)
-            record["contentHash"] = recipe.contentHash as CKRecordValue
-            record["payloadVersion"] = recipe.payloadVersion as CKRecordValue
-            if let image = recipe.displayImage {
-              let imageURL = try writeAsset(image)
-              temporaryFiles.append(imageURL)
-              record["displayImage"] = CKAsset(fileURL: imageURL)
-            } else {
-              record["displayImage"] = nil
-            }
-            return record
-          }
-          let result: CookbookModifyResult
-          do {
-            result = try await database.modifyRecords(saving: records, deleting: [], savePolicy: .changedKeys, atomically: false)
-          } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
-            if Self.isZoneNotFound(error) { throw error }
-            throw Self.publishFailure(error, fallbackCount: batch.count)
-          }
-          let failures = result.saveResults.values.compactMap { result -> Error? in
-            if case let .failure(error) = result { return error }
-            return nil
-          }
-          guard failures.isEmpty else {
-            if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
-              throw first
-            }
-            throw CookbookPublishFailure.records(failures, fallbackCount: batch.count)
-          }
-          await progress(min(start + batch.count, recipes.count))
+          saved = try await save(batch, in: database, savedBefore: saved, progress: progress)
         }
       },
       deleteRecipes: { names in
@@ -164,6 +129,68 @@ public enum CookbookCloudKitClientFactory {
         catch let error as CKError where error.code == .zoneNotFound { return }
       }
     )
+  }
+
+  /// Saves one batch. When every failure is `batchRequestFailed`, no record named a cause: the request failed as a
+  /// whole. Split it and save each half, so a request that was too large goes through in pieces and a record that
+  /// can't be saved is isolated with its own error. Depth-first, so a failure that hits every record costs about
+  /// log2(batch) requests before it's reported, not one per record.
+  private static func save(
+    _ recipes: [CookbookPublishRecipe],
+    in database: CKDatabase,
+    savedBefore: Int,
+    progress: @Sendable (Int) async -> Void
+  ) async throws -> Int {
+    let failures = try await attemptSave(recipes, in: database)
+    if failures.isEmpty {
+      await progress(savedBefore + recipes.count)
+      return savedBefore + recipes.count
+    }
+    if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
+      throw first
+    }
+    if recipes.count > 1, failures.allSatisfy({ ($0 as? CKError)?.code == .batchRequestFailed }) {
+      let middle = recipes.count / 2
+      let afterFirstHalf = try await save(
+        Array(recipes[..<middle]), in: database, savedBefore: savedBefore, progress: progress
+      )
+      return try await save(Array(recipes[middle...]), in: database, savedBefore: afterFirstHalf, progress: progress)
+    }
+    throw CookbookPublishFailure.records(failures, fallbackCount: recipes.count)
+  }
+
+  /// One modify request. Returns the per-record failures; the asset files are removed before it returns.
+  private static func attemptSave(_ recipes: [CookbookPublishRecipe], in database: CKDatabase) async throws -> [any Error] {
+    var temporaryFiles: [URL] = []
+    defer { temporaryFiles.forEach { try? FileManager.default.removeItem(at: $0) } }
+    let records = try recipes.map { recipe -> CKRecord in
+      let id = CKRecord.ID(recordName: recipe.recordName, zoneID: zoneID)
+      let record = CKRecord(recordType: "CookbookRecipe", recordID: id)
+      let payloadURL = try writeAsset(recipe.payload)
+      temporaryFiles.append(payloadURL)
+      record["payload"] = CKAsset(fileURL: payloadURL)
+      record["contentHash"] = recipe.contentHash as CKRecordValue
+      record["payloadVersion"] = recipe.payloadVersion as CKRecordValue
+      if let image = recipe.displayImage {
+        let imageURL = try writeAsset(image)
+        temporaryFiles.append(imageURL)
+        record["displayImage"] = CKAsset(fileURL: imageURL)
+      } else {
+        record["displayImage"] = nil
+      }
+      return record
+    }
+    let result: CookbookModifyResult
+    do {
+      result = try await database.modifyRecords(saving: records, deleting: [], savePolicy: .changedKeys, atomically: false)
+    } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
+      if isZoneNotFound(error) { throw error }
+      return error.partialErrorsByItemID.map { Array($0.values) } ?? [error]
+    }
+    return result.saveResults.values.compactMap { result -> (any Error)? in
+      if case let .failure(error) = result { return error }
+      return nil
+    }
   }
 
   private static func fetchShare(in database: CKDatabase) async throws -> CKShare? {
