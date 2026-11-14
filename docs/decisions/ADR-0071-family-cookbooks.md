@@ -275,3 +275,36 @@ normally saves it. Cook mode in a cookbook moves to S4.
   screen showed `importedFrom`. The reader's source now shows that line and the copy date for cookbook copies only.
   Other `importedFrom` values ("Paprika HTML", "Web Recipe Capture") are internal labels and stay hidden (Jon). One
   core helper owns the string's format, so the display never guesses at a prefix. Still no schema change.
+
+## Amendment 4 — Lenses travel with the cookbook (2026-11-14)
+
+D1 said saved lenses are never shared. Jon reversed that: a cookbook carries **all** of its owner's Lenses
+([ADR-0050](ADR-0050-recipe-power-browser.md) Amendment 1), **view-only**. A viewer picks one in the cookbook's
+Power Browser and gets the owner's shelves over the owner's recipes. That's the frame the owner built the library
+around, and it's most of what makes ~2,000 recipes browsable.
+
+- **This doesn't cross ADR-0070 D1.** That rule keeps one person's household state out of another person's library.
+  The Lenses land in the owner's mirror, beside the owner's recipes, and never in the viewer's library.
+- **They work unchanged.** The mirror keeps the owner's IDs (D2), and every filter a Lens can use reads fields the
+  payload carries, including rating, favorite and times cooked. So a Lens query runs on the mirror as it runs at
+  home.
+- **Transport: one more record in the zone.** `CookbookLenses`, named `"lenses"`, carries every Lens and shelf row
+  plus the categories and facets their queries refer to. Without those, a shelf whose label has no recipes yet would
+  read as unresolved (ADR-0050 A1-D5) when it's only empty. It's hash-compared like a recipe (D4), and it needs a
+  Production schema deploy with the other two types.
+- **Too new is counted, not shown as damaged.** A Lens whose query a viewer's app can't decode is left out and
+  counted in "needs a newer Yes Chef" (D4). The viewer can't repair it, so it isn't shown as a broken Lens.
+- **No copying a Lens.** Its queries hold the owner's label IDs. Saving one into your own library would mean matching
+  labels by name and refusing loudly when they don't match. Not now; recipes are still the only thing a viewer
+  copies (D7).
+
+Two related S4 decisions:
+
+- **The change token lives in the mirror file**, in a table the mirror owns outside the app's migrator, as D4 says.
+  It's written in the same transaction as the page it describes, and it's deleted with the file when the schema
+  changes. A token can't outlive its rows.
+- **A device doesn't publish while its library is still fetching from iCloud.** A fresh install in the middle of its
+  first sync holds part of the library, and D4's publisher deletes from the zone whatever it doesn't hold. The run
+  waits and tries again 2 minutes later.
+
+S4 keeps D4's viewer and adds the Lenses. The visiting polish carried from S2 becomes S5.
