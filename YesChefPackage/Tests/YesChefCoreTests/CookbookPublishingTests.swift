@@ -71,6 +71,17 @@ struct CookbookPublishingTests {
     #expect(CookbookPublishFailure.records([], fallbackCount: 7) == .failedRecords(count: 7, firstError: "Unknown CloudKit error"))
   }
 
+  @Test func retryWaitsOnlyWhenCloudKitSaysTo() {
+    let limited = CKError(.requestRateLimited, userInfo: [CKErrorRetryAfterKey: 29.5])
+    #expect(CookbookRetry.delay(for: limited) == 29.5)
+    #expect(CookbookRetry.delay(for: CKError(.zoneBusy)) == 5)
+    #expect(CookbookRetry.delay(for: CKError(.quotaExceeded)) == nil)
+    #expect(CookbookRetry.delay(for: CKError(.batchRequestFailed)) == nil)
+    #expect(CookbookRetry.delay(forRecordFailures: [CKError(.batchRequestFailed), limited]) == 29.5)
+    #expect(CookbookRetry.delay(forRecordFailures: [limited, CKError(.quotaExceeded)]) == nil)
+    #expect(CookbookRetry.delay(forRecordFailures: [CKError(.batchRequestFailed)]) == nil)
+  }
+
   @Test func noOpPublishDoesNotLoadDisplayImageBytes() async throws {
     let now = Date(timeIntervalSince1970: 1_000)
     let recipeID = UUID()

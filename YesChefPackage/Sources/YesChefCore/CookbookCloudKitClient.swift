@@ -18,9 +18,12 @@ public enum CookbookCloudKitClientFactory {
         var token: CKServerChangeToken?
         var moreComing = true
         while moreComing {
-          let page = try await database.recordZoneChanges(
-            inZoneWith: zoneID, since: token, desiredKeys: ["contentHash"], resultsLimit: 400
-          )
+          let pageToken = token
+          let page = try await retrying {
+            try await database.recordZoneChanges(
+              inZoneWith: zoneID, since: pageToken, desiredKeys: ["contentHash"], resultsLimit: 400
+            )
+          }
           for result in page.modificationResultsByID.values {
             let record = try result.get().record
             guard record.recordType == "CookbookRecipe" else { continue }
@@ -43,17 +46,7 @@ public enum CookbookCloudKitClientFactory {
           let batch = names[start..<min(start + 400, names.count)].map {
             CKRecord.ID(recordName: $0, zoneID: zoneID)
           }
-          let result: CookbookModifyResult
-          do {
-            result = try await database.modifyRecords(saving: [], deleting: batch, savePolicy: .changedKeys, atomically: false)
-          } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
-            if Self.isZoneNotFound(error) { throw error }
-            throw Self.publishFailure(error, fallbackCount: batch.count)
-          }
-          let failures = result.deleteResults.values.compactMap { result -> Error? in
-            if case let .failure(error) = result { return error }
-            return nil
-          }
+          let failures = try await modify(in: database, saving: [], deleting: batch)
           guard failures.isEmpty else {
             if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
               throw first
@@ -64,7 +57,9 @@ public enum CookbookCloudKitClientFactory {
       },
       fetchProfile: {
         do {
-          let record = try await database.record(for: CKRecord.ID(recordName: "profile", zoneID: zoneID))
+          let record = try await retrying {
+            try await database.record(for: CKRecord.ID(recordName: "profile", zoneID: zoneID))
+          }
           guard let displayName = record["displayName"] as? String else { return nil }
           return CookbookPublishProfile(
             displayName: displayName,
@@ -82,23 +77,12 @@ public enum CookbookCloudKitClientFactory {
         record["recipeCount"] = profile.recipeCount as CKRecordValue
         record["payloadVersion"] = profile.payloadVersion as CKRecordValue
         record["publishedAt"] = profile.publishedAt as CKRecordValue?
-        do {
-          let result = try await database.modifyRecords(
-            saving: [record], deleting: [], savePolicy: .changedKeys, atomically: false
-          )
-          let failures = result.saveResults.values.compactMap { result -> Error? in
-            if case let .failure(error) = result { return error }
-            return nil
+        let failures = try await modify(in: database, saving: [record], deleting: [])
+        guard failures.isEmpty else {
+          if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
+            throw first
           }
-          guard failures.isEmpty else {
-            if failures.allSatisfy({ ($0 as? CKError)?.code == .zoneNotFound }), let first = failures.first {
-              throw first
-            }
-            throw CookbookPublishFailure.records(failures, fallbackCount: 1)
-          }
-        } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
-          if Self.isZoneNotFound(error) { throw error }
-          throw Self.publishFailure(error, fallbackCount: 1)
+          throw CookbookPublishFailure.records(failures, fallbackCount: 1)
         }
       },
       fetchShare: { try await Self.fetchShare(in: database) },
@@ -180,22 +164,55 @@ public enum CookbookCloudKitClientFactory {
       }
       return record
     }
-    let result: CookbookModifyResult
-    do {
-      result = try await database.modifyRecords(saving: records, deleting: [], savePolicy: .changedKeys, atomically: false)
-    } catch let error as CKError where error.code == .partialFailure || error.code == .quotaExceeded {
-      if isZoneNotFound(error) { throw error }
-      return error.partialErrorsByItemID.map { Array($0.values) } ?? [error]
+    return try await modify(in: database, saving: records, deleting: [])
+  }
+
+  /// One modify request, sent again while CloudKit asks us to wait (rate limits, a busy zone). Returns the per-record
+  /// failures left after that.
+  private static func modify(in database: CKDatabase, saving: [CKRecord], deleting: [CKRecord.ID]) async throws -> [any Error] {
+    var attempt = 1
+    while true {
+      let failures: [any Error]
+      do {
+        let result: CookbookModifyResult = try await database.modifyRecords(
+          saving: saving, deleting: deleting, savePolicy: .changedKeys, atomically: false
+        )
+        failures = result.saveResults.values.compactMap(\.failure) + result.deleteResults.values.compactMap(\.failure)
+      } catch let error as CKError where error.code == .partialFailure {
+        if isZoneNotFound(error) { throw error }
+        failures = error.partialErrorsByItemID.map { Array($0.values) } ?? [error]
+      } catch {
+        guard attempt < CookbookRetry.attempts, let delay = CookbookRetry.delay(for: error) else { throw error }
+        attempt += 1
+        try await Task.sleep(for: .seconds(delay))
+        continue
+      }
+      guard !failures.isEmpty, attempt < CookbookRetry.attempts,
+        let delay = CookbookRetry.delay(forRecordFailures: failures)
+      else { return failures }
+      attempt += 1
+      try await Task.sleep(for: .seconds(delay))
     }
-    return result.saveResults.values.compactMap { result -> (any Error)? in
-      if case let .failure(error) = result { return error }
-      return nil
+  }
+
+  /// Runs a CloudKit call, again while CloudKit asks us to wait.
+  private static func retrying<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
+    var attempt = 1
+    while true {
+      do { return try await operation() }
+      catch {
+        guard attempt < CookbookRetry.attempts, let delay = CookbookRetry.delay(for: error) else { throw error }
+        attempt += 1
+        try await Task.sleep(for: .seconds(delay))
+      }
     }
   }
 
   private static func fetchShare(in database: CKDatabase) async throws -> CKShare? {
     do {
-      let record = try await database.record(for: CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID))
+      let record = try await retrying {
+        try await database.record(for: CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID))
+      }
       return record as? CKShare
     } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
       return nil
@@ -208,10 +225,6 @@ public enum CookbookCloudKitClientFactory {
     return url
   }
 
-  private static func publishFailure(_ error: CKError, fallbackCount: Int) -> CookbookPublishFailure {
-    let itemErrors = error.partialErrorsByItemID?.values.map { $0 } ?? []
-    return .records(itemErrors.isEmpty ? [error] : itemErrors, fallbackCount: fallbackCount)
-  }
 
   private static func isZoneNotFound(_ error: CKError) -> Bool {
     guard error.code == .partialFailure,
@@ -281,5 +294,41 @@ public enum CookbookPublishFailure: LocalizedError, Equatable {
     case .assetNotAvailable: "assetNotAvailable"
     default: "code \(code.rawValue)"
     }
+  }
+}
+
+/// CloudKit errors that clear on their own if you wait: it says how long in `retryAfterSeconds`.
+public enum CookbookRetry {
+  public static let attempts = 5
+
+  public static func delay(for error: any Error) -> TimeInterval? {
+    guard let error = error as? CKError else { return nil }
+    switch error.code {
+    case .requestRateLimited, .zoneBusy, .serviceUnavailable, .networkFailure, .networkUnavailable:
+      return error.retryAfterSeconds ?? 5
+    case .partialFailure:
+      return delay(forRecordFailures: error.partialErrorsByItemID.map { Array($0.values) } ?? [])
+    default:
+      return nil
+    }
+  }
+
+  /// A batch is worth sending again when at least one record was told to wait and every other failure is only the
+  /// batch rejection that came with it.
+  public static func delay(forRecordFailures errors: [any Error]) -> TimeInterval? {
+    var delays: [TimeInterval] = []
+    for error in errors {
+      if (error as? CKError)?.code == .batchRequestFailed { continue }
+      guard let delay = delay(for: error) else { return nil }
+      delays.append(delay)
+    }
+    return delays.max()
+  }
+}
+
+private extension Result {
+  var failure: Failure? {
+    if case let .failure(error) = self { return error }
+    return nil
   }
 }
