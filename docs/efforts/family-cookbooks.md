@@ -1,7 +1,7 @@
 # Effort — Family cookbooks
 
 Status: Ready
-Summary: Browse family members' recipes read-only and copy one into yours. S3 publishes your library to the cookbook zone. S4 accepts shares, fetches the shared recipes and the owner's Lenses, and ships the feature outside DEBUG. S5 is visiting polish carried from S2.
+Summary: Browse family members' recipes read-only and copy one into yours. S3 publishes your library to the cookbook zone. S4 accepts shares, fetches the shared recipes and the owner's Lenses, and ships the feature outside DEBUG. S5 is visiting polish: accepting opens the cookbook, rows show In My Recipes, and a copy brings its photo and its linked recipes.
 
 Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
@@ -15,7 +15,7 @@ publisher and fetcher in `YesChefCore` with tests, and may take from the spike w
 - [x] **S2b** — visiting fixes from the S2 device pass (this brief, below)
 - [x] **S3** — publish (this brief, below)
 - [x] **S4** — accept, fetch and lenses (this brief, below)
-- [ ] **S5** — visiting polish, carried from S2: In My Recipes on list rows, copy-them-too for unlinked related recipes, cook mode in a cookbook, and an Open action on the copy toast (the reader's button always copies and asks Open Mine / Copy Anyway when you have a copy, since #516). Briefed after S4's device pass
+- [ ] **S5** — visiting polish (this brief, below): accepting opens the cookbook, In My Recipes on list rows, an Open action on the copy toast, the full photo on a copy, Copy Them Too for linked recipes, and Focus in a cookbook
 
 ## Where things are for S0 (architect, 2026-11-13, `origin/main` e5b3143)
 
@@ -777,3 +777,130 @@ All devices run Yes Chef Dev built from the PR.
    Messages: the app launches into the cookbook. Then Jon removes and re-invites her again, and she accepts with
    the app running.
 7. Settings › Sync on all three devices shows no new errors.
+
+## S5 — Visiting polish
+
+S5 is the polish S2 deferred, plus two items from S4's device pass. Accepting an invitation opens the cookbook
+(Jon, 2026-11-14), and a copy brings its full photo, because today a copy gets only the thumbnail. No synced
+schema change.
+
+### Where things are (architect, 2026-11-14, `origin/main` 472803f + #522)
+
+- **Accepting:** `CookbookSceneDelegate.accept` (`CookbookSharing.swift` line 119) accepts with the cookbook
+  container and posts `.cookbookShareAccepted` with no zone (line 127). `CookbookLibraryModel.start` fetches when
+  that notification arrives. `AppContainer` owns `selectedSection` as `@State` (`RecipeLibraryView.swift` line 34).
+  The cookbook picker's selection is `FamilyCookbooksView`'s own `@State selectedOwnerName`
+  (`CookbookLibrary.swift` line 193), keyed by `zoneOwnerName`.
+- **Copy:** `CookbookCopyModel` (`CookbookCopyModel.swift`). `copy` (line 87) passes `displayImages: [:]`, so a
+  copy's photos get `displayData` nil, and the hero falls back to the thumbnail. It ends with
+  `toastCenter?.postSuccess("Copied to My Recipes")` (line 110). `copyIDsBySource` (line 26) is filled one recipe
+  at a time by `refreshCopyStatus`, from the reader.
+- **Copy result:** `CookbookCopyResult` (`RecipeRepository+CookbookCopy.swift` line 4) returns only titles:
+  `textOnlyServeWith` and `unlinkedRelated`. `resolve` (in `performCookbookCopy`) links a target only when
+  `existingCopies` finds exactly one copy. The reader's alert reads "Related recipes not in your library: …"
+  (`RecipeDetailView.swift` line 321).
+- **In My Recipes:** `RecipeRepository.existingCopies(of:in:)` (line 17) matches an import ref's normalized URL and
+  title, or any source's normalized URL, and skips archived recipes. The reader's header label is at
+  `RecipeDetailView.swift` line 548. `RecipeListRow` (`RecipeListRow.swift`) is the row for the list
+  (`RecipeLibraryView.swift` lines 582, 591), the Power Browser (`PowerBrowserView.swift` line 311) and Lens shelves
+  (`RecipeLensViews.swift` lines 92, 260).
+- **Toast:** `AppToastCenter.postSuccess` (`AppToastCenter.swift` line 23) shows text for 2 seconds. It has no
+  action.
+- **Full photo in a cookbook:** S4's `cookbookDisplayImageLoader` (`CookbookSharing.swift`) fetches a recipe
+  record's `displayImage` and caches it in the mirror photo's `displayData`.
+- **Cooking:** in your library, the reader's **Focus** button hides the list (`AppMainLayout.swift` line 418). The
+  cookbook's reader (`CookbookLibrary.swift` line 298) passes no `focusButtonTapped`, so a cookbook has no Focus.
+  The multi-recipe cook session (`CookSessionView`) starts only from a menu or a calendar day.
+
+### Build — core (`YesChefCore`, package tests)
+
+1. **Copy status in bulk.** Add `RecipeRepository.copiedSourceIDs(_ keys: [Recipe.ID: RecipeImportIdentityKey],
+   in db:) -> Set<Recipe.ID>`. It answers `existingCopies` for many recipes in one read, with exactly the same rule:
+   one fetch of refs, sources and archived flags, not one per recipe. `CookbookPayload.identityKeys(in:)` reads
+   each mirror recipe's key (title and source URL).
+2. **Linked targets in the copy result.** `CookbookCopyResult` gains `uncopiedTargets: [Recipe.ID]`: the source IDs
+   of serve-with and related targets that `resolve` couldn't link **because you have no copy** (zero matches). Keep
+   the two title lists for the alert. A target you have several copies of stays text and isn't listed, so Copy Them
+   Too never makes a third.
+3. **Relinking.** Add `RecipeRepository.relinkCookbookCopy(_ recipeID:, from bundle:, in db:)`. It re-runs
+   `resolve` for the copy's text-only serve-with rows (match each row by its bundle row's ID through the copy's ID
+   map, or by `sortOrder` and title; say which in the PR) and its missing related pairs. It never unlinks or
+   duplicates a link. Copying a target already links that target's own related pair back to the first copy,
+   because `resolve` finds the first copy. Relinking covers serve-with, which only points one way.
+
+### Build — app
+
+4. **Accepting opens the cookbook.** After a successful acceptance, post the share's zone owner
+   (`metadata.share.recordID.zoneID.ownerName`) with the notification. Move the picker's selection into
+   `CookbookLibraryModel` as `selectedZoneOwnerName`, so the root can set it. As soon as that zone's context is in
+   `contexts`, which happens before its first page, select it and switch `selectedSection` to `.cookbooks`, so the
+   first fetch counts up on screen. This applies on a cold launch and while running. A recipe cover that's already
+   open stays open, with the cookbook behind it. A failed acceptance keeps S4's alert and doesn't switch.
+5. **In My Recipes on rows.** `CookbookCopyModel` keeps `copiedSourceIDs` per cookbook, computed with item 1 on
+   open, after each fetch, after each copy, and on foreground. These are on-demand reads, never an always-on
+   whole-library `@Fetch` (ADR-0029 Finding 8: such a fetch re-runs on the writer inside every commit). The cookbook root sets it in an
+   environment value. `RecipeListRow` shows a small **In My Recipes** mark when its recipe is in the set, in the
+   list, the Power Browser and Lens shelves. The reader's header uses the same set, and `copyIDsBySource` goes.
+6. **Open on the copy toast.** The toast gains an optional action. "Copied to My Recipes" carries **Open**, which
+   opens your copy (`scope: .mine`), the way Open Mine does. With an action the toast stays 5 seconds, and tapping
+   anywhere except the button still dismisses it. VoiceOver announces the action.
+7. **A copy brings its full photo.** Before writing the copy, get the display photo's bytes: the mirror's cached
+   `displayData`, else S4's fetch of the record's `displayImage`. Pass them as `displayImages`, keyed by the display
+   photo (`CookbookPayload.displayPhotoID`). If the fetch fails, copy anyway with the thumbnail, and add a warning
+   to the result ("The full photo couldn't load; the copy has the thumbnail.") so the copy-result alert shows it.
+   Other photos carry only thumbnails, as published.
+8. **Copy Them Too.** When `uncopiedTargets` isn't empty, the copy-result alert offers **Copy Them Too** (with
+   Cancel). It copies each target that's in this cookbook's mirror, one level deep, with item 7's photo and no
+   further prompts, then runs item 3 on the first copy, all in one library write. Targets missing from the mirror
+   stay text, and a second alert names them. Then refresh item 5's set and post the toast ("Copied 3 recipes")
+   with Open on the first copy.
+9. **Focus in a cookbook.** The cookbook's split view passes `isFocusActive` and `focusButtonTapped`, as your
+   library does, so you can cook from the reader full-width with the screen kept awake. The multi-recipe cook
+   session stays yours. It starts from a menu or a day, and those need a copy first (D6).
+
+### Keep
+
+- No synced table, column or migration. The copy is ADR-0071 D7's transfer import. Item 8 runs it once per target.
+- Copy status uses `existingCopies`' rule, in one place.
+- Nothing writes to the mirror except `apply` and the image cache. Item 7 reads the mirror's cached bytes and
+  caches a fetched image through the same guarded write.
+- Failures are loud: a failed photo fetch becomes a visible warning, never a silent thumbnail.
+
+### Tests
+
+- **Package:**
+  - `copiedSourceIDs` agrees with `existingCopies` for each recipe: a ref match, a source-URL-only match, an
+    archived copy (not matched) and no match.
+  - `uncopiedTargets` lists a related target and a serve-with target you have no copy of, and leaves out one you
+    have two copies of.
+  - Relinking after copying both targets links the serve-with row and the related pair. Running it again changes
+    nothing.
+  - A copy with `displayImages` for the display photo stores its `displayData`.
+- **App (`YesChefTests`)**, with fake clients:
+  - An accepted share's zone selects that cookbook and switches to `.cookbooks` once its context exists. A failed
+    acceptance doesn't switch.
+  - Copying adds the recipe to `copiedSourceIDs`.
+  - Copy Them Too copies the mirror's targets, links them, and names the target that isn't in the mirror.
+  - A failed photo fetch still copies, with the warning.
+
+### Done when
+
+- `scripts/check-drift.sh` is green, the generic iOS build passes, and `YesChefTests` passes on a simulator. This
+  slice changes App-layer models (guardrail #9).
+- Closeout (ADR-0005 D16) runs. It ticks S5, appends the device pass below, and advances `NEXT_UP.md` per ADR-0005
+  D12.
+
+### Device pass (Jon and Wendy, about 20 minutes)
+
+All devices run Yes Chef Dev built from the PR.
+
+1. **Accepting:** Jon removes Wendy and re-invites her. With Yes Chef force-quit she accepts from Messages: the app
+   opens on Jon's cookbook while the first fetch counts up. Repeat with the app running, from another tab.
+2. **Rows:** a recipe Wendy has copied shows **In My Recipes** in the list, in the Power Browser and on a Lens
+   shelf. Copy another, and its row gains the mark without leaving the cookbook.
+3. **Toast:** copy a recipe and tap **Open** on the toast: Wendy's copy opens.
+4. **Photo:** open that copy in Wendy's library. The hero is the full photo, not the blurry thumbnail.
+5. **Copy Them Too:** copy a recipe whose related or serve-with recipes Wendy doesn't have. Tap Copy Them Too. Open
+   the first copy: its related and serve-with links open her copies.
+6. **Focus:** in a cookbook recipe on the iPad, tap Focus. The list hides, and the screen stays awake.
+
