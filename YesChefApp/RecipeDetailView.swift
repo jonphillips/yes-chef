@@ -309,7 +309,7 @@ struct RecipeDetailView: View {
         if case .existingCopies? = cookbookCopyModel?.prompt { return true }
         return false
       },
-      set: { _ in }
+      set: { if !$0 { cookbookCopyModel?.promptDismissed() } }
     )
   }
 
@@ -321,7 +321,7 @@ struct RecipeDetailView: View {
         default: false
         }
       },
-      set: { _ in }
+      set: { if !$0 { cookbookCopyModel?.promptDismissed() } }
     )
   }
 

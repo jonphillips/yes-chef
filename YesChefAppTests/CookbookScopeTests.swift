@@ -93,6 +93,7 @@ struct CookbookScopeTests {
       #expect(promptedRecipeID == recipeID)
       #expect(matches == libraryIDs)
       #expect(await copyModel.newestCopy(of: matches) == libraryIDs.first)
+      copyModel.promptDismissed()  // SwiftUI dismisses the alert before the button's action runs.
       await copyModel.copyAnywayButtonTapped()
       let copiesAfterCopyAnyway = try await libraryDatabase.read { try Recipe.fetchAll($0) }
       #expect(copiesAfterCopyAnyway.count == 2)
@@ -147,6 +148,7 @@ struct CookbookScopeTests {
       }
       #expect(Set(result.uncopiedTargets) == [targetID, missingID])
 
+      model.promptDismissed()
       await model.copyThemTooButtonTapped(result)
       guard case let .missingTargets(copyResult)? = model.prompt else {
         Issue.record("Expected the missing-target result")

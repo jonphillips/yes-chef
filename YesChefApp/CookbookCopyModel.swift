@@ -143,6 +143,12 @@ final class CookbookCopyModel {
     pendingCopy = nil
   }
 
+  /// SwiftUI writes `false` to an alert's binding before the tapped button's action runs, so dismissal
+  /// clears only the prompt. The pending copy survives for Copy Anyway and Copy Them Too.
+  func promptDismissed() {
+    prompt = nil
+  }
+
   private func copy(
     _ bundle: RecipeBundleCoding.RecipeBundle, context: CookbookContext
   ) async throws {
