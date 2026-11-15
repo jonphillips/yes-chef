@@ -10,7 +10,10 @@ import YesChefCore
 @MainActor
 final class CookbookPublishModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var libraryDatabase
+  @ObservationIgnored @Dependency(\.defaultSyncEngine) private var syncEngine
   @ObservationIgnored private let client: CookbookPublishClient
+  @ObservationIgnored private let syncFetchState: (@MainActor () -> Bool)?
+  @ObservationIgnored private let syncRetryDelay: Duration
   @ObservationIgnored private var observation: AnyDatabaseCancellable?
   @ObservationIgnored private var debounceTask: Task<Void, Never>?
   @ObservationIgnored private var isCheckingZone = false
@@ -29,8 +32,14 @@ final class CookbookPublishModel {
   private(set) var isSharing = false
   private(set) var lastCheckedAt: Date?
 
-  init(client: CookbookPublishClient = CookbookCloudKitClientFactory.live()) {
+  init(
+    client: CookbookPublishClient = CookbookCloudKitClientFactory.live(),
+    isLibraryFetchingChanges: (@MainActor () -> Bool)? = nil,
+    syncRetryDelay: Duration = .seconds(120)
+  ) {
     self.client = client
+    self.syncFetchState = isLibraryFetchingChanges
+    self.syncRetryDelay = syncRetryDelay
   }
 
   var shareContainer: CKContainer { CKContainer(identifier: CookbookCloudKitClientFactory.containerIdentifier) }
@@ -44,6 +53,7 @@ final class CookbookPublishModel {
       Table(RecipeNote.tableName), Table(RecipePhoto.tableName), Table(Category.tableName), Table(Facet.tableName),
       Table(RecipeCategory.tableName), Table(RecipeServeWith.tableName), Table(RecipeRelatedRecipe.tableName),
       Table(RecipeVariation.tableName),
+      Table(RecipeLens.tableName), Table(RecipeLensShelf.tableName),
     ]
     observation = DatabaseRegionObservation(tracking: tables).start(in: libraryDatabase) { [weak self] error in
       Task { @MainActor [weak self] in self?.errorMessage = "Cookbook library observation failed: \(error.localizedDescription)" }
@@ -150,6 +160,16 @@ final class CookbookPublishModel {
   func publishNow() async {
     guard !isPublishing else { needsFollowUp = true; return }
     guard share != nil else { return }
+    if syncFetchState?() ?? syncEngine.isFetchingChanges {
+      progressText = "Waiting for iCloud sync to finish. Publishing will retry in 2 minutes."
+      debounceTask?.cancel()
+      debounceTask = Task { [weak self] in
+        guard let self else { return }
+        do { try await Task.sleep(for: self.syncRetryDelay) } catch { return }
+        await self.publishIfShared()
+      }
+      return
+    }
     guard !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       errorMessage = "Enter the name your family will see before sharing."
       return
@@ -164,13 +184,16 @@ final class CookbookPublishModel {
 
   private func publishCurrentSnapshot() async {
     do {
-      let bundles = try await libraryDatabase.read { try CookbookPayload.bundles(in: $0) }
+      let (bundles, lenses) = try await libraryDatabase.read {
+        (try CookbookPayload.bundles(in: $0), try CookbookLensBundle.read(from: $0))
+      }
       progressText = "Preparing \(bundles.count) recipes"
       let database = libraryDatabase
       let outcome = try await CookbookPublisher.publish(
         bundles: bundles,
         displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
         currentProfile: publishedProfile,
+        lenses: lenses,
         client: client,
         loadDisplayImages: { photoIDs in
           guard !photoIDs.isEmpty else { return [:] }

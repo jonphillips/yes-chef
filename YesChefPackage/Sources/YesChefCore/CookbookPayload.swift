@@ -22,6 +22,11 @@ public enum CookbookProvenance {
 
 /// Intentionally omits full-size display images; those travel as separate assets.
 public enum CookbookPayload {
+  public static func displayPhotoID(for recipe: Recipe, photos: [RecipePhoto]) -> RecipePhoto.ID? {
+    recipe.coverPhotoID.flatMap { coverID in photos.first { $0.id == coverID } }?.id
+      ?? photos.sorted { $0.sortOrder < $1.sortOrder }.first?.id
+  }
+
   public static func bundles(in db: Database) throws -> [RecipeBundleCoding.RecipeBundle] {
     let recipes = try Recipe.fetchAll(db)
     let sources = try RecipeSource.fetchAll(db)

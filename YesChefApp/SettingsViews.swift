@@ -28,15 +28,6 @@ struct SettingsView: View {
   /// on dismissal, before the Restore button's action could use it.
   @State private var isConfirmingRestore = false
   @State private var isPresentingRestoreRestartCover = false
-  @State private var isPresentingCookbookImporter = false
-  @State private var isPresentingCookbookShare = false
-  @State private var exportedCookbookURL: URL?
-  @State private var cookbookFileLog = ""
-#if DEBUG
-  // UIDevice.name is the generic "iPad"/"iPhone" without an entitlement, and the owner name
-  // ends up in a copy's "Copied from …'s cookbook" source, so the exporter types it.
-  @AppStorage("CookbookFile.ownerName") private var cookbookOwnerName = ""
-#endif
   @Environment(\.scenePhase) private var scenePhase
 
   init(
@@ -77,11 +68,9 @@ struct SettingsView: View {
         facetCoverageRow
       }
 
-#if DEBUG
       Section("Family Cookbook") {
         familyCookbookRow
       }
-#endif
 
       Section("Developer") {
         seedCoverageRow
@@ -89,8 +78,6 @@ struct SettingsView: View {
 #if DEBUG
         Text("Yes Chef Dev · CloudKit Development")
         modelCallInventoryRow
-        cookbookSpikeRow
-        cookbookFileTransportRows
 #endif
       }
 
@@ -237,16 +224,6 @@ struct SettingsView: View {
       allowedContentTypes: [.yesChefSQLiteBackup, .data],
       onCompletion: backupRestoreSelected
     )
-    .fileImporter(
-      isPresented: $isPresentingCookbookImporter,
-      allowedContentTypes: [.json],
-      onCompletion: cookbookFileSelected
-    )
-    .sheet(isPresented: $isPresentingCookbookShare) {
-      if let exportedCookbookURL {
-        CookbookShareSheet(url: exportedCookbookURL)
-      }
-    }
     .alert("Restore This Backup?", isPresented: $isConfirmingRestore) {
       Button("Restore", role: .destructive) {
         Task {
@@ -464,60 +441,6 @@ struct SettingsView: View {
     }
   }
 #if DEBUG
-  @ViewBuilder private var cookbookFileTransportRows: some View {
-    TextField("Cookbook owner name", text: $cookbookOwnerName)
-      .textContentType(.givenName)
-
-    Button {
-      Task {
-        do {
-          let url = try await cookbookLibraryModel.exportCookbookFile(ownerName: ownerName)
-          exportedCookbookURL = url
-          cookbookFileLog = "\(Date.now.formatted(date: .abbreviated, time: .shortened)) · Exported \(url.lastPathComponent)"
-          isPresentingCookbookShare = true
-        } catch {
-          cookbookFileLog = "Export failed: \(error)"
-        }
-      }
-    } label: {
-      Label("Export My Cookbook File", symbol: .share)
-    }
-    .disabled(ownerName.isEmpty)
-
-    Button {
-      isPresentingCookbookImporter = true
-    } label: {
-      Label("Load Cookbook File", symbol: .fromChat)
-    }
-
-    if !cookbookFileLog.isEmpty {
-      Text(cookbookFileLog)
-        .font(.footnote.monospaced())
-        .foregroundStyle(cookbookFileLog.localizedCaseInsensitiveContains("failed") ? .red : .secondary)
-        .textSelection(.enabled)
-    }
-  }
-
-  private var ownerName: String {
-    cookbookOwnerName.trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  private func cookbookFileSelected(_ result: Result<URL, any Error>) {
-    switch result {
-    case let .success(url):
-      Task {
-        do {
-          let load = try await cookbookLibraryModel.loadCookbookFile(at: url)
-          cookbookFileLog = "\(Date.now.formatted(date: .abbreviated, time: .shortened)) · Applied \(load.appliedCount), newer-version skipped \(load.newerVersionSkippedCount), time \(load.elapsedSeconds.formatted(.number.precision(.fractionLength(1))))s"
-        } catch {
-          cookbookFileLog = "Load failed: \(error)"
-        }
-      }
-    case let .failure(error):
-      cookbookFileLog = "Load failed: \(error)"
-    }
-  }
-
   @ViewBuilder private var modelCallInventoryRow: some View {
     if let selectedPane {
       Button {
@@ -535,23 +458,7 @@ struct SettingsView: View {
     }
   }
 
-  @ViewBuilder private var cookbookSpikeRow: some View {
-    if let selectedPane {
-      Button {
-        selectedPane.wrappedValue = .cookbookSpike
-      } label: {
-        SettingsPane.cookbookSpike.label
-      }
-      .foregroundStyle(.primary)
-    } else {
-      NavigationLink {
-        CookbookSpikeView()
-      } label: {
-        SettingsPane.cookbookSpike.label
-      }
-    }
-  }
-
+#endif
   @ViewBuilder private var familyCookbookRow: some View {
     if let selectedPane {
       Button { selectedPane.wrappedValue = .familyCookbook } label: {
@@ -566,7 +473,6 @@ struct SettingsView: View {
       }
     }
   }
-#endif
 }
 
 private struct RestoreRestartCover: View {
@@ -657,15 +563,11 @@ struct SettingsDetailPane: View {
       NavigationStack {
         ModelCallInventoryView()
       }
-    case .cookbookSpike:
-      NavigationStack {
-        CookbookSpikeView()
-      }
+#endif
     case .familyCookbook:
       NavigationStack {
         FamilyCookbookSettingsView(model: cookbookPublishModel)
       }
-#endif
     case nil:
       ContentUnavailableView {
         Label("Settings", symbol: AppSection.settings.symbol)

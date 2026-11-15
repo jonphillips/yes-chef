@@ -134,6 +134,42 @@ struct CookbookPublishModelTests {
       #expect(await fake.saveCallCount == 2)
     }
   }
+
+  @Test func publishWaitsForLibrarySyncThenRunsOnceRescheduled() async throws {
+    let now = Date(timeIntervalSince1970: 900)
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      try await database.write { db in
+        try Recipe.insert { Recipe(id: UUID(), title: "Soup", dateCreated: now, dateModified: now) }.execute(db)
+      }
+      let fetchState = CookbookSyncFetchState()
+      let fake = CookbookPublishFake()
+      let model = CookbookPublishModel(
+        client: fake.client(), isLibraryFetchingChanges: { fetchState.isFetchingChanges }, syncRetryDelay: .milliseconds(20)
+      )
+      model.displayName = "Jon"
+
+      await model.shareMyRecipes()
+      #expect(model.progressText == "Waiting for iCloud sync to finish. Publishing will retry in 2 minutes.")
+      #expect(await fake.saveCallCount == 0)
+      #expect(await fake.profileSaveCount == 0)
+
+      fetchState.isFetchingChanges = false
+      await fake.waitUntilSaveCount(1)
+      await fake.waitUntilProfileSaveCount(1)
+      #expect(await fake.saveCallCount == 1)
+      #expect(await fake.profileSaveCount == 1)
+      #expect(model.progressText == nil)
+    }
+  }
+}
+
+@MainActor
+private final class CookbookSyncFetchState {
+  var isFetchingChanges = true
 }
 
 private actor CookbookPublishFake {
@@ -146,6 +182,7 @@ private actor CookbookPublishFake {
   private var firstSaveContinuation: CheckedContinuation<Void, Never>?
   private var firstSaveStarted: CheckedContinuation<Void, Never>?
   private var saveCountWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
+  private var profileSaveWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
 
   init(hasShare: Bool = true, saveFailure: CookbookPublishFailure? = nil, holdFirstSave: Bool = false) {
     self.hasShare = hasShare
@@ -188,7 +225,13 @@ private actor CookbookPublishFake {
   }
 
   private func currentProfile() -> CookbookPublishProfile? { profile }
-  private func storeProfile(_ profile: CookbookPublishProfile) { self.profile = profile; profileSaveCount += 1 }
+  private func storeProfile(_ profile: CookbookPublishProfile) {
+    self.profile = profile
+    profileSaveCount += 1
+    let ready = profileSaveWaiters.filter { profileSaveCount >= $0.0 }
+    profileSaveWaiters.removeAll { profileSaveCount >= $0.0 }
+    ready.forEach { $0.1.resume() }
+  }
   private func shareIfAvailable() -> CKShare? {
     hasShare ? CKShare(recordZoneID: CookbookCloudKitClientFactory.zoneID) : nil
   }
@@ -207,5 +250,10 @@ private actor CookbookPublishFake {
   func waitUntilSaveCount(_ count: Int) async {
     if saveCallCount >= count { return }
     await withCheckedContinuation { saveCountWaiters.append((count, $0)) }
+  }
+
+  func waitUntilProfileSaveCount(_ count: Int) async {
+    if profileSaveCount >= count { return }
+    await withCheckedContinuation { profileSaveWaiters.append((count, $0)) }
   }
 }

@@ -1,4 +1,3 @@
-#if DEBUG
 import CloudKit
 import SwiftUI
 import YesChefCore
@@ -74,4 +73,3 @@ struct FamilyCookbookSettingsView: View {
     }
   }
 }
-#endif

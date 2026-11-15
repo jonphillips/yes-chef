@@ -71,33 +71,12 @@ struct AppContainer: View {
     @Bindable var menuModel = menuModel
     @Bindable var groceryModel = groceryModel
 
-    AppMainLayout(
-      horizontalSizeClass: horizontalSizeClass,
+    makeAppMainLayout(
       recipeModel: recipeModel,
-      powerBrowserModel: powerBrowserModel,
       workbenchModel: workbenchModel,
-      browserModel: browserModel,
       mealCalendarModel: mealCalendarModel,
       menuModel: menuModel,
-      groceryModel: groceryModel,
-      cookbookLibraryModel: cookbookLibraryModel,
-      cookbookPublishModel: cookbookPublishModel,
-      cookbookCopyModel: cookbookCopyModel,
-      createRecipeModel: createRecipeModel,
-      chatAccessInboxModel: chatAccessInboxModel,
-      chatAccessExportModel: chatAccessExportModel,
-      automaticBackupModel: automaticBackupModel,
-      selectedSection: $selectedSection,
-      selectedSettingsPane: $selectedSettingsPane,
-      onBrowserCapture: browserCaptureButtonTapped,
-      onRecipeSelected: { presentation in
-        presentedRecipe = presentation
-      },
-      onCookSessionRequested: { presentation in
-        presentedCookSession = presentation
-      },
-      onTodayPrepRequested: { presentation in presentedTodayPrep = presentation },
-      onRecipeCreated: recipeCreated
+      groceryModel: groceryModel
     )
     .onAppear {
       chatAccessInboxModel.onMenuSelected = { menuID in
@@ -105,17 +84,13 @@ struct AppContainer: View {
         selectedSection = .menus
       }
     }
-    .task {
-      cookbookPublishModel.start()
-      await syncActivityRecorder.scenePhaseChanged(isForeground: scenePhase == .active)
-      if scenePhase == .active { await automaticBackupModel.runIfDue() }
-    }
-    .onChange(of: scenePhase) { _, phase in
-      if phase == .active { cookbookPublishModel.sceneBecameActive() }
-    }
+    .task { await appStarted() }
+    .onChange(of: scenePhase) { _, phase in if phase == .active { appBecameActive() } }
+    .modifier(CookbookAcceptanceAlert(model: cookbookLibraryModel))
     .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
         presentation: presentation,
+        cookbookLibraryModel: cookbookLibraryModel,
         recipeModel: recipeModel,
         mealCalendarModel: mealCalendarModel,
         groceryModel: groceryModel,
@@ -391,6 +366,41 @@ struct AppContainer: View {
     )
   }
 
+  private func makeAppMainLayout(
+    recipeModel: RecipeLibraryModel,
+    workbenchModel: WorkbenchLibraryModel,
+    mealCalendarModel: MealCalendarModel,
+    menuModel: MenuLibraryModel,
+    groceryModel: GroceryLibraryModel
+  ) -> AppMainLayout {
+    AppMainLayout(
+      horizontalSizeClass: horizontalSizeClass, recipeModel: recipeModel, powerBrowserModel: powerBrowserModel,
+      workbenchModel: workbenchModel, browserModel: browserModel, mealCalendarModel: mealCalendarModel,
+      menuModel: menuModel, groceryModel: groceryModel, cookbookLibraryModel: cookbookLibraryModel,
+      cookbookPublishModel: cookbookPublishModel, cookbookCopyModel: cookbookCopyModel,
+      createRecipeModel: createRecipeModel, chatAccessInboxModel: chatAccessInboxModel,
+      chatAccessExportModel: chatAccessExportModel, automaticBackupModel: automaticBackupModel,
+      selectedSection: $selectedSection, selectedSettingsPane: $selectedSettingsPane,
+      onBrowserCapture: browserCaptureButtonTapped,
+      onRecipeSelected: { presentation in presentedRecipe = presentation },
+      onCookSessionRequested: { presentation in presentedCookSession = presentation },
+      onTodayPrepRequested: { presentation in presentedTodayPrep = presentation },
+      onRecipeCreated: recipeCreated
+    )
+  }
+
+  private func appStarted() async {
+    cookbookLibraryModel.start()
+    cookbookPublishModel.start()
+    await syncActivityRecorder.scenePhaseChanged(isForeground: scenePhase == .active)
+    if scenePhase == .active { await automaticBackupModel.runIfDue() }
+  }
+
+  private func appBecameActive() {
+    cookbookPublishModel.sceneBecameActive()
+    cookbookLibraryModel.sceneBecameActive()
+  }
+
   private func receiveFindReferral(from url: URL) async {
     guard let referralID = FindReferralDoor.referralID(from: url) else {
       AppLog.handoff.info("Ignoring unrecognized Yes Chef URL door")
@@ -437,6 +447,7 @@ struct AppContainer: View {
 private struct RecipeFullScreenCover: View {
   @Environment(\.dismiss) private var dismiss
   let presentation: RecipeDetailPresentation
+  let cookbookLibraryModel: CookbookLibraryModel
   let recipeModel: RecipeLibraryModel
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
@@ -480,6 +491,9 @@ private struct RecipeFullScreenCover: View {
       } operation: {
         makeDetailView(onRecipeSelected: route)
           .environment(\.recipeImageDatabase, context.mirror.database)
+          .environment(\.cookbookDisplayImageLoader, cookbookDisplayImageLoader(
+            fetchClient: cookbookLibraryModel.fetchClient, mirror: context.mirror, zoneOwnerName: context.zoneOwnerName
+          ))
       }
     }
   }

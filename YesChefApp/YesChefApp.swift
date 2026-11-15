@@ -6,9 +6,7 @@ import YesChefCore
 
 @main
 struct YesChefApp: App {
-#if DEBUG
-  @UIApplicationDelegateAdaptor(CookbookSpikeAppDelegate.self) private var cookbookSpikeAppDelegate
-#endif
+  @UIApplicationDelegateAdaptor(CookbookAppDelegate.self) private var cookbookAppDelegate
   private let handoffReviewCoordinator: HandoffReviewCoordinator
   private let createRecipeCoordinator: CreateRecipeCoordinator
   private let syncActivityRecorder: SyncActivityRecorder
