@@ -81,56 +81,7 @@ struct LensesTab: View {
     )) {
       Button("OK") { model.errorMessage = nil }
     } message: { Text(model.errorMessage ?? "") }
-    .confirmationDialog("Already in My Recipes", isPresented: existingCopiesPresented, titleVisibility: .visible) {
-      if case let .existingCopies(_, _, ids)? = copyModel.prompt {
-        Button("Open Mine") {
-          Task {
-            if let id = await copyModel.newestCopy(of: ids) { onRecipeSelected(RecipeDetailPresentation(recipeID: id)) }
-            copyModel.clearPrompt()
-          }
-        }
-        Button("Copy Anyway") { Task { await copyModel.copyAnywayButtonTapped() } }
-      }
-      Button("Cancel", role: .cancel) { copyModel.clearPrompt() }
-    } message: { Text("This recipe already has a copy in your library.") }
-    .alert("Cookbook Copy", isPresented: copyResultPresented) {
-      if case let .copyResult(result)? = copyModel.prompt, !result.uncopiedTargets.isEmpty {
-        Button("Copy Them Too") { Task { await copyModel.copyThemTooButtonTapped(result) } }
-        Button("Cancel", role: .cancel) { copyModel.clearPrompt() }
-      } else if case let .missingTargets(result)? = copyModel.prompt, !result.uncopiedTargets.isEmpty {
-        Button("Copy Them Too") { Task { await copyModel.copyThemTooButtonTapped(result) } }
-        Button("OK", role: .cancel) { copyModel.clearPrompt() }
-      } else {
-        Button("OK", role: .cancel) { copyModel.clearPrompt() }
-      }
-    } message: { Text(copyPromptMessage) }
   }
-
-  private var existingCopiesPresented: Binding<Bool> {
-    Binding(get: { if case .existingCopies? = copyModel.prompt { true } else { false } },
-      set: { if !$0 { copyModel.promptDismissed() } })
-  }
-
-  private var copyResultPresented: Binding<Bool> {
-    Binding(get: {
-      switch copyModel.prompt {
-      case .copyResult?, .missingTargets?, .failure?: true
-      default: false
-      }
-    }, set: { if !$0 { copyModel.promptDismissed() } })
-  }
-
-  private var copyPromptMessage: String {
-    switch copyModel.prompt {
-    case let .copyResult(result), let .missingTargets(result):
-      let related = result.unlinkedRelated.isEmpty ? [] : ["Related recipes not in your library: " + result.unlinkedRelated.joined(separator: ", ")]
-      let serves = result.textOnlyServeWith.isEmpty ? [] : ["Kept as text: " + result.textOnlyServeWith.joined(separator: ", ")]
-      return (related + serves + result.warnings).joined(separator: "\n")
-    case let .failure(message): return message
-    default: return ""
-    }
-  }
-
 }
 
 struct CookbookLensesView: View {
@@ -437,6 +388,7 @@ private struct LensDetailContent: View {
       if model.activeLens?.id != lensID { model.open(lens, editing: model.isEditing) }
       if lensName.isEmpty { lensName = lens.name }
     }
+    .modifier(CookbookCopyPrompts(copyModel: copyModel, isActive: context != nil, onRecipeSelected: onRecipeSelected))
   }
 }
 
@@ -715,5 +667,66 @@ private extension LensesModel.Destination.QueryContext {
   }
   var isBase: Bool {
     switch self { case .newBase, .editBase: true; case .addShelf, .editShelf: false }
+  }
+}
+
+/// Presents `CookbookCopyModel`'s prompts for copies started from a cookbook Lens's shelves. The Lenses tab and a
+/// cookbook's Lenses surface both show `LensDetailContent`, so the prompts live with it.
+private struct CookbookCopyPrompts: ViewModifier {
+  let copyModel: CookbookCopyModel
+  let isActive: Bool
+  let onRecipeSelected: (RecipeDetailPresentation) -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .confirmationDialog("Already in My Recipes", isPresented: existingCopiesPresented, titleVisibility: .visible) {
+        if case let .existingCopies(_, _, ids)? = copyModel.prompt {
+          Button("Open Mine") {
+            Task {
+              if let id = await copyModel.newestCopy(of: ids) { onRecipeSelected(RecipeDetailPresentation(recipeID: id)) }
+              copyModel.clearPrompt()
+            }
+          }
+          Button("Copy Anyway") { Task { await copyModel.copyAnywayButtonTapped() } }
+        }
+        Button("Cancel", role: .cancel) { copyModel.clearPrompt() }
+      } message: { Text("This recipe already has a copy in your library.") }
+      .alert("Cookbook Copy", isPresented: copyResultPresented) {
+        if case let .copyResult(result)? = copyModel.prompt, !result.uncopiedTargets.isEmpty {
+          Button("Copy Them Too") { Task { await copyModel.copyThemTooButtonTapped(result) } }
+          Button("Cancel", role: .cancel) { copyModel.clearPrompt() }
+        } else if case let .missingTargets(result)? = copyModel.prompt, !result.uncopiedTargets.isEmpty {
+          Button("Copy Them Too") { Task { await copyModel.copyThemTooButtonTapped(result) } }
+          Button("OK", role: .cancel) { copyModel.clearPrompt() }
+        } else {
+          Button("OK", role: .cancel) { copyModel.clearPrompt() }
+        }
+      } message: { Text(copyPromptMessage) }
+  }
+
+  private var existingCopiesPresented: Binding<Bool> {
+    Binding(get: { if isActive, case .existingCopies? = copyModel.prompt { true } else { false } },
+      set: { if !$0 { copyModel.promptDismissed() } })
+  }
+
+  private var copyResultPresented: Binding<Bool> {
+    Binding(get: {
+      guard isActive else { return false }
+      return switch copyModel.prompt {
+      case .copyResult?, .missingTargets?, .failure?: true
+      default: false
+      }
+    }, set: { if !$0 { copyModel.promptDismissed() } })
+  }
+
+  private var copyPromptMessage: String {
+    switch copyModel.prompt {
+    case let .copyResult(result), let .missingTargets(result):
+      let related = result.unlinkedRelated.isEmpty ? [] : ["Related recipes not in your library: " + result.unlinkedRelated.joined(separator: ", ")]
+      let serves = result.textOnlyServeWith.isEmpty ? [] : ["Kept as text: " + result.textOnlyServeWith.joined(separator: ", ")]
+      return (related + serves + result.warnings).joined(separator: "\n")
+    case let .failure(message): return message
+    default: return ""
+    }
   }
 }

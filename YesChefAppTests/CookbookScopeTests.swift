@@ -9,6 +9,35 @@ import YesChefCore
 @MainActor
 struct CookbookScopeTests {
   @Test
+  func cookbookModelsAreRebuiltWhenAnOwnersMirrorIsReplaced() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let firstMirror = try CookbookMirror(id: UUID(), directory: root)
+    let secondMirror = try CookbookMirror(id: UUID(), directory: root)
+    defer {
+      try? firstMirror.deleteMirror()
+      try? secondMirror.deleteMirror()
+      try? FileManager.default.removeItem(at: root)
+    }
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.uuid = .incrementing
+    } operation: {
+      let client = CookbookFetchClient(
+        sharedZones: { [] },
+        fetchPage: { _, _ in CookbookFetchedPage(records: [], deletions: [], changeToken: Data(), moreComing: false) },
+        fetchDisplayImage: { _, _ in Data() }
+      )
+      let model = CookbookLibraryModel(fetchClient: client, directory: root)
+      let first = CookbookContext(ownerName: "Jon", mirror: firstMirror, zoneOwnerName: "same-owner")
+      let reshared = CookbookContext(ownerName: "Jon", mirror: secondMirror, zoneOwnerName: "same-owner")
+
+      let original = model.libraryModels(for: first).lenses
+      #expect(model.libraryModels(for: first).lenses === original)
+      #expect(model.libraryModels(for: reshared).lenses !== original)
+    }
+  }
+
+  @Test
   func cookbookSurfaceStartsOnLensesOnlyWhenTheMirrorHasOne() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let lensMirror = try CookbookMirror(id: UUID(), directory: root)

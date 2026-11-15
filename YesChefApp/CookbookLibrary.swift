@@ -39,7 +39,9 @@ final class CookbookLibraryModel {
   @ObservationIgnored private var fetchTask: Task<Void, Never>?
   @ObservationIgnored private var needsFollowUp = false
   @ObservationIgnored private var notificationTask: Task<Void, Never>?
-  @ObservationIgnored private var modelsByOwner: [String: CookbookLibraryModels] = [:]
+  /// Keyed by mirror file, not owner: an owner who stops sharing and shares again gets a new mirror, and models
+  /// built over the deleted one would read nothing.
+  @ObservationIgnored private var modelsByMirror: [URL: CookbookLibraryModels] = [:]
   private let directory: URL
   private let indexURL: URL
 
@@ -52,9 +54,9 @@ final class CookbookLibraryModel {
   }
 
   func libraryModels(for context: CookbookContext) -> CookbookLibraryModels {
-    if let models = modelsByOwner[context.zoneOwnerName] { return models }
+    if let models = modelsByMirror[context.mirror.fileURL] { return models }
     let models = CookbookLibraryModels(context: context)
-    modelsByOwner[context.zoneOwnerName] = models
+    modelsByMirror[context.mirror.fileURL] = models
     return models
   }
 
@@ -200,6 +202,8 @@ final class CookbookLibraryModel {
       }
       entries.removeAll { !zoneOwners.contains($0.zoneOwnerName ?? "") }
       contexts.removeAll { !zoneOwners.contains($0.zoneOwnerName) }
+      let mirrorURLs = Set(contexts.map(\.mirror.fileURL))
+      modelsByMirror = modelsByMirror.filter { mirrorURLs.contains($0.key) }
       try persist()
       errorMessage = nil
     } catch {
