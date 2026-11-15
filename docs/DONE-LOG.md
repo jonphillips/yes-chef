@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-15 — Device-pass triage: 21 gates cleared by use (`plan/open-questions-triage`)
+
+- **Result:** Jon has used Menus and prep plans, ChatGPT staging and From Chat, Groceries, and the Workbench hand-offs and new symbols since they shipped, with nothing wrong. That clears 21 gates from `device-passes.md`: polish-batch-2026-11, Workbench hand-off S1 + S2 and S3, menu-absorbs-calendar-days S1 + S2 and S3–S5, menu-detail-declutter, app-symbol-vocabulary, chat-started-returns-and-menus S4 + S5, menu-row-note-on-recipe, stage-menu-day, from-chat-destination, stage-prep-plan, dogfood-2026-11-10, prep-step-make-ahead-window, menu-help-and-add-menu, prep-plan-time-order, grocery-two-trips, today-prep, prep-times-and-day-groceries, ingredient-name-fixes and grocery-consolidate-list. Five gates stay, because ordinary use wouldn't exercise them: create-recipe-calendar-review-fixes (the unconfirmed text-loss repro), ChatAccessKit export adoption (eviction and stale-ref checks), kitchen-knowledge-promotion (an ops step), dogfood-polish-2026-11-13 (sharing to Messages and Notes) and family-cookbooks S5.
+- **Verification:** Jon's everyday use, confirmed 2026-11-15.
+
+---
 ## 2026-11-14 — Family cookbooks S5 visiting polish (`effort/family-cookbooks-s5-visiting-polish`)
 
 - **Result:** Acceptance now opens the invited cookbook. Cookbook rows show copy status, copies retain full-size photos and can copy missing linked recipes, and cookbook reading supports Focus.
