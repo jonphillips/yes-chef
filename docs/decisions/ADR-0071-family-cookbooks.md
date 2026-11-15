@@ -308,3 +308,7 @@ Two related S4 decisions:
   waits and tries again 2 minutes later.
 
 S4 keeps D4's viewer and adds the Lenses. The visiting polish carried from S2 becomes S5.
+
+**Where the viewer picks a Lens moved on 2026-11-15** ([ADR-0050 Amendment 2](ADR-0050-recipe-power-browser.md#amendment-2--lenses-get-their-own-tab-and-a-lens-is-built-on-its-own-screen-2026-11-15)):
+a cookbook opens on its owner's Lens gallery, and the owner's Lenses also appear, read-only, in the viewer's Lenses
+tab. Everything above still holds. A Lens is still never copied.
