@@ -3,7 +3,7 @@
 Status: Ready
 Summary: Browse family members' recipes read-only and copy one into yours. S3 publishes your library to the cookbook zone. S4 accepts shares, fetches the shared recipes and the owner's Lenses, and ships the feature outside DEBUG. S5 is visiting polish: accepting opens the cookbook, rows show In My Recipes, and a copy brings its photo and its linked recipes.
 
-Origin: Jon, 2026-11-13. Decision: [ADR-0071](../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
+Origin: Jon, 2026-11-13. Decision: [ADR-0071](../../decisions/ADR-0071-family-cookbooks.md). This brief holds the slice
 plan; the ADR holds the why. **S0 is a spike.** Its code is debug-only and disposable. S3 and S4 rebuild the
 publisher and fetcher in `YesChefCore` with tests, and may take from the spike what survives.
 
@@ -624,7 +624,7 @@ All devices run Yes Chef Dev.
 
 S4 makes the feature work end to end. A viewer accepts an invitation, the app fetches the owner's zone into the
 mirror and keeps it current (D4's viewer), the owner's Lenses come with the recipes ([Amendment
-4](../decisions/ADR-0071-family-cookbooks.md#amendment-4--lenses-travel-with-the-cookbook-2026-11-14)), and the
+4](../../decisions/ADR-0071-family-cookbooks.md#amendment-4--lenses-travel-with-the-cookbook-2026-11-14)), and the
 DEBUG gates come off. The S0 spike and the S2 file transport are retired. The visiting polish carried from S2 is S5.
 
 ### Where things are (architect, 2026-11-14, PR #519 head 00d13de)

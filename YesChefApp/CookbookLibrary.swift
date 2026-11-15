@@ -21,6 +21,7 @@ final class CookbookLibraryModel {
   private(set) var progress: [String: String] = [:]
   private(set) var errorMessage: String?
   var acceptanceErrorMessage: String?
+  var selectedZoneOwnerName: String?
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored let fetchClient: CookbookFetchClient
@@ -72,6 +73,9 @@ final class CookbookLibraryModel {
     notificationTask = Task { [weak self] in
       for await notification in NotificationCenter.default.notifications(named: .cookbookShareAccepted) {
         guard let self else { return }
+        if let ownerName = notification.userInfo?["zoneOwnerName"] as? String {
+          self.selectedZoneOwnerName = ownerName
+        }
         await self.fetchCookbooks()
         if let message = notification.userInfo?["error"] as? String { self.acceptanceErrorMessage = message }
       }
@@ -190,10 +194,8 @@ struct FamilyCookbooksView: View {
   let mealCalendarModel: MealCalendarModel
   let groceryModel: GroceryLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
-  @State private var selectedOwnerName: String?
-
   private var selectedContext: CookbookContext? {
-    model.contexts.first { $0.zoneOwnerName == (selectedOwnerName ?? "") }
+    model.contexts.first { $0.zoneOwnerName == (model.selectedZoneOwnerName ?? "") }
       ?? model.contexts.first
   }
 
@@ -205,8 +207,8 @@ struct FamilyCookbooksView: View {
           contexts: model.contexts,
           libraryModel: model,
           selectedOwnerName: Binding(
-            get: { selectedOwnerName ?? context.zoneOwnerName },
-            set: { selectedOwnerName = $0 }
+            get: { model.selectedZoneOwnerName ?? context.zoneOwnerName },
+            set: { model.selectedZoneOwnerName = $0 }
           ),
           copyModel: copyModel,
           mealCalendarModel: mealCalendarModel,
@@ -223,10 +225,8 @@ struct FamilyCookbooksView: View {
     }
     .task { await model.fetchCookbooks() }
     .onChange(of: model.contexts.map(\.zoneOwnerName)) { _, ownerNames in
-      guard let selectedOwnerName,
-        !ownerNames.contains(selectedOwnerName)
-      else { return }
-      self.selectedOwnerName = ownerNames.first
+      if let selected = model.selectedZoneOwnerName, ownerNames.contains(selected) { return }
+      model.selectedZoneOwnerName = ownerNames.first
     }
   }
 }
@@ -302,6 +302,8 @@ private struct CookbookRecipesView: View {
                   mealCalendarModel: mealCalendarModel,
                   groceryModel: groceryModel,
                   cookbookCopyModel: copyModel,
+                  isFocusActive: columnVisibility == .detailOnly,
+                  focusButtonTapped: focusButtonTapped,
                   onRecipeSelected: onRecipeSelected
                 )
               }
@@ -325,9 +327,15 @@ private struct CookbookRecipesView: View {
       }
     }
     .environment(\.recipeImageDatabase, context.mirror.database)
+    .environment(\.cookbookCopiedSourceIDs, copyModel.copiedSourceIDsByCookbook[context.zoneOwnerName] ?? [])
     .environment(\.cookbookDisplayImageLoader, cookbookDisplayImageLoader(
       fetchClient: libraryModel.fetchClient, mirror: mirror, zoneOwnerName: context.zoneOwnerName
     ))
+    .task(id: context.loadedAt) { await copyModel.refreshCopyStatus(context: context) }
+  }
+
+  private func focusButtonTapped() {
+    columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
   }
 }
 

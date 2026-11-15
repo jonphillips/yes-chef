@@ -24,5 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-
-- [Family cookbooks](family-cookbooks.md) — **Ready.** S0–S2b cover the transport spike, recipe bundles, read-only browsing, and copying recipes. S3 publishes to the cookbook zone. S4 accepts shares and fetches recipes.

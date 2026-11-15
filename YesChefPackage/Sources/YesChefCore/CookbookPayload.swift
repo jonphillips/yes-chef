@@ -22,6 +22,14 @@ public enum CookbookProvenance {
 
 /// Intentionally omits full-size display images; those travel as separate assets.
 public enum CookbookPayload {
+  public static func identityKeys(in db: Database) throws -> [Recipe.ID: RecipeImportIdentityKey] {
+    let recipes = try Recipe.fetchAll(db).filter { !$0.archived }
+    let sourcesByRecipeID = Dictionary(uniqueKeysWithValues: try RecipeSource.fetchAll(db).map { ($0.recipeID, $0) })
+    return Dictionary(uniqueKeysWithValues: recipes.map { recipe in
+      (recipe.id, RecipeImportIdentityKey(sourceURL: sourcesByRecipeID[recipe.id]?.url, title: recipe.title))
+    })
+  }
+
   public static func displayPhotoID(for recipe: Recipe, photos: [RecipePhoto]) -> RecipePhoto.ID? {
     recipe.coverPhotoID.flatMap { coverID in photos.first { $0.id == coverID } }?.id
       ?? photos.sorted { $0.sortOrder < $1.sortOrder }.first?.id

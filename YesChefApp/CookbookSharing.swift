@@ -124,7 +124,9 @@ final class CookbookSceneDelegate: NSObject, UIWindowSceneDelegate {
     Task { @MainActor in
       do {
         _ = try await CKContainer(identifier: CookbookCloudKitClientFactory.containerIdentifier).accept(metadata)
-        NotificationCenter.default.post(name: .cookbookShareAccepted, object: nil)
+        NotificationCenter.default.post(name: .cookbookShareAccepted, object: nil, userInfo: [
+          "zoneOwnerName": metadata.share.recordID.zoneID.ownerName,
+        ])
       } catch {
         NotificationCenter.default.post(
           name: .cookbookShareAccepted, object: nil, userInfo: ["error": error.localizedDescription]

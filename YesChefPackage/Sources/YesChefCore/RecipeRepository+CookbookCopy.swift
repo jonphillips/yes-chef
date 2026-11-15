@@ -5,6 +5,7 @@ public struct CookbookCopyResult: Equatable, Sendable {
   public var recipeID: Recipe.ID
   public var textOnlyServeWith: [String]
   public var unlinkedRelated: [String]
+  public var uncopiedTargets: [Recipe.ID]
   public var warnings: [String]
 }
 
@@ -16,6 +17,27 @@ public enum CookbookCopyError: Error, Equatable {
 extension RecipeRepository {
   public static func existingCopies(of bundle: RecipeBundleCoding.RecipeBundle, in db: Database) throws -> [Recipe.ID] {
     try existingCopies(sourceURL: bundle.source?.url, title: bundle.recipe.title, in: db)
+  }
+
+  public static func copiedSourceIDs(
+    _ keys: [Recipe.ID: RecipeImportIdentityKey], in db: Database
+  ) throws -> Set<Recipe.ID> {
+    let refs = try RecipeImportRef.fetchAll(db)
+    let sources = try RecipeSource.fetchAll(db)
+    let recipes = try Recipe.fetchAll(db).filter { !$0.archived }
+    let recipeIDs = Set(recipes.map(\.id))
+    let urlsByRecipe = Dictionary(grouping: sources.compactMap { source in
+      RecipeImportIdentityKey.normalizedSourceURL(source.url).map { ($0, source.recipeID) }
+    }, by: \.0)
+    var copied: Set<Recipe.ID> = []
+    for (sourceID, key) in keys {
+      let refMatches = Array(refs.lazy
+        .filter { $0.normalizedSourceURL == key.normalizedSourceURL && $0.normalizedTitle == key.normalizedTitle }
+        .map(\.recipeID))
+      let urlMatches = key.normalizedSourceURL.flatMap { urlsByRecipe[$0] }?.map(\.1) ?? []
+      if (refMatches + urlMatches).contains(where: recipeIDs.contains) { copied.insert(sourceID) }
+    }
+    return copied
   }
 
   private static func existingCopies(sourceURL: String?, title: String, in db: Database) throws -> [Recipe.ID] {
@@ -184,10 +206,14 @@ extension RecipeRepository {
       return matches.count == 1 ? matches[0] : nil
     }
     var textOnly: [String] = []
+    var uncopiedTargets: Set<Recipe.ID> = []
     for row in bundle.serveWith {
       guard let id = serveRows[row.id] else { throw CookbookCopyError.missingParent(row.id) }
       let linked = try row.linkedRecipeID.flatMap { try resolve($0) }
-      if row.linkedRecipeID != nil, linked == nil { textOnly.append(row.title) }
+      if let targetID = row.linkedRecipeID, linked == nil {
+        textOnly.append(row.title)
+        if try resolveMatches(targetID, targets: targets, in: db).isEmpty { uncopiedTargets.insert(targetID) }
+      }
       let copy = RecipeServeWith(id: id, recipeID: recipeID, linkedRecipeID: linked, title: row.title, note: row.note,
         sortOrder: row.sortOrder, provenance: row.provenance, dateCreated: row.dateCreated, dateModified: row.dateModified)
       try RecipeServeWith.insert { copy }.execute(db)
@@ -197,13 +223,50 @@ extension RecipeRepository {
       let other = row.recipeID == old.id ? row.relatedRecipeID : row.recipeID
       if let resolved = try resolve(other), resolved != recipeID {
         try linkRelatedRecipes(recipeID, resolved, in: db, now: now, uuid: uuid)
-      } else { unlinked.append(targets[other]?.title ?? other.uuidString) }
+      } else {
+        unlinked.append(targets[other]?.title ?? other.uuidString)
+        if try resolveMatches(other, targets: targets, in: db).isEmpty { uncopiedTargets.insert(other) }
+      }
     }
     let key = RecipeImportIdentityKey(sourceURL: source?.url, title: old.title)
     let ref = RecipeImportRef(id: uuid(), recipeID: recipeID, normalizedSourceURL: key.normalizedSourceURL,
       normalizedTitle: key.normalizedTitle, dateCreated: now)
     try RecipeImportRef.insert { ref }.execute(db)
-    return CookbookCopyResult(recipeID: recipeID, textOnlyServeWith: textOnly, unlinkedRelated: unlinked, warnings: warnings)
+    return CookbookCopyResult(recipeID: recipeID, textOnlyServeWith: textOnly, unlinkedRelated: unlinked,
+      uncopiedTargets: uncopiedTargets.sorted { $0.uuidString < $1.uuidString }, warnings: warnings)
+  }
+
+  /// Resolves text-only serve-with rows and missing related links after target recipes are copied.
+  public static func relinkCookbookCopy(
+    _ recipeID: Recipe.ID, from bundle: RecipeBundleCoding.RecipeBundle,
+    in db: Database, now: Date, uuid: () -> UUID
+  ) throws {
+    let targets = Dictionary(bundle.linkTargets.map { ($0.recipeID, $0) }, uniquingKeysWith: { first, _ in first })
+    for sourceRow in bundle.serveWith where sourceRow.linkedRecipeID != nil {
+      guard let targetID = sourceRow.linkedRecipeID,
+        let current = try RecipeServeWith.where({ $0.recipeID.eq(recipeID) })
+          .fetchAll(db).first(where: { $0.sortOrder == sourceRow.sortOrder && $0.title == sourceRow.title }),
+        current.linkedRecipeID == nil
+      else { continue }
+      let matches = try resolveMatches(targetID, targets: targets, in: db)
+      guard matches.count == 1, let resolved = matches.first else { continue }
+      var updated = current
+      updated.linkedRecipeID = resolved
+      try RecipeServeWith.upsert { updated }.execute(db)
+    }
+    for row in bundle.relatedRecipes {
+      let targetID = row.recipeID == bundle.recipe.id ? row.relatedRecipeID : row.recipeID
+      let matches = try resolveMatches(targetID, targets: targets, in: db)
+      guard matches.count == 1, let resolved = matches.first, resolved != recipeID else { continue }
+      try linkRelatedRecipes(recipeID, resolved, in: db, now: now, uuid: uuid)
+    }
+  }
+
+  private static func resolveMatches(
+    _ targetID: Recipe.ID, targets: [Recipe.ID: RecipeBundleCoding.LinkTarget], in db: Database
+  ) throws -> [Recipe.ID] {
+    guard let target = targets[targetID] else { return [] }
+    return try existingCopies(sourceURL: target.sourceURL, title: target.title, in: db)
   }
 
   static func copyCookbookLabels(_ labels: [RecipeBundleCoding.LabelPath], recipeID: UUID, in db: Database, now: Date, uuid: () -> UUID) throws {

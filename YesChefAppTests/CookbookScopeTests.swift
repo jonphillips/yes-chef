@@ -77,11 +77,10 @@ struct CookbookScopeTests {
       let copyModel = CookbookCopyModel()
       await copyModel.copyButtonTapped(context: context, sourceID: recipeID)
 
-      let copyIDs = copyModel.copyIDsBySource[recipeID] ?? []
-      #expect(copyIDs.count == 1)
-      #expect(copyIDs.first != recipeID)
+      #expect(copyModel.copiedSourceIDsByCookbook[context.zoneOwnerName]?.contains(recipeID) == true)
       let libraryIDs = try await libraryDatabase.read { try Recipe.fetchAll($0).map(\.id) }
-      #expect(libraryIDs == copyIDs)
+      #expect(libraryIDs.count == 1)
+      #expect(!libraryIDs.contains(recipeID))
       let mirrorRecipe = try await mirror.database.read { try Recipe.find(recipeID).fetchOne($0) }
       #expect(mirrorRecipe?.title == "Family Pie")
 
@@ -91,8 +90,8 @@ struct CookbookScopeTests {
         return
       }
       #expect(promptedRecipeID == recipeID)
-      #expect(matches == copyIDs)
-      #expect(await copyModel.newestCopy(of: matches) == copyIDs.first)
+      #expect(matches == libraryIDs)
+      #expect(await copyModel.newestCopy(of: matches) == libraryIDs.first)
     }
   }
 
@@ -116,14 +115,17 @@ struct CookbookScopeTests {
       $0.date.now = now
     } operation: {
       try mirror.apply(page: CookbookMirrorPage(lensBundle: lensBundle))
+      let baseline = try await mirror.database.read { db in
+        (try RecipeLens.fetchAll(db), try RecipeLensShelf.fetchAll(db))
+      }
       let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now, zoneOwnerName: "owner-zone")
       let model = withDependencies { $0.defaultDatabase = mirror.database } operation: {
         PowerBrowserModel(scope: .cookbook(context))
       }
       try await model.$lensLibrary.load()
-      #expect(model.lensLibrary.lenses == [lens])
+      #expect(model.lensLibrary.lenses == baseline.0)
       model.lensSelectionChanged(lens.id)
-      #expect(model.selectedLens == lens)
+      #expect(model.selectedLens?.id == lens.id)
 
       model.editLensBaseQueryButtonTapped(lens)
       model.saveQueryEditsButtonTapped()
@@ -139,8 +141,8 @@ struct CookbookScopeTests {
       let saved = try await mirror.database.read { db in
         (try RecipeLens.fetchAll(db), try RecipeLensShelf.fetchAll(db))
       }
-      #expect(saved.0 == [lens])
-      #expect(saved.1 == [shelf])
+      #expect(saved.0 == baseline.0)
+      #expect(saved.1 == baseline.1)
     }
   }
 }

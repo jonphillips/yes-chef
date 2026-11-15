@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-14 — Family cookbooks S5 visiting polish (`effort/family-cookbooks-s5-visiting-polish`)
+
+- **Result:** Acceptance now opens the invited cookbook. Cookbook rows show copy status, copies retain full-size photos and can copy missing linked recipes, and cookbook reading supports Focus.
+- **Verification:** scripts/check-drift.sh passed (924 package tests, lint, and app test-target build); generic iOS build passed; YesChefTests passed (160 tests).
+- **Owed:** family-cookbooks S5 visiting polish's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-14 — Family cookbooks S4 device pass cleared (`fix/cookbook-lens-label-ids`)
 
 - **Result:** Jon's S4 pass on Yes Chef Dev passed. The pass found one problem: Lenses arrived in the cookbook, but every shelf was blank. Recipes reach the mirror with labels as name paths and get the mirror's own IDs, while the lens record carried the owner's label rows and IDs. The architect fixed it in #522: applying the lens record now finds each label by name and path, using the rule recipes use, and rewrites the shelf queries onto the mirror's IDs. The S4 line is gone from `device-passes.md`. The Held entry's Production schema deploy is still owed before the first TestFlight build.
