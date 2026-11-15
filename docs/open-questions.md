@@ -93,10 +93,13 @@ From the old Next Up:
   The fix is a jon-platform CloudSyncKit slice (Galavant shares it): show "Syncing…" or the last scan's result
   instead of green when the scan is skipped, and count the engine's real queue. Do it after the cut.
 
-- **Drop the vendored SQLiteData when upstream fixes #547.** `Vendor/sqlite-data` (ADR-0056 Amd 2) exits when a
-  SQLiteData release keeps children of parents the server never confirmed. Watch
-  [pointfreeco/sqlite-data#548](https://github.com/pointfreeco/sqlite-data/pull/548). Return to the remote package
-  then, and remove the `project.yml` override.
+- **Drop the vendored SQLiteData when upstream fixes #547.** `Vendor/sqlite-data` (ADR-0056 Amd 2) is upstream
+  1.13.0 plus one patch (`Vendor/sqlite-data/YESCHEF-PATCH.md`). The patch keeps and re-queues a child whose parent
+  the server never confirmed ([#547](https://github.com/pointfreeco/sqlite-data/issues/547)). 1.13.0 re-queues
+  only parents held back by `quotaExceeded` (#576). A parent rejected with `serverRejectedRequest` or
+  `limitExceeded` still loses its children upstream. The two parked-record patches were dropped at the 1.13.0
+  rebase, because 1.13.0 fixes [#565](https://github.com/pointfreeco/sqlite-data/issues/565) (#567, #569). Return
+  to the remote package when a release fixes #547, and remove the `project.yml` override then.
 
 - **Migration baseline squash — optional, post-cut, both apps (deferred by ADR-0056 Amd 1).** Use GRDB
   `registerMigration(_:merging:)`. The precondition is that every device is at the final legacy migration.

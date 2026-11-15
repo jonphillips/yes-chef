@@ -1,5 +1,5 @@
 {
-  "originHash" : "56fa270b302bcb8a541b80e45da217742758d557604c95f0e246dd3199f46333",
+  "originHash" : "5d666df15fefe08377fdd59228d29838214423ab4ee7f025c014dfa348c6e8d7",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/sqlite-data",
       "state" : {
-        "revision" : "26471412f457f2c640bf5759a63870353a19f9e1",
-        "version" : "1.8.2"
+        "revision" : "e72164ceb92a10b62407624c98e5bc2c47d8c0e1",
+        "version" : "1.13.0"
       }
     },
     {
@@ -83,6 +83,15 @@
       }
     },
     {
+      "identity" : "swift-issue-reporting",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pointfreeco/swift-issue-reporting",
+      "state" : {
+        "revision" : "b23bb4493c439d3e05152bc167014235ba3d47fc",
+        "version" : "2.1.2"
+      }
+    },
+    {
       "identity" : "swift-perception",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-perception",
@@ -114,8 +123,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-structured-queries",
       "state" : {
-        "revision" : "dafddd843f10630aa6b5be47c1b6a59cc4ab6586",
-        "version" : "0.34.0"
+        "revision" : "72d536d5f0319097612bea961e356f4223efd926",
+        "version" : "0.39.2"
       }
     },
     {
@@ -141,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/xctest-dynamic-overlay",
       "state" : {
-        "revision" : "cb281f343fd953280336dcbd3822cdf47c182f5b",
-        "version" : "1.10.0"
+        "revision" : "d9308ad679143c26a30dec52daefe82f54af2b82",
+        "version" : "1.13.1"
       }
     }
   ],

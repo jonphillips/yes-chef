@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-15 — SQLiteData 1.13.0 rebase (`vendor/sqlite-data-1.13.0`)
+
+- **Result:** `Vendor/sqlite-data` is now upstream 1.13.0 plus one patch, #389's keep-and-re-queue on `referenceViolation` (upstream #547, still open). The two parked-record patches (#414) were dropped, because 1.13.0 fixes #565 (#567, #569). A new mock-only regression test shows pristine 1.13.0 still deletes a child whose parent was rejected with `serverRejectedRequest`. `YesChefPackage` raises its SQLiteData floor to 1.13.0. Its tracked lockfile had pinned 1.8.2, so package tests never ran against the vendored base; it now pins 1.13.0, StructuredQueries 0.39.2 and xctest-dynamic-overlay 1.13.1, the app's set.
+- **Verification:** `swift test --package-path Vendor/sqlite-data` passed (380 tests, 2 known issues); scripts/check-drift.sh passed (904 core tests, 20 script tests, SwiftLint, and app test-target build); generic iOS build passed; YesChefTests passed (165 tests).
+- **Owed:** the SQLiteData 1.13.0 rebase two-device sync pass, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-14 — Family cookbooks S5 visiting polish (`effort/family-cookbooks-s5-visiting-polish`)
 
 - **Result:** Acceptance now opens the invited cookbook. Cookbook rows show copy status, copies retain full-size photos and can copy missing linked recipes, and cookbook reading supports Focus.
