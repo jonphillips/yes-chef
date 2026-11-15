@@ -15,7 +15,7 @@ struct SaveRecipeLensView: View {
           ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
           ToolbarItem(placement: .confirmationAction) {
             Button("Save") {
-              if let id = model.saveLensButtonTapped(name: name) { onLensCreated(id) }
+              model.saveLensButtonTapped(name: name, onLensCreated: onLensCreated)
               dismiss()
             }
             .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

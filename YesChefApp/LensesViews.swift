@@ -9,6 +9,7 @@ private struct LensRoute: Hashable {
 struct LensesTab: View {
   let model: LensesModel
   let copyModel: CookbookCopyModel
+  let cookbookLibraryModel: CookbookLibraryModel
   let contexts: [CookbookContext]
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   let onBrowseAll: (RecipeBrowserQuery, CookbookContext?) -> Void
@@ -31,9 +32,11 @@ struct LensesTab: View {
           }
           LensGallerySection(title: "My Lenses", model: model, context: nil, onOpen: { path.append($0) })
           ForEach(contexts, id: \.zoneOwnerName) { context in
-            CookbookLensGallerySection(
+            LensGallerySection(
+              title: context.ownerName,
+              model: cookbookLibraryModel.libraryModels(for: context).lenses,
               context: context,
-              onOpen: { path.append(LensRoute(id: $0, context: context)) }
+              onOpen: { path.append($0) }
             )
           }
         }
@@ -47,9 +50,9 @@ struct LensesTab: View {
       }
       .navigationDestination(for: LensRoute.self) { route in
         if let context = route.context {
-          CookbookLensDetail(context: context, lensID: route.id, onRecipeSelected: onRecipeSelected,
-            copyModel: copyModel,
-            onBrowseAll: { query in onBrowseAll(query, context) })
+          LensDetailContent(model: cookbookLibraryModel.libraryModels(for: context).lenses,
+            lensID: route.id, onRecipeSelected: onRecipeSelected, context: context,
+            copyModel: copyModel, onBrowseAll: { query in onBrowseAll(query, context) })
         } else {
           LensesDetailView(model: model, lensID: route.id, onRecipeSelected: onRecipeSelected,
             copyModel: copyModel,
@@ -65,7 +68,7 @@ struct LensesTab: View {
         LensQuerySheet(model: model, context: context)
       }
     }
-    .onChange(of: model.openLensID) { _, id in
+    .onChange(of: model.openLensID, initial: true) { _, id in
       guard let id, path.last?.id != id else { return }
       path.append(LensRoute(id: id, context: nil))
     }
@@ -78,6 +81,54 @@ struct LensesTab: View {
     )) {
       Button("OK") { model.errorMessage = nil }
     } message: { Text(model.errorMessage ?? "") }
+    .confirmationDialog("Already in My Recipes", isPresented: existingCopiesPresented, titleVisibility: .visible) {
+      if case let .existingCopies(_, _, ids)? = copyModel.prompt {
+        Button("Open Mine") {
+          Task {
+            if let id = await copyModel.newestCopy(of: ids) { onRecipeSelected(RecipeDetailPresentation(recipeID: id)) }
+            copyModel.clearPrompt()
+          }
+        }
+        Button("Copy Anyway") { Task { await copyModel.copyAnywayButtonTapped() } }
+      }
+      Button("Cancel", role: .cancel) { copyModel.clearPrompt() }
+    } message: { Text("This recipe already has a copy in your library.") }
+    .alert("Cookbook Copy", isPresented: copyResultPresented) {
+      if case let .copyResult(result)? = copyModel.prompt, !result.uncopiedTargets.isEmpty {
+        Button("Copy Them Too") { Task { await copyModel.copyThemTooButtonTapped(result) } }
+        Button("Cancel", role: .cancel) { copyModel.clearPrompt() }
+      } else if case let .missingTargets(result)? = copyModel.prompt, !result.uncopiedTargets.isEmpty {
+        Button("Copy Them Too") { Task { await copyModel.copyThemTooButtonTapped(result) } }
+        Button("OK", role: .cancel) { copyModel.clearPrompt() }
+      } else {
+        Button("OK", role: .cancel) { copyModel.clearPrompt() }
+      }
+    } message: { Text(copyPromptMessage) }
+  }
+
+  private var existingCopiesPresented: Binding<Bool> {
+    Binding(get: { if case .existingCopies? = copyModel.prompt { true } else { false } },
+      set: { if !$0 { copyModel.promptDismissed() } })
+  }
+
+  private var copyResultPresented: Binding<Bool> {
+    Binding(get: {
+      switch copyModel.prompt {
+      case .copyResult?, .missingTargets?, .failure?: true
+      default: false
+      }
+    }, set: { if !$0 { copyModel.promptDismissed() } })
+  }
+
+  private var copyPromptMessage: String {
+    switch copyModel.prompt {
+    case let .copyResult(result), let .missingTargets(result):
+      let related = result.unlinkedRelated.isEmpty ? [] : ["Related recipes not in your library: " + result.unlinkedRelated.joined(separator: ", ")]
+      let serves = result.textOnlyServeWith.isEmpty ? [] : ["Kept as text: " + result.textOnlyServeWith.joined(separator: ", ")]
+      return (related + serves + result.warnings).joined(separator: "\n")
+    case let .failure(message): return message
+    default: return ""
+    }
   }
 
 }
@@ -104,27 +155,6 @@ struct CookbookLensesView: View {
       }
     }
     .environment(\.recipeImageDatabase, context.mirror.database)
-  }
-}
-
-private struct CookbookLensGallerySection: View {
-  let context: CookbookContext
-  let onOpen: (RecipeLens.ID) -> Void
-  @State private var model: LensesModel
-
-  init(context: CookbookContext, onOpen: @escaping (RecipeLens.ID) -> Void) {
-    self.context = context
-    self.onOpen = onOpen
-    _model = State(initialValue: withDependencies({ $0.defaultDatabase = context.mirror.database }) {
-      LensesModel(scope: .cookbook(context))
-    })
-  }
-
-  var body: some View {
-    if !model.lensLibrary.lenses.isEmpty {
-      LensGallerySection(title: context.ownerName, model: model, context: context, onOpen: { onOpen($0.id) })
-        .environment(\.recipeImageDatabase, context.mirror.database)
-    }
   }
 }
 
@@ -215,13 +245,7 @@ private struct LensCard: View {
   let model: LensesModel
 
   private var evaluation: RecipeLensEvaluation? {
-    let data = model.browser.browserData
-    let engine = RecipeBrowserEngine(recipes: data.recipes, recipeCategories: data.recipeCategories,
-      categories: data.categories, facets: data.facets, sources: data.sources, variations: data.variations,
-      recipeIDsWithPhotos: data.recipeIDsWithPhotos)
-    return RecipeLensEvaluator.evaluate(lens: lens,
-      shelves: model.lensLibrary.shelves.filter { $0.lensID == lens.id }, using: engine,
-      facets: data.facets, categories: data.categories)
+    model.evaluation(for: lens)
   }
 
   var body: some View {
@@ -266,21 +290,15 @@ private struct NewLensView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var search = ""
 
-  private var values: [(Facet, RecipeBrowserResult.ValueAvailability)] {
-    model.browser.result.availableFacets.flatMap { availability in
-      availability.values.filter { $0.category.name.localizedCaseInsensitiveContains(search) }
-        .map { (availability.facet, $0) }
-    }
-  }
-
   var body: some View {
+    let availability = model.newLensAvailability
     NavigationStack {
       List {
-        ForEach(model.browser.result.availableFacets) { availability in
-          Section(availability.facet.name) {
-            ForEach(availability.values.filter { $0.category.name.localizedCaseInsensitiveContains(search) }) { value in
+        ForEach(availability) { facetAvailability in
+          Section(facetAvailability.facet.name) {
+            ForEach(facetAvailability.values.filter { $0.category.name.localizedCaseInsensitiveContains(search) }) { value in
               Button {
-                model.createFromValue(value.category, facet: availability.facet)
+                model.createFromValue(value.category, facet: facetAvailability.facet)
                 dismiss()
               } label: {
                 HStack {
@@ -315,34 +333,6 @@ private struct LensesDetailView: View {
   var body: some View {
     LensDetailContent(model: model, lensID: lensID, onRecipeSelected: onRecipeSelected,
       copyModel: copyModel, onBrowseAll: onBrowseAll)
-  }
-}
-
-private struct CookbookLensDetail: View {
-  let context: CookbookContext
-  let lensID: RecipeLens.ID
-  let onRecipeSelected: (RecipeDetailPresentation) -> Void
-  let copyModel: CookbookCopyModel
-  let onBrowseAll: (RecipeBrowserQuery) -> Void
-  @State private var model: LensesModel
-
-  init(context: CookbookContext, lensID: RecipeLens.ID, onRecipeSelected: @escaping (RecipeDetailPresentation) -> Void,
-    copyModel: CookbookCopyModel,
-    onBrowseAll: @escaping (RecipeBrowserQuery) -> Void) {
-    self.context = context
-    self.lensID = lensID
-    self.onRecipeSelected = onRecipeSelected
-    self.copyModel = copyModel
-    self.onBrowseAll = onBrowseAll
-    _model = State(initialValue: withDependencies({ $0.defaultDatabase = context.mirror.database }) {
-      LensesModel(scope: .cookbook(context))
-    })
-  }
-
-  var body: some View {
-    LensDetailContent(model: model, lensID: lensID, onRecipeSelected: onRecipeSelected,
-      context: context, copyModel: copyModel, onBrowseAll: onBrowseAll)
-      .environment(\.recipeImageDatabase, context.mirror.database)
   }
 }
 
@@ -387,12 +377,12 @@ private struct LensDetailContent: View {
               }
             }
           }
-          ForEach(model.shelves) { shelf in
+          ForEach(model.visibleShelves(for: lens).map(\.shelf)) { shelf in
             LensShelfView(model: model, shelf: shelf, context: context, copyModel: copyModel,
               onRecipeSelected: onRecipeSelected)
           }
           .reorderable()
-          if model.shelves.isEmpty, let evaluation = model.evaluation {
+          if model.visibleShelves(for: lens).isEmpty, let evaluation = model.evaluation {
             LensBaseRecipesView(model: model, recipeIDs: evaluation.baseRecipeIDs,
               onRecipeSelected: onRecipeSelected)
           }
@@ -432,8 +422,7 @@ private struct LensDetailContent: View {
           }
         }
         Button("Browse all") {
-          model.browseAll()
-          onBrowseAll(model.browser.query)
+          onBrowseAll(model.browseAll())
         }
       }
     }
@@ -467,7 +456,7 @@ private struct LensShelfView: View {
     let ids: [Recipe.ID] = if case let .ready(values) = result?.state { values } else { [] }
     let rows = model.browser.recipeRows(for: RecipeBrowserResult(matchingRecipeIDs: ids, availableFacets: []))
     let isBroken: Bool = if case .unresolved? = result?.state { true } else { false }
-    let isEmpty: Bool = if case .empty? = result?.state { true } else { rows.isEmpty }
+    let isEmpty: Bool = if case .empty? = result?.state { true } else { false }
     if isEmpty && !model.isEditing {
       EmptyView()
     } else {
@@ -493,12 +482,20 @@ private struct LensShelfView: View {
           if !rows.isEmpty { Button("See all") { showsAll = true } }
         }
       }.padding(.horizontal)
-      if isBroken && model.isEditing {
-        Button("Fix") { model.destination = .query(.editShelf(shelf.id, lensID: shelf.lensID)) }
-          .padding(.horizontal)
+      if isBroken, case let .unresolved(reasons)? = result?.state {
+        ContentUnavailableView {
+          Label("Shelf needs repair", systemImage: "exclamationmark.triangle")
+        } description: {
+          Text(reasons.joined(separator: " "))
+        } actions: {
+          if model.scope == .mine {
+            Button("Fix") { model.destination = .query(.editShelf(shelf.id, lensID: shelf.lensID)) }
+          }
+        }
+        .padding(.horizontal)
       }
-      if let progress = copyModel.shelfCopyProgress, context != nil {
-        Text(progress).font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+      if let progress = copyModel.shelfCopyProgress, progress.shelfID == shelf.id, context != nil {
+        Text(progress.message).font(.caption).foregroundStyle(.secondary).padding(.horizontal)
       }
       if rows.isEmpty {
         if model.isEditing { Text("0 recipes").font(.caption).foregroundStyle(.secondary).padding(.horizontal) }
@@ -538,9 +535,10 @@ private struct LensShelfView: View {
       Button("Copy \(uncopiedIDs.count) to My Recipes") {
         guard let context else { return }
         Task {
-          let report = await copyModel.copyShelf(context: context, sourceIDs: uncopiedIDs)
+          let report = await copyModel.copyShelf(context: context, shelfID: shelf.id, sourceIDs: uncopiedIDs)
           let failures = report.failures.isEmpty ? "" : "\n\nFailed:\n" + report.failures.joined(separator: "\n")
-          shelfCopyReport = "Copied \(report.copied) recipes.\(failures)"
+          let warnings = report.warnings.isEmpty ? "" : "\n\nWarnings:\n" + report.warnings.joined(separator: "\n")
+          shelfCopyReport = "Copied \(report.copied) recipes.\(failures)\(warnings)"
         }
       }
       Button("Cancel", role: .cancel) {}
@@ -613,21 +611,14 @@ private struct LensRemainderEditor: View {
 private struct LensSuggestionTray: View {
   let model: LensesModel
 
-  private var suggestions: [RecipeBrowserResult.FacetAvailability] {
-    guard let lens = model.openLens,
-      let base = try? RecipeLensQueryCodec.decode(lens.baseQuery) else { return [] }
-    return RecipeLensEvaluator.suggestions(for: base, using: model.browser.lensEngineForViews())
-  }
+  private var suggestions: [RecipeBrowserResult.FacetAvailability] { model.suggestions }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       Text("Suggestions").font(.title2.bold())
       ForEach(suggestions) { facet in
         ForEach(facet.values.filter { value in
-          !model.shelves.contains { shelf in
-            guard let query = try? RecipeLensQueryCodec.decode(shelf.query) else { return false }
-            return query.facetSelections.contains { $0.facetID == facet.facet.id && $0.categoryIDs.contains(value.category.id) }
-          }
+          !model.alreadyShelvedFacetValues.contains("\(facet.facet.id.uuidString):\(value.category.id.uuidString)")
         }) { value in
           Button { model.addSuggestedShelf(value, facet: facet.facet) } label: {
             HStack {
@@ -685,7 +676,7 @@ private struct LensQuerySheet: View {
       .onAppear { loadQuery() }
       .onChange(of: queryModel.query) { _, query in
         guard !hasTypedTitle, context.isShelf else { return }
-        title = model.browser.selectionLabels(for: query).first ?? "New shelf"
+        title = model.defaultShelfTitle(for: query)
       }
       .onChange(of: title) { _, _ in
         if isTitleFocused { hasTypedTitle = true }
@@ -700,17 +691,17 @@ private struct LensQuerySheet: View {
       if let lens = model.lensLibrary.lenses.first(where: { $0.id == id }) { queryModel.query = (try? RecipeLensQueryCodec.decode(lens.baseQuery)) ?? RecipeBrowserQuery() }
     case let .addShelf(id):
       if let lens = model.lensLibrary.lenses.first(where: { $0.id == id }) {
-        let baseQuery = (try? RecipeLensQueryCodec.decode(lens.baseQuery)) ?? RecipeBrowserQuery()
-        queryModel.query = baseQuery
-        queryModel.restrictedRecipeIDs = Set(model.browser.lensEngineForViews().matchingRecipeIDs(for: baseQuery))
-        title = model.browser.selectionLabels(for: queryModel.query).first ?? "New shelf"
+        let draft = model.customShelfDraft(for: lens)
+        queryModel.query = draft.query
+        queryModel.restrictedRecipeIDs = draft.restrictedRecipeIDs
+        title = draft.title
       }
     case let .editShelf(id, lensID):
       if let shelf = model.lensLibrary.shelves.first(where: { $0.id == id }) {
         queryModel.query = (try? RecipeLensQueryCodec.decode(shelf.query)) ?? RecipeBrowserQuery()
         if let lens = model.lensLibrary.lenses.first(where: { $0.id == lensID }),
           let base = try? RecipeLensQueryCodec.decode(lens.baseQuery) {
-          queryModel.restrictedRecipeIDs = Set(model.browser.lensEngineForViews().matchingRecipeIDs(for: base))
+          queryModel.restrictedRecipeIDs = Set(model.browser.browserEngine().matchingRecipeIDs(for: base))
         }
         title = shelf.title
       }
@@ -724,13 +715,5 @@ private extension LensesModel.Destination.QueryContext {
   }
   var isBase: Bool {
     switch self { case .newBase, .editBase: true; case .addShelf, .editShelf: false }
-  }
-}
-
-private extension PowerBrowserModel {
-  func lensEngineForViews() -> RecipeBrowserEngine {
-    RecipeBrowserEngine(recipes: browserData.recipes, recipeCategories: browserData.recipeCategories,
-      categories: browserData.categories, facets: browserData.facets, sources: browserData.sources,
-      variations: browserData.variations, recipeIDsWithPhotos: browserData.recipeIDsWithPhotos)
   }
 }

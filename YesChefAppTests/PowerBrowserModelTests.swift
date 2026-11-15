@@ -174,8 +174,10 @@ struct PowerBrowserModelTests {
       @Dependency(\.defaultDatabase) var database
       let model = PowerBrowserModel()
       model.query = RecipeBrowserQuery(text: "salsa")
-      model.saveLensButtonTapped(name: "Salsa")
+      var createdID: RecipeLens.ID?
+      model.saveLensButtonTapped(name: "Salsa", onLensCreated: { createdID = $0 })
       let lens = try await database.read { db in try #require(RecipeLens.fetchAll(db).first) }
+      #expect(createdID == lens.id)
       #expect(try RecipeLensQueryCodec.decode(lens.baseQuery) == model.query)
 
       let first = try await database.write { db in

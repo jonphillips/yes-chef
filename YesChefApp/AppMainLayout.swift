@@ -174,6 +174,7 @@ struct AppMainLayout: View {
       LensesTab(
         model: lensesModel,
         copyModel: cookbookCopyModel,
+        cookbookLibraryModel: cookbookLibraryModel,
         contexts: cookbookLibraryModel.contexts,
         onRecipeSelected: onRecipeSelected,
         onBrowseAll: { query, context in

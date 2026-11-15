@@ -23,6 +23,13 @@ extension PowerBrowserModel {
     }
   }
 
+  @discardableResult
+  func saveLensButtonTapped(name: String, onLensCreated: (RecipeLens.ID) -> Void) -> RecipeLens.ID? {
+    guard let id = saveLensButtonTapped(name: name) else { return nil }
+    onLensCreated(id)
+    return id
+  }
+
   func selectionLabels(for query: RecipeBrowserQuery) -> [String] {
     let categoriesByID = Dictionary(uniqueKeysWithValues: browserData.categories.map { ($0.id, $0) })
     let facetsByID = Dictionary(uniqueKeysWithValues: browserData.facets.map { ($0.id, $0) })

@@ -42,11 +42,9 @@ struct CookbookLibraryModels {
     let models = withDependencies {
       $0.defaultDatabase = context.mirror.database
     } operation: {
-      (
-        RecipeLibraryModel(scope: .cookbook(context)),
-        PowerBrowserModel(scope: .cookbook(context)),
-        LensesModel(scope: .cookbook(context))
-      )
+      let browser = PowerBrowserModel(scope: .cookbook(context))
+      return (RecipeLibraryModel(scope: .cookbook(context)), browser,
+        LensesModel(scope: .cookbook(context), browser: browser))
     }
     recipes = models.0
     powerBrowser = models.1

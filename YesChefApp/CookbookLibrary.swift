@@ -39,6 +39,7 @@ final class CookbookLibraryModel {
   @ObservationIgnored private var fetchTask: Task<Void, Never>?
   @ObservationIgnored private var needsFollowUp = false
   @ObservationIgnored private var notificationTask: Task<Void, Never>?
+  @ObservationIgnored private var modelsByOwner: [String: CookbookLibraryModels] = [:]
   private let directory: URL
   private let indexURL: URL
 
@@ -48,6 +49,13 @@ final class CookbookLibraryModel {
 
   func setSurface(_ surface: CookbookLibrarySurface, for context: CookbookContext) {
     selectedSurfaceByOwnerName[context.zoneOwnerName] = surface
+  }
+
+  func libraryModels(for context: CookbookContext) -> CookbookLibraryModels {
+    if let models = modelsByOwner[context.zoneOwnerName] { return models }
+    let models = CookbookLibraryModels(context: context)
+    modelsByOwner[context.zoneOwnerName] = models
+    return models
   }
 
   func resolveInitialSurface(for context: CookbookContext, lensCount: Int) {
@@ -302,7 +310,7 @@ private struct CookbookRecipesView: View {
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
     self.onRecipeSelected = onRecipeSelected
-    _models = State(initialValue: CookbookLibraryModels(context: context))
+    _models = State(initialValue: libraryModel.libraryModels(for: context))
   }
 
   var body: some View {

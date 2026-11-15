@@ -6,6 +6,11 @@ import YesChefCore
 @Observable
 @MainActor
 final class LensesModel {
+  struct CustomShelfDraft {
+    var query: RecipeBrowserQuery
+    var restrictedRecipeIDs: Set<Recipe.ID>
+    var title: String
+  }
   private struct CachedEvaluation {
     var lens: RecipeLens
     var shelves: [RecipeLensShelf]
@@ -34,8 +39,6 @@ final class LensesModel {
 
   let scope: LibraryScope
   let browser: PowerBrowserModel
-  @ObservationIgnored
-  @Fetch(RecipeLensLibraryRequest(), animation: .default) var lensLibrary = RecipeLensLibrary(lenses: [], shelves: [])
   var openLensID: RecipeLens.ID?
   private(set) var activeLens: RecipeLens?
   var isEditing = false
@@ -48,13 +51,15 @@ final class LensesModel {
   @ObservationIgnored @Dependency(\.defaultDatabase) private var database
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
-  @ObservationIgnored private var cachedEvaluation: CachedEvaluation?
+  @ObservationIgnored private var cachedEvaluations: [RecipeLens.ID: CachedEvaluation] = [:]
+  @ObservationIgnored private var cachedShelfSelections: (shelves: [RecipeLensShelf], values: Set<String>)?
 
-  init(scope: LibraryScope = .mine) {
+  init(scope: LibraryScope = .mine, browser: PowerBrowserModel? = nil) {
     self.scope = scope
-    self.browser = PowerBrowserModel(scope: scope)
+    self.browser = browser ?? PowerBrowserModel(scope: scope)
   }
 
+  var lensLibrary: RecipeLensLibrary { browser.lensLibrary }
   var openLens: RecipeLens? { lensLibrary.lenses.first { $0.id == openLensID } ?? activeLens }
   var shelves: [RecipeLensShelf] {
     guard let openLensID else { return [] }
@@ -62,33 +67,55 @@ final class LensesModel {
   }
   var evaluation: RecipeLensEvaluation? {
     guard let openLens else { return nil }
-    let currentShelves = self.shelves
+    return evaluation(for: openLens)
+  }
+
+  func evaluation(for lens: RecipeLens) -> RecipeLensEvaluation {
+    let currentShelves = lensLibrary.shelves.filter { $0.lensID == lens.id }.sorted { $0.sortOrder < $1.sortOrder }
     let data = browser.browserData
-    if let cachedEvaluation, cachedEvaluation.lens == openLens,
-      cachedEvaluation.shelves == currentShelves, cachedEvaluation.data == data {
-      return cachedEvaluation.evaluation
+    if let cached = cachedEvaluations[lens.id], cached.lens == lens,
+      cached.shelves == currentShelves, cached.data == data {
+      return cached.evaluation
     }
-    let engine = RecipeBrowserEngine(
-      recipes: data.recipes,
-      recipeCategories: data.recipeCategories,
-      categories: data.categories,
-      facets: data.facets,
-      sources: data.sources,
-      variations: data.variations,
-      recipeIDsWithPhotos: data.recipeIDsWithPhotos
-    )
     let evaluation = RecipeLensEvaluator.evaluate(
-      lens: openLens, shelves: currentShelves, using: engine, facets: data.facets, categories: data.categories
+      lens: lens, shelves: currentShelves, using: browser.browserEngine(), facets: data.facets, categories: data.categories
     )
-    cachedEvaluation = CachedEvaluation(lens: openLens, shelves: currentShelves, data: data, evaluation: evaluation)
+    cachedEvaluations[lens.id] = CachedEvaluation(lens: lens, shelves: currentShelves, data: data, evaluation: evaluation)
     return evaluation
+  }
+
+  func visibleShelves(for lens: RecipeLens, includingEmpty: Bool? = nil) -> [RecipeLensEvaluation.ShelfResult] {
+    let results = evaluation(for: lens).shelves
+    let showEmpty = includingEmpty ?? (isEditing && scope == .mine)
+    return results.filter { result in if case .empty = result.state { return showEmpty }; return true }
+  }
+
+  var alreadyShelvedFacetValues: Set<String> {
+    let currentShelves = shelves
+    if let cachedShelfSelections, cachedShelfSelections.shelves == currentShelves { return cachedShelfSelections.values }
+    let values = Set(currentShelves.flatMap { shelf -> [String] in
+      guard let query = try? RecipeLensQueryCodec.decode(shelf.query) else { return [] }
+      return query.facetSelections.flatMap { selection in
+        selection.categoryIDs.map { "\(selection.facetID.uuidString):\($0.uuidString)" }
+      }
+    })
+    cachedShelfSelections = (currentShelves, values)
+    return values
+  }
+
+  var suggestions: [RecipeBrowserResult.FacetAvailability] {
+    guard let lens = openLens, let base = try? RecipeLensQueryCodec.decode(lens.baseQuery) else { return [] }
+    return RecipeLensEvaluator.suggestions(for: base, using: browser.browserEngine())
+  }
+
+  var newLensAvailability: [RecipeBrowserResult.FacetAvailability] {
+    browser.result(for: RecipeBrowserQuery()).availableFacets
   }
 
   func open(_ lens: RecipeLens, editing: Bool = false) {
     openLensID = lens.id
     activeLens = lens
     isEditing = editing && scope == .mine
-    browser.query = (try? RecipeLensQueryCodec.decode(lens.baseQuery)) ?? RecipeBrowserQuery()
   }
 
   func open(id: RecipeLens.ID, editing: Bool = false) {
@@ -96,7 +123,6 @@ final class LensesModel {
     isEditing = editing && scope == .mine
     guard let lens = lensLibrary.lenses.first(where: { $0.id == id }) else { return }
     activeLens = lens
-    browser.query = (try? RecipeLensQueryCodec.decode(lens.baseQuery)) ?? RecipeBrowserQuery()
   }
 
   func closeLens() {
@@ -133,11 +159,6 @@ final class LensesModel {
     }
   }
 
-  func saveAsLens(name: String, query: RecipeBrowserQuery, onLensCreated: (RecipeLens.ID) -> Void) {
-    guard let id = createLens(name: name, query: query) else { return }
-    onLensCreated(id)
-  }
-
   func recipeTapped(_ id: Recipe.ID) -> RecipeDetailPresentation {
     RecipeDetailPresentation(recipeID: id, scope: scope)
   }
@@ -168,9 +189,24 @@ final class LensesModel {
     } catch { errorMessage = error.localizedDescription }
   }
 
+  func customShelfDraft(for lens: RecipeLens) -> CustomShelfDraft {
+    let base = (try? RecipeLensQueryCodec.decode(lens.baseQuery)) ?? RecipeBrowserQuery()
+    return CustomShelfDraft(
+      query: RecipeBrowserQuery(),
+      restrictedRecipeIDs: Set(browser.browserEngine().matchingRecipeIDs(for: base)),
+      title: ""
+    )
+  }
+
+  func defaultShelfTitle(for query: RecipeBrowserQuery) -> String {
+    let labels = browser.selectionLabels(for: query)
+    return labels.isEmpty ? "New shelf" : labels.joined(separator: " · ")
+  }
+
   func saveQuery(_ query: RecipeBrowserQuery, target: Destination.QueryContext, title: String? = nil) {
     guard scope == .mine else { return }
-    let defaultTitle = browser.selectionLabels(for: query).first ?? "New Lens"
+    let labels = browser.selectionLabels(for: query)
+    let defaultTitle = labels.isEmpty ? (target.isShelf ? "New shelf" : "New Lens") : labels.joined(separator: " · ")
     do {
       var created: RecipeLens?
       try database.write { db in
@@ -272,9 +308,9 @@ final class LensesModel {
     catch { errorMessage = error.localizedDescription }
   }
 
-  func browseAll() {
-    guard let openLens else { return }
-    browser.query = (try? RecipeLensQueryCodec.decode(openLens.baseQuery)) ?? RecipeBrowserQuery()
+  func browseAll() -> RecipeBrowserQuery {
+    guard let openLens else { return RecipeBrowserQuery() }
+    return (try? RecipeLensQueryCodec.decode(openLens.baseQuery)) ?? RecipeBrowserQuery()
   }
 }
 
@@ -282,5 +318,11 @@ private extension String {
   var trimmedNonEmpty: String? {
     let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+private extension LensesModel.Destination.QueryContext {
+  var isShelf: Bool {
+    switch self { case .addShelf, .editShelf: true; case .newBase, .editBase: false }
   }
 }

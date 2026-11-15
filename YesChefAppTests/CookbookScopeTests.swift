@@ -138,9 +138,15 @@ struct CookbookScopeTests {
       try? mirror.deleteMirror()
       try? FileManager.default.removeItem(at: directory)
     }
+    let photoID = UUID()
     let bundles = [firstID, secondID].map { id in
-      RecipeBundleCoding.RecipeBundle(version: RecipeBundleCoding.currentVersion,
-        recipe: Recipe(id: id, title: "Recipe \(id.uuidString.prefix(4))", dateCreated: now, dateModified: now))
+      let photo = id == secondID ? RecipePhoto(id: photoID, recipeID: id, imageDataReference: "photo",
+        thumbnailData: Data([1]), mediaType: "image/jpeg", pixelWidth: 1, pixelHeight: 1, sortOrder: 0,
+        dateCreated: now) : nil
+      let recipe = Recipe(id: id, title: "Recipe \(id.uuidString.prefix(4))", dateCreated: now,
+        dateModified: now, coverPhotoID: photo?.id)
+      return RecipeBundleCoding.RecipeBundle(version: RecipeBundleCoding.currentVersion,
+        recipe: recipe, photos: photo.map { [$0] } ?? [])
     }
     let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now, zoneOwnerName: "copy-shelf")
     try await withDependencies {
@@ -149,11 +155,12 @@ struct CookbookScopeTests {
       $0.uuid = .incrementing
     } operation: {
       try mirror.apply(upserting: bundles, deleting: [])
-      let model = CookbookCopyModel()
+      let model = CookbookCopyModel(fetchClient: photoFetchClient { throw CocoaError(.fileReadUnknown) })
       await model.copyButtonTapped(context: context, sourceID: firstID)
-      let report = await model.copyShelf(context: context, sourceIDs: [firstID, missingID, secondID])
+      let report = await model.copyShelf(context: context, shelfID: UUID(), sourceIDs: [firstID, missingID, secondID])
       #expect(report.copied == 1)
       #expect(report.failures.count == 1)
+      #expect(report.warnings.contains { $0.contains("Recipe \(secondID.uuidString.prefix(4))") && $0.contains("thumbnail") })
       @Dependency(\.defaultDatabase) var database
       #expect(try await database.read { try Recipe.fetchCount($0) } == 2)
     }
@@ -327,7 +334,7 @@ struct CookbookScopeTests {
       let model = withDependencies { $0.defaultDatabase = mirror.database } operation: {
         LensesModel(scope: .cookbook(context))
       }
-      try await model.$lensLibrary.load()
+      try await model.browser.$lensLibrary.load()
       #expect(model.lensLibrary.lenses == baseline.0)
       model.open(lens, editing: true)
       #expect(model.openLens?.id == lens.id)
@@ -335,7 +342,12 @@ struct CookbookScopeTests {
 
       model.saveQuery(RecipeBrowserQuery(text: "Do not save"), target: .editBase(lens.id))
       model.deleteLens(lens)
-      model.saveAsLens(name: "Do not save", query: RecipeBrowserQuery()) { _ in Issue.record("Cookbook lens should not be created") }
+      let cookbookBrowser = withDependencies { $0.defaultDatabase = mirror.database } operation: {
+        PowerBrowserModel(scope: .cookbook(context))
+      }
+      var callbackID: RecipeLens.ID?
+      #expect(cookbookBrowser.saveLensButtonTapped(name: "Do not save", onLensCreated: { callbackID = $0 }) == nil)
+      #expect(callbackID == nil)
       model.renameLens(lens, to: "Do not rename")
       model.deleteShelf(shelf)
       model.renameShelf(shelf, to: "Do not rename")

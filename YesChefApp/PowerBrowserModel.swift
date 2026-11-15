@@ -466,7 +466,7 @@ final class PowerBrowserModel {
       .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
   }
 
-  private func browserEngine() -> RecipeBrowserEngine {
+  func browserEngine() -> RecipeBrowserEngine {
     let data = restrictedRecipeIDs.map(browserData.restricted(to:)) ?? browserData
     if let cachedEngine, cachedEngine.data == data {
       return cachedEngine.engine
@@ -483,6 +483,10 @@ final class PowerBrowserModel {
     cachedEngine = CachedEngine(data: data, engine: engine)
     cachedDerivations = nil
     return engine
+  }
+
+  func result(for query: RecipeBrowserQuery) -> RecipeBrowserResult {
+    browserEngine().result(for: query)
   }
 
   private func derivations() -> CachedDerivations {
