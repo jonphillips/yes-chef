@@ -4,39 +4,25 @@ import YesChefCore
 struct PowerBrowserView: View {
   let model: PowerBrowserModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
+  var onLensCreated: (RecipeLens.ID) -> Void = { _ in }
 
   var body: some View {
     @Bindable var model = model
     let result = model.result
 
-    Group {
-      if model.isShowingLensShelves {
-        NavigationStack {
-          RecipeLensShelvesView(model: model, onRecipeSelected: onRecipeSelected)
-            .toolbar { PowerBrowserLensToolbar(model: model) }
-        }
-      } else {
-        NavigationSplitView {
-          PowerBrowserFacetsView(model: model, result: result)
-        } detail: {
-          PowerBrowserResultsView(model: model, result: result, onRecipeSelected: onRecipeSelected)
-        }
-        .navigationSplitViewStyle(.balanced)
-        .onChange(of: result.availableFacets.map(\.id), initial: true) { _, facetIDs in
-          model.availableFacetsAppeared(facetIDs)
-        }
-      }
+    NavigationSplitView {
+      PowerBrowserFacetsView(model: model, result: result)
+    } detail: {
+      PowerBrowserResultsView(model: model, result: result, onRecipeSelected: onRecipeSelected)
+    }
+    .navigationSplitViewStyle(.balanced)
+    .onChange(of: result.availableFacets.map(\.id), initial: true) { _, facetIDs in
+      model.availableFacetsAppeared(facetIDs)
     }
     .sheet(item: $model.destination) { destination in
       switch destination {
       case .saveLens:
-        SaveRecipeLensView(model: model)
-      case let .editLens(id):
-        if let lens = model.lensLibrary.lenses.first(where: { $0.id == id }) {
-          RecipeLensEditorView(model: model, lens: lens)
-        }
-      case let .seeAll(title, ids):
-        LensSeeAllView(title: title, rows: model.recipeRows(for: RecipeBrowserResult(matchingRecipeIDs: ids, availableFacets: [])), scope: model.scope, onRecipeSelected: onRecipeSelected)
+        SaveRecipeLensView(model: model, onLensCreated: onLensCreated)
       }
     }
     .alert("Lens Error", isPresented: $model.isShowingLensError) {
@@ -45,7 +31,7 @@ struct PowerBrowserView: View {
   }
 }
 
-private struct PowerBrowserFacetsView: View {
+struct PowerBrowserFacetsView: View {
   let model: PowerBrowserModel
   let result: RecipeBrowserResult
 
@@ -332,7 +318,7 @@ private struct PowerBrowserResultsView: View {
     .navigationBarTitleDisplayMode(.inline)
     .searchable(text: $model.searchText, prompt: "Search recipes")
     .toolbar {
-      PowerBrowserLensToolbar(model: model)
+      PowerBrowserLensToolbar(model: model, onSaveAsLens: { model.saveAsLensButtonTapped() })
       ToolbarItem(placement: .primaryAction) {
         Menu {
           Picker("Sort", selection: $model.query.sort) {
@@ -350,28 +336,13 @@ private struct PowerBrowserResultsView: View {
 
 private struct PowerBrowserLensToolbar: ToolbarContent {
   let model: PowerBrowserModel
+  var onSaveAsLens: () -> Void = {}
 
   var body: some ToolbarContent {
-    ToolbarItem(placement: .principal) {
-      Picker("Recipe Lens", selection: Binding(
-        get: { model.selectedLensID },
-        set: { model.lensSelectionChanged($0) }
-      )) {
-        Text("All recipes").tag(Optional<RecipeLens.ID>.none)
-        ForEach(model.lensLibrary.lenses) { lens in Text(lens.name).tag(Optional(lens.id)) }
-      }
-      .pickerStyle(.menu)
-    }
     if model.scope == .mine {
-    ToolbarItem(placement: .primaryAction) {
-      if model.isEditingSavedQuery {
-        Button("Save query") { model.saveQueryEditsButtonTapped() }
-      } else if model.selectedLens != nil {
-        Button("Edit Lens", systemImage: "slider.horizontal.3") { model.editLensButtonTapped() }
-      } else {
-        Button("Save as Lens", systemImage: "bookmark") { model.saveAsLensButtonTapped() }
+      ToolbarItem(placement: .primaryAction) {
+        Button("Save as Lens", systemImage: "bookmark", action: onSaveAsLens)
       }
-    }
     }
   }
 }

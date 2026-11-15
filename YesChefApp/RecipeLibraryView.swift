@@ -18,7 +18,8 @@ struct AppContainer: View {
   @State private var cookbookLibraryModel: CookbookLibraryModel
   @State private var cookbookPublishModel = CookbookPublishModel()
   @State private var recipeModel = RecipeLibraryModel()
-  @State private var powerBrowserModel = PowerBrowserModel()
+  @State private var powerBrowserModel: PowerBrowserModel
+  @State private var lensesModel: LensesModel
   @State private var createRecipeModel = CreateRecipeModel()
   @State private var chatAccessInboxModel: ChatAccessInboxModel
   @State private var chatAccessExportModel = ChatAccessExportModel()
@@ -43,6 +44,8 @@ struct AppContainer: View {
     let cookbookCopyModel = CookbookCopyModel()
     cookbookCopyModel.toastCenter = toastCenter
     let cookbookLibraryModel = CookbookLibraryModel()
+    let powerBrowserModel = PowerBrowserModel()
+    let lensesModel = LensesModel(browser: powerBrowserModel)
     let inboxModel = ChatAccessInboxModel()
     inboxModel.toastCenter = toastCenter
     let mealCalendarModel = MealCalendarModel(toastCenter: toastCenter)
@@ -58,6 +61,8 @@ struct AppContainer: View {
     _toastCenter = State(wrappedValue: toastCenter)
     _cookbookCopyModel = State(wrappedValue: cookbookCopyModel)
     _cookbookLibraryModel = State(wrappedValue: cookbookLibraryModel)
+    _powerBrowserModel = State(wrappedValue: powerBrowserModel)
+    _lensesModel = State(wrappedValue: lensesModel)
     _chatAccessInboxModel = State(wrappedValue: inboxModel)
     _mealCalendarModel = State(wrappedValue: mealCalendarModel)
     _menuModel = State(wrappedValue: menuModel)
@@ -381,6 +386,7 @@ struct AppContainer: View {
   ) -> AppMainLayout {
     AppMainLayout(
       horizontalSizeClass: horizontalSizeClass, recipeModel: recipeModel, powerBrowserModel: powerBrowserModel,
+      lensesModel: lensesModel,
       workbenchModel: workbenchModel, browserModel: browserModel, mealCalendarModel: mealCalendarModel,
       menuModel: menuModel, groceryModel: groceryModel, cookbookLibraryModel: cookbookLibraryModel,
       cookbookPublishModel: cookbookPublishModel, cookbookCopyModel: cookbookCopyModel,
@@ -391,7 +397,11 @@ struct AppContainer: View {
       onRecipeSelected: { presentation in presentedRecipe = presentation },
       onCookSessionRequested: { presentation in presentedCookSession = presentation },
       onTodayPrepRequested: { presentation in presentedTodayPrep = presentation },
-      onRecipeCreated: recipeCreated
+      onRecipeCreated: recipeCreated,
+      onBrowseAll: { query in
+        powerBrowserModel.query = query
+        selectedSection = .powerBrowser
+      }
     )
   }
 

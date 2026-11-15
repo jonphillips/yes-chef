@@ -248,6 +248,17 @@ public enum RecipeLensRepository {
 
   public static func delete(_ lens: RecipeLens, in db: Database) throws {
     try RecipeLens.where { $0.id.eq(lens.id) }.delete().execute(db)
+    let remaining = try RecipeLens.order { $0.sortOrder }.fetchAll(db)
+    try rewriteLensOrder(remaining, in: db)
+  }
+
+  public static func reorderLenses(orderedIDs: [RecipeLens.ID], in db: Database) throws {
+    let current = try RecipeLens.order { $0.sortOrder }.fetchAll(db)
+    guard current.count == orderedIDs.count, Set(current.map(\.id)) == Set(orderedIDs) else { return }
+    let byID = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0) })
+    for (order, id) in orderedIDs.enumerated() where byID[id]?.sortOrder != order {
+      try RecipeLens.find(id).update { $0.sortOrder = order }.execute(db)
+    }
   }
 
   public static func addShelf(
@@ -327,6 +338,12 @@ public enum RecipeLensRepository {
   private static func rewriteOrder(_ shelves: [RecipeLensShelf], in db: Database) throws {
     for (order, shelf) in shelves.enumerated() where shelf.sortOrder != order {
       try RecipeLensShelf.update { $0.sortOrder = order }.where { $0.id.eq(shelf.id) }.execute(db)
+    }
+  }
+
+  private static func rewriteLensOrder(_ lenses: [RecipeLens], in db: Database) throws {
+    for (order, lens) in lenses.enumerated() where lens.sortOrder != order {
+      try RecipeLens.find(lens.id).update { $0.sortOrder = order }.execute(db)
     }
   }
 }

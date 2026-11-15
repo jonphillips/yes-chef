@@ -13,6 +13,10 @@ and everything downstream move forward without waiting on it.
 
 - **Cookbook payload photo columns are hand-listed (2026-11-14, #519).** `CookbookPayloadPhotoRow` names every
   `RecipePhoto` column but `displayData`; a new column silently misses cookbook payloads. Add it there, or add a guard.
+- **Flaky `CookbookPublishModelTests.publishWaitsForLibrarySyncThenRunsOnceRescheduled` (2026-11-15, #530).** It
+  checks `progressText == nil` as soon as the fake's profile save lands, but the model still awaits
+  `client.fetchProfile()` before clearing it. Failed 2 of 3 isolated runs on #530's branch, which doesn't touch
+  publishing. Wait for the model's own completion instead of the fake's save count.
 - **Top `safeAreaInset` bars may hide large titles (2026-11-13)** on Workbenches, Recipes, Browsers. Check on device.
 - **Ingredient parser splits inside a parenthetical (2026-11-12).** The Pumpkin Pie butter
   item's notes read "3/4 stick) cold unsalted butter, cut into 1/4-inch slices", so a line like "6 tablespoons

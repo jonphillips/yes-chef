@@ -10,6 +10,7 @@ struct AppMainLayout: View {
   let horizontalSizeClass: UserInterfaceSizeClass?
   let recipeModel: RecipeLibraryModel
   let powerBrowserModel: PowerBrowserModel
+  let lensesModel: LensesModel
   let workbenchModel: WorkbenchLibraryModel
   let browserModel: BrowserModel
   let mealCalendarModel: MealCalendarModel
@@ -29,6 +30,7 @@ struct AppMainLayout: View {
   var onCookSessionRequested: (CookSessionPresentation) -> Void
   var onTodayPrepRequested: (TodayPrepPresentation) -> Void
   var onRecipeCreated: (Recipe.ID) -> Void
+  var onBrowseAll: (RecipeBrowserQuery) -> Void
 
   var body: some View {
     TabView(selection: $selectedSection) {
@@ -39,8 +41,11 @@ struct AppMainLayout: View {
         groceriesTab
         mealCalendarTab
         menusTab
-        fromChatTab
-        createRecipeTab
+        Group {
+          lensesTab
+          fromChatTab
+          createRecipeTab
+        }
         Group {
           powerBrowserTab
           if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
@@ -51,6 +56,7 @@ struct AppMainLayout: View {
       } else {
         recipesTab
         Group {
+          lensesTab
           powerBrowserTab
           if !cookbookLibraryModel.contexts.isEmpty { cookbooksTab }
         }
@@ -152,12 +158,40 @@ struct AppMainLayout: View {
   private var powerBrowserTab: some TabContent<AppSection?> {
     Tab(value: AppSection.powerBrowser) {
       if selectedSection == .powerBrowser {
-        PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected)
+        PowerBrowserView(model: powerBrowserModel, onRecipeSelected: onRecipeSelected, onLensCreated: { id in
+          lensesModel.open(id: id, editing: true)
+          selectedSection = .lenses
+        })
       }
     } label: {
       Label(AppSection.powerBrowser.title, symbol: AppSection.powerBrowser.symbol)
     }
     .defaultVisibility(.hidden, for: .tabBar)
+  }
+
+  private var lensesTab: some TabContent<AppSection?> {
+    Tab(value: AppSection.lenses) {
+      LensesTab(
+        model: lensesModel,
+        copyModel: cookbookCopyModel,
+        cookbookLibraryModel: cookbookLibraryModel,
+        contexts: cookbookLibraryModel.contexts,
+        onRecipeSelected: onRecipeSelected,
+        onBrowseAll: { query, context in
+          if let context {
+            cookbookLibraryModel.selectedZoneOwnerName = context.zoneOwnerName
+            cookbookLibraryModel.setSurface(.powerBrowser, for: context)
+            cookbookLibraryModel.pendingPowerBrowserQuery = query
+            selectedSection = .cookbooks
+          } else {
+            onBrowseAll(query)
+          }
+        }
+      )
+    } label: {
+      Label(AppSection.lenses.title, symbol: AppSection.lenses.symbol)
+    }
+    .defaultVisibility(UIDevice.current.userInterfaceIdiom == .phone ? .hidden : .automatic, for: .tabBar)
   }
 
   private var cookbooksTab: some TabContent<AppSection?> {

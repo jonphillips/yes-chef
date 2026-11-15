@@ -6,6 +6,16 @@ import YesChefCore
 @Observable
 @MainActor
 final class CookbookCopyModel {
+  struct ShelfCopyProgress: Equatable {
+    var shelfID: RecipeLensShelf.ID
+    var message: String
+  }
+
+  struct ShelfCopyReport: Equatable {
+    var copied: Int
+    var failures: [String]
+    var warnings: [String]
+  }
   enum Prompt: Identifiable {
     case existingCopies(context: CookbookContext, sourceID: Recipe.ID, ids: [Recipe.ID])
     case copyResult(CookbookCopyResult)
@@ -33,6 +43,7 @@ final class CookbookCopyModel {
   @ObservationIgnored let fetchClient: CookbookFetchClient
 
   private(set) var copiedSourceIDsByCookbook: [String: Set<Recipe.ID>] = [:]
+  private(set) var shelfCopyProgress: ShelfCopyProgress?
   var prompt: Prompt?
   private var pendingCopy: PendingCopy?
   var toastCenter: AppToastCenter?
@@ -53,6 +64,8 @@ final class CookbookCopyModel {
   }
 
   func copyButtonTapped(context: CookbookContext, sourceID: Recipe.ID) async {
+    prompt = nil
+    pendingCopy = nil
     do {
       guard let bundle = try await context.mirror.database.read({
         try CookbookPayload.bundle(for: sourceID, in: $0)
@@ -70,6 +83,53 @@ final class CookbookCopyModel {
     } catch {
       prompt = .failure(String(describing: error))
     }
+  }
+
+  func existingCopyID(context: CookbookContext, sourceID: Recipe.ID) async -> Recipe.ID? {
+    guard let bundle = try? await context.mirror.database.read({ try CookbookPayload.bundle(for: sourceID, in: $0) }) else {
+      return nil
+    }
+    return try? await libraryDatabase.read { db in
+      try RecipeRepository.existingCopies(of: bundle, in: db).first
+    }
+  }
+
+  func copyShelf(context: CookbookContext, shelfID: RecipeLensShelf.ID, sourceIDs: [Recipe.ID]) async -> ShelfCopyReport {
+    var copied = 0
+    var failures: [String] = []
+    var warnings: [String] = []
+    defer { shelfCopyProgress = nil }
+    for (index, sourceID) in sourceIDs.enumerated() {
+      shelfCopyProgress = ShelfCopyProgress(shelfID: shelfID, message: "Copying \(index + 1) of \(sourceIDs.count)")
+      do {
+        guard let bundle = try await context.mirror.database.read({
+          try CookbookPayload.bundle(for: sourceID, in: $0)
+        }) else { throw CookbookCopyError.missingParent(sourceID) }
+        let existing = try await libraryDatabase.read {
+          try RecipeRepository.existingCopies(of: bundle, in: $0)
+        }
+        guard existing.isEmpty else { continue }
+        let (displayImages, photoWarning) = await displayImageData(for: bundle, context: context)
+        let copyDate = now
+        let makeUUID = uuid
+        let result = try await libraryDatabase.write { db in
+          try RecipeRepository.copyCookbookRecipe(bundle, ownerName: context.ownerName,
+            displayImages: displayImages, in: db, now: copyDate, uuid: { makeUUID() })
+        }
+        copied += 1
+        let recipeWarnings = result.warnings + (photoWarning.map { [$0] } ?? [])
+        if !recipeWarnings.isEmpty {
+          warnings.append("\(bundle.recipe.title): \(recipeWarnings.joined(separator: " "))")
+        }
+      } catch {
+        let title = (try? await context.mirror.database.read { db in
+          try Recipe.find(sourceID).select(\.title).fetchOne(db)
+        }) ?? nil
+        failures.append("\(title ?? "Recipe \(sourceID.uuidString)"): \(error.localizedDescription)")
+      }
+    }
+    await refreshCopyStatus(context: context)
+    return ShelfCopyReport(copied: copied, failures: failures, warnings: warnings)
   }
 
   func copyAnywayButtonTapped() async {

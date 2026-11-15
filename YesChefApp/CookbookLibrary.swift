@@ -5,6 +5,14 @@ import Observation
 import SwiftUI
 import YesChefCore
 
+enum CookbookLibrarySurface: String, CaseIterable, Identifiable {
+  case lenses = "Lenses"
+  case recipes = "Recipes"
+  case powerBrowser = "Power Browser"
+
+  var id: Self { self }
+}
+
 @Observable
 @MainActor
 final class CookbookLibraryModel {
@@ -22,6 +30,8 @@ final class CookbookLibraryModel {
   private(set) var errorMessage: String?
   var acceptanceErrorMessage: String?
   var selectedZoneOwnerName: String?
+  private var selectedSurfaceByOwnerName: [String: CookbookLibrarySurface] = [:]
+  var pendingPowerBrowserQuery: RecipeBrowserQuery?
   private(set) var acceptedZoneOwnerName: String?
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
@@ -29,8 +39,31 @@ final class CookbookLibraryModel {
   @ObservationIgnored private var fetchTask: Task<Void, Never>?
   @ObservationIgnored private var needsFollowUp = false
   @ObservationIgnored private var notificationTask: Task<Void, Never>?
+  /// Keyed by mirror file, not owner: an owner who stops sharing and shares again gets a new mirror, and models
+  /// built over the deleted one would read nothing.
+  @ObservationIgnored private var modelsByMirror: [URL: CookbookLibraryModels] = [:]
   private let directory: URL
   private let indexURL: URL
+
+  func surface(for context: CookbookContext) -> CookbookLibrarySurface {
+    selectedSurfaceByOwnerName[context.zoneOwnerName] ?? .recipes
+  }
+
+  func setSurface(_ surface: CookbookLibrarySurface, for context: CookbookContext) {
+    selectedSurfaceByOwnerName[context.zoneOwnerName] = surface
+  }
+
+  func libraryModels(for context: CookbookContext) -> CookbookLibraryModels {
+    if let models = modelsByMirror[context.mirror.fileURL] { return models }
+    let models = CookbookLibraryModels(context: context)
+    modelsByMirror[context.mirror.fileURL] = models
+    return models
+  }
+
+  func resolveInitialSurface(for context: CookbookContext, lensCount: Int) {
+    guard selectedSurfaceByOwnerName[context.zoneOwnerName] == nil else { return }
+    selectedSurfaceByOwnerName[context.zoneOwnerName] = lensCount > 0 ? .lenses : .recipes
+  }
 
   init(
     fetchClient: CookbookFetchClient = CookbookCloudKitClientFactory.fetchClient(),
@@ -169,6 +202,8 @@ final class CookbookLibraryModel {
       }
       entries.removeAll { !zoneOwners.contains($0.zoneOwnerName ?? "") }
       contexts.removeAll { !zoneOwners.contains($0.zoneOwnerName) }
+      let mirrorURLs = Set(contexts.map(\.mirror.fileURL))
+      modelsByMirror = modelsByMirror.filter { mirrorURLs.contains($0.key) }
       try persist()
       errorMessage = nil
     } catch {
@@ -248,13 +283,6 @@ struct FamilyCookbooksView: View {
   }
 }
 
-private enum CookbookLibrarySurface: String, CaseIterable, Identifiable {
-  case recipes = "Recipes"
-  case powerBrowser = "Power Browser"
-
-  var id: Self { self }
-}
-
 private struct CookbookRecipesView: View {
 
   let context: CookbookContext
@@ -266,7 +294,6 @@ private struct CookbookRecipesView: View {
   let groceryModel: GroceryLibraryModel
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   @State private var models: CookbookLibraryModels
-  @State private var surface = CookbookLibrarySurface.recipes
   @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
 
   init(
@@ -287,12 +314,17 @@ private struct CookbookRecipesView: View {
     self.mealCalendarModel = mealCalendarModel
     self.groceryModel = groceryModel
     self.onRecipeSelected = onRecipeSelected
-    _models = State(initialValue: CookbookLibraryModels(context: context))
+    _models = State(initialValue: libraryModel.libraryModels(for: context))
   }
 
   var body: some View {
+    @Bindable var libraryModel = libraryModel
     @Bindable var recipes = models.recipes
     let mirror = context.mirror
+    let surface = Binding(
+      get: { libraryModel.surface(for: context) },
+      set: { libraryModel.setSurface($0, for: context) }
+    )
     VStack(spacing: 0) {
       CookbookLibraryHeader(
         context: context,
@@ -300,10 +332,17 @@ private struct CookbookRecipesView: View {
         errorMessage: libraryModel.errorMessage,
         progressMessage: libraryModel.progress[context.zoneOwnerName],
         selectedOwnerName: $selectedOwnerName,
-        surface: $surface
+        surface: surface
       )
       Group {
-        switch surface {
+        switch libraryModel.surface(for: context) {
+        case .lenses:
+          CookbookLensesView(context: context, model: models.lenses,
+            copyModel: copyModel,
+            onRecipeSelected: onRecipeSelected, onBrowseAll: { query in
+              models.powerBrowser.query = query
+              libraryModel.setSurface(.powerBrowser, for: context)
+            })
         case .recipes:
           NavigationSplitView(columnVisibility: $columnVisibility) {
             RecipeListView(model: models.recipes, onArchivedRecipesRequested: {})
@@ -349,6 +388,16 @@ private struct CookbookRecipesView: View {
       fetchClient: libraryModel.fetchClient, mirror: mirror, zoneOwnerName: context.zoneOwnerName
     ))
     .task(id: context.loadedAt) { await copyModel.refreshCopyStatus(context: context) }
+    .onChange(of: models.lenses.lensLibrary.lenses.count) { oldCount, newCount in
+      libraryModel.resolveInitialSurface(for: context, lensCount: newCount)
+    }
+    .onAppear {
+      libraryModel.resolveInitialSurface(for: context, lensCount: models.lenses.lensLibrary.lenses.count)
+      if let query = libraryModel.pendingPowerBrowserQuery {
+        models.powerBrowser.query = query
+        libraryModel.pendingPowerBrowserQuery = nil
+      }
+    }
   }
 
   private func focusButtonTapped() {

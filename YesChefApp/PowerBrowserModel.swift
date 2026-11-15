@@ -25,30 +25,14 @@ final class PowerBrowserModel {
     var looseCategoryOptions: [LooseCategoryOption]
   }
 
-  private struct CachedLensEvaluation {
-    var lens: RecipeLens
-    var shelves: [RecipeLensShelf]
-    var data: RecipeBrowserData
-    var evaluation: RecipeLensEvaluation
-  }
-
   enum BrowserDestination: Identifiable {
     case saveLens
-    case editLens(RecipeLens.ID)
-    case seeAll(title: String, recipeIDs: [Recipe.ID])
 
     var id: String {
       switch self {
       case .saveLens: "saveLens"
-      case let .editLens(id): "editLens-\(id)"
-      case let .seeAll(title, ids): "seeAll-\(title)-\(ids.map(\.uuidString).joined(separator: ","))"
       }
     }
-  }
-
-  enum QueryEditTarget: Equatable {
-    case lensBase(RecipeLens.ID)
-    case shelf(RecipeLensShelf.ID, lensID: RecipeLens.ID)
   }
 
   struct FacetSelection: Identifiable, Equatable {
@@ -115,72 +99,19 @@ final class PowerBrowserModel {
   @ObservationIgnored @Dependency(\.uuid) var uuid
   @ObservationIgnored private var cachedEngine: CachedEngine?
   @ObservationIgnored private var cachedDerivations: CachedDerivations?
-  @ObservationIgnored private var cachedLensEvaluation: CachedLensEvaluation?
   @ObservationIgnored private var hasSeededFacetExpansion = false
   var query = RecipeBrowserQuery()
   var expandedFacetIDs: Set<Facet.ID> = []
   var totalTimeAtMostText = ""
   var servingsAtLeastText = ""
   var addedAfterDate = Date()
-  var selectedLensID: RecipeLens.ID?
   var destination: BrowserDestination?
   var lensError: String?
-  var queryEditTarget: QueryEditTarget?
+  var restrictedRecipeIDs: Set<Recipe.ID>?
 
   var isShowingLensError: Bool {
     get { lensError != nil }
     set { if !newValue { lensError = nil } }
-  }
-
-  var selectedLens: RecipeLens? {
-    lensLibrary.lenses.first { $0.id == selectedLensID }
-  }
-
-  var selectedLensShelves: [RecipeLensShelf] {
-    guard let selectedLensID else { return [] }
-    return lensLibrary.shelves.filter { $0.lensID == selectedLensID }.sorted { $0.sortOrder < $1.sortOrder }
-  }
-
-  var isShowingLensShelves: Bool {
-    selectedLens != nil && (!selectedLensShelves.isEmpty || hasUnresolvedLensBase)
-  }
-
-  var hasUnresolvedLensBase: Bool {
-    guard let baseState = lensEvaluation?.baseState else { return false }
-    if case .unresolved = baseState { return true }
-    return false
-  }
-
-  var lensEvaluation: RecipeLensEvaluation? {
-    guard let lens = selectedLens else { return nil }
-    let shelves = selectedLensShelves
-    if let cachedLensEvaluation,
-      cachedLensEvaluation.lens == lens,
-      cachedLensEvaluation.shelves == shelves,
-      cachedLensEvaluation.data == browserData {
-      return cachedLensEvaluation.evaluation
-    }
-    let evaluation = RecipeLensEvaluator.evaluate(
-      lens: lens, shelves: shelves, using: browserEngine(),
-      facets: browserData.facets, categories: browserData.categories
-    )
-    cachedLensEvaluation = CachedLensEvaluation(
-      lens: lens, shelves: shelves, data: browserData, evaluation: evaluation
-    )
-    return evaluation
-  }
-
-  func shelfCount(_ id: RecipeLensShelf.ID) -> Int? {
-    guard let state = lensEvaluation?.shelves.first(where: { $0.shelf.id == id })?.state else { return nil }
-    return switch state {
-    case let .ready(ids): ids.count
-    case .empty: 0
-    case .unresolved: nil
-    }
-  }
-
-  var lensSuggestions: [RecipeBrowserResult.FacetAvailability] {
-    RecipeLensEvaluator.suggestions(for: query, using: browserEngine())
   }
 
   var searchText: String {
@@ -535,22 +466,27 @@ final class PowerBrowserModel {
       .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
   }
 
-  private func browserEngine() -> RecipeBrowserEngine {
-    if let cachedEngine, cachedEngine.data == browserData {
+  func browserEngine() -> RecipeBrowserEngine {
+    let data = restrictedRecipeIDs.map(browserData.restricted(to:)) ?? browserData
+    if let cachedEngine, cachedEngine.data == data {
       return cachedEngine.engine
     }
     let engine = RecipeBrowserEngine(
-      recipes: browserData.recipes,
-      recipeCategories: browserData.recipeCategories,
-      categories: browserData.categories,
-      facets: browserData.facets,
-      sources: browserData.sources,
-      variations: browserData.variations,
-      recipeIDsWithPhotos: browserData.recipeIDsWithPhotos
+      recipes: data.recipes,
+      recipeCategories: data.recipeCategories,
+      categories: data.categories,
+      facets: data.facets,
+      sources: data.sources,
+      variations: data.variations,
+      recipeIDsWithPhotos: data.recipeIDsWithPhotos
     )
-    cachedEngine = CachedEngine(data: browserData, engine: engine)
+    cachedEngine = CachedEngine(data: data, engine: engine)
     cachedDerivations = nil
     return engine
+  }
+
+  func result(for query: RecipeBrowserQuery) -> RecipeBrowserResult {
+    browserEngine().result(for: query)
   }
 
   private func derivations() -> CachedDerivations {

@@ -24,4 +24,3 @@ discoverable"):
   <topic> docs/` and read adjacent efforts, including `archive/`, and cross-link them.
 
 ## Live
-- [The Lenses tab](lenses-tab.md) — **Ready.** Lenses move out of the Power Browser into their own tab: a gallery of your Lenses and your family's, each Lens built and edited on its own screen with a tray of suggested shelves, and a family cookbook opening on its owner's Lenses. No schema change.
