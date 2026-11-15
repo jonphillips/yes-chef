@@ -312,11 +312,75 @@ struct CookbookMirrorTests {
       let saved = try mirror.database.read { db in
         (try RecipeLens.fetchAll(db), try RecipeLensShelf.fetchAll(db), try Category.fetchAll(db), try Facet.fetchAll(db))
       }
-      #expect(saved.0 == [lens])
-      #expect(saved.1 == [shelf])
-      #expect(saved.2 == [hiddenCategory])
-      #expect(saved.3 == [hiddenFacet])
+      #expect(saved.0.map(\.id) == [lens.id])
+      #expect(saved.1.map(\.id) == [shelf.id])
+      #expect(saved.2.map { [$0.name: $0.hidden] } == [["Retired": true]])
+      #expect(saved.3.map { [$0.name: $0.hidden] } == [["Hidden": true]])
+      let query = try RecipeLensQueryCodec.decode(saved.0[0].baseQuery)
+      #expect(query.facetSelections == [.init(facetID: saved.3[0].id, categoryIDs: [saved.2[0].id])])
       #expect(try mirror.skippedRecordCount() == 2)
+    }
+  }
+
+  @Test func lensShelvesUseTheLabelsRecipesArrivedWith() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer { try? mirror.deleteMirror() }
+    let now = Date(timeIntervalSince1970: 100)
+    let cuisine = Facet(id: UUID(), name: "Cuisine", sortOrder: 0, dateCreated: now)
+    let mexican = YesChefCore.Category(id: UUID(), name: "Mexican", facetID: cuisine.id, sortOrder: 0, dateCreated: now)
+    let moles = YesChefCore.Category(id: UUID(), name: "Moles", facetID: cuisine.id, parentCategoryID: mexican.id, sortOrder: 0, dateCreated: now)
+    func shelfQuery(_ category: YesChefCore.Category) throws -> String {
+      try RecipeLensQueryCodec.encode(RecipeBrowserQuery(facetSelections: [.init(facetID: cuisine.id, categoryIDs: [category.id])]))
+    }
+    let lens = RecipeLens(
+      id: UUID(), name: "Cuisines", baseQuery: try RecipeLensQueryCodec.encode(RecipeBrowserQuery()),
+      sortOrder: 0, dateCreated: now, dateModified: now
+    )
+    let mexicanShelf = RecipeLensShelf(id: UUID(), lensID: lens.id, title: "Mexican", query: try shelfQuery(mexican), sortOrder: 0)
+    let molesShelf = RecipeLensShelf(id: UUID(), lensID: lens.id, title: "Moles", query: try shelfQuery(moles), sortOrder: 1)
+    let tacos = Recipe(id: UUID(), title: "Tacos", dateCreated: now, dateModified: now)
+    let mole = Recipe(id: UUID(), title: "Mole negro", dateCreated: now, dateModified: now)
+    func mirrorLabels() throws -> (facets: [Facet], categories: [YesChefCore.Category], joins: [RecipeCategory], shelves: [RecipeLensShelf]) {
+      try mirror.database.read { db in
+        (try Facet.fetchAll(db), try Category.fetchAll(db), try RecipeCategory.fetchAll(db),
+         try RecipeLensShelf.order { $0.sortOrder }.fetchAll(db))
+      }
+    }
+    func shelfCategoryIDs(_ shelf: RecipeLensShelf) throws -> Set<YesChefCore.Category.ID> {
+      try RecipeLensQueryCodec.decode(shelf.query).facetSelections.reduce(into: Set<YesChefCore.Category.ID>()) { $0.formUnion($1.categoryIDs) }
+    }
+    try withDependencies { $0.context = .live; $0.date.now = now; $0.uuid = .incrementing } operation: {
+      // A full fetch brings the recipes before the lens record.
+      try mirror.apply(page: CookbookMirrorPage(bundles: [
+        .init(recipe: tacos, labels: [.init(facet: "Cuisine", path: ["Mexican"])])
+      ]))
+      try mirror.apply(page: CookbookMirrorPage(lensBundle: .init(
+        lenses: [lens], shelves: [mexicanShelf, molesShelf], categories: [mexican, moles], facets: [cuisine]
+      )))
+      var labels = try mirrorLabels()
+      #expect(labels.facets.map(\.name) == ["Cuisine"])
+      #expect(labels.categories.map(\.name).sorted() == ["Mexican", "Moles"])
+      let mirrorMexican = try #require(labels.categories.first { $0.name == "Mexican" })
+      let mirrorMoles = try #require(labels.categories.first { $0.name == "Moles" })
+      #expect(labels.joins.map(\.categoryID) == [mirrorMexican.id])
+      #expect(mirrorMoles.parentCategoryID == mirrorMexican.id)
+      #expect(try shelfCategoryIDs(labels.shelves[0]) == [mirrorMexican.id])
+      #expect(try shelfCategoryIDs(labels.shelves[1]) == [mirrorMoles.id])
+      #expect(try RecipeLensQueryCodec.decode(labels.shelves[0].query).facetSelections.map(\.facetID) == [labels.facets[0].id])
+      let readBack = try mirror.database.read { try CookbookLensBundle.read(from: $0) }
+      #expect(readBack.categories.count == Set(readBack.categories.map(\.id)).count)
+
+      // A page without the lens record keeps the lens-only label, and a later recipe joins it.
+      try mirror.apply(page: CookbookMirrorPage(changeToken: Data("quiet".utf8)))
+      #expect(try mirrorLabels().categories.contains(mirrorMoles))
+      try mirror.apply(page: CookbookMirrorPage(bundles: [
+        .init(recipe: mole, labels: [.init(facet: "Cuisine", path: ["Mexican", "Moles"])])
+      ]))
+      labels = try mirrorLabels()
+      #expect(labels.categories.count == 2)
+      #expect(labels.joins.first { $0.recipeID == mole.id }?.categoryID == mirrorMoles.id)
     }
   }
 
