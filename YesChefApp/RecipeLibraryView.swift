@@ -86,6 +86,8 @@ struct AppContainer: View {
     }
     .task { await appStarted() }
     .onChange(of: scenePhase) { _, phase in if phase == .active { appBecameActive() } }
+    .onChange(of: cookbookLibraryModel.acceptedZoneOwnerName) { _, _ in openAcceptedCookbookIfReady() }
+    .onChange(of: cookbookLibraryModel.contexts.map(\.zoneOwnerName)) { _, _ in openAcceptedCookbookIfReady() }
     .modifier(CookbookAcceptanceAlert(model: cookbookLibraryModel))
     .fullScreenCover(item: $presentedRecipe) { presentation in
       RecipeFullScreenCover(
@@ -352,7 +354,11 @@ struct AppContainer: View {
       }
     }
     .overlay(alignment: .top) {
-      AppToastOverlay(toastCenter: toastCenter)
+      AppToastOverlay(toastCenter: toastCenter, onAction: { action in
+        if case let .openRecipe(recipeID) = action {
+          presentedRecipe = RecipeDetailPresentation(recipeID: recipeID, scope: .mine)
+        }
+      })
         .ignoresSafeArea(.keyboard)
     }
     .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
@@ -399,6 +405,17 @@ struct AppContainer: View {
   private func appBecameActive() {
     cookbookPublishModel.sceneBecameActive()
     cookbookLibraryModel.sceneBecameActive()
+    Task {
+      for context in cookbookLibraryModel.contexts {
+        await cookbookCopyModel.refreshCopyStatus(context: context)
+      }
+    }
+  }
+
+  private func openAcceptedCookbookIfReady() {
+    if cookbookLibraryModel.selectAcceptedCookbookIfReady() {
+      selectedSection = .cookbooks
+    }
   }
 
   private func receiveFindReferral(from url: URL) async {

@@ -192,6 +192,89 @@ struct CookbookPayloadTests {
     }
   }
 
+  @Test func uncopiedTargetsCanBeCopiedAndRelinkedIdempotently() throws {
+    @Dependency(\.defaultDatabase) var database
+    let recipeID = UUID()
+    let targetID = UUID()
+    let duplicateTargetID = UUID()
+    let recipe = Recipe(id: recipeID, title: "Stew", dateCreated: now, dateModified: now)
+    let target = Recipe(id: targetID, title: "Rice", dateCreated: now, dateModified: now)
+    let duplicateTarget = Recipe(id: duplicateTargetID, title: "Sauce", dateCreated: now, dateModified: now)
+    let relation = RecipeRelatedRecipe(id: UUID(), recipeID: recipeID, relatedRecipeID: targetID, dateCreated: now)
+    let serve = RecipeServeWith(id: UUID(), recipeID: recipeID, linkedRecipeID: targetID, title: "Rice",
+      sortOrder: 0, provenance: .handAuthored, dateCreated: now, dateModified: now)
+    let duplicateRelation = RecipeRelatedRecipe(id: UUID(), recipeID: recipeID, relatedRecipeID: duplicateTargetID, dateCreated: now)
+    let duplicateServe = RecipeServeWith(id: UUID(), recipeID: recipeID, linkedRecipeID: duplicateTargetID, title: "Sauce",
+      sortOrder: 1, provenance: .handAuthored, dateCreated: now, dateModified: now)
+    let bundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: recipe, serveWith: [serve, duplicateServe],
+      relatedRecipes: [relation, duplicateRelation], linkTargets: [
+        .init(recipeID: targetID, title: target.title, sourceURL: nil),
+        .init(recipeID: duplicateTargetID, title: duplicateTarget.title, sourceURL: nil),
+      ])
+
+    try database.write { db in
+      let duplicateTargetBundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: duplicateTarget)
+      _ = try RecipeRepository.copyCookbookRecipe(duplicateTargetBundle, ownerName: "Wendy", displayImages: [:],
+        in: db, now: now, uuid: UUID.init)
+      _ = try RecipeRepository.copyCookbookRecipe(duplicateTargetBundle, ownerName: "Wendy", displayImages: [:],
+        in: db, now: now, uuid: UUID.init)
+      let first = try RecipeRepository.copyCookbookRecipe(bundle, ownerName: "Wendy", displayImages: [:],
+        in: db, now: now, uuid: UUID.init)
+      #expect(first.uncopiedTargets == [targetID])
+      let targetBundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: target)
+      let targetCopy = try RecipeRepository.copyCookbookRecipe(targetBundle, ownerName: "Wendy", displayImages: [:],
+        in: db, now: now, uuid: UUID.init)
+
+      try RecipeRepository.relinkCookbookCopy(first.recipeID, from: bundle, in: db, now: now, uuid: UUID.init)
+      let copiedServeRows = try RecipeServeWith.where { $0.recipeID.eq(first.recipeID) }.fetchAll(db)
+      let copiedServe = try #require(copiedServeRows.first { $0.title == "Rice" })
+      #expect(copiedServe.linkedRecipeID == targetCopy.recipeID)
+      #expect(copiedServeRows.first { $0.title == "Sauce" }?.linkedRecipeID == nil)
+      #expect(try RecipeRepository.existingCopies(of: duplicateTargetBundle, in: db).count == 2)
+      #expect(try RecipeRelatedRecipe.fetchCount(db) == 1)
+
+      try RecipeRepository.relinkCookbookCopy(first.recipeID, from: bundle, in: db, now: now, uuid: UUID.init)
+      #expect(try RecipeRelatedRecipe.fetchCount(db) == 1)
+    }
+  }
+
+  @Test func copiedSourceIDsMatchReferenceAndSourceURLRulesAndSkipArchivedCopies() throws {
+    @Dependency(\.defaultDatabase) var database
+    let referenceID = UUID()
+    let sourceOnlyID = UUID()
+    let archivedID = UUID()
+    let reference = Recipe(id: referenceID, title: "Reference", dateCreated: now, dateModified: now)
+    let sourceOnly = Recipe(id: sourceOnlyID, title: "Source only", dateCreated: now, dateModified: now)
+    let archived = Recipe(id: archivedID, title: "Archived", archived: true, dateCreated: now, dateModified: now)
+    let url = "https://example.com/shared"
+    let refKey = RecipeImportIdentityKey(sourceURL: "https://example.com/ref", title: "Reference")
+    let sourceKey = RecipeImportIdentityKey(sourceURL: url, title: "Different title")
+    let archivedKey = RecipeImportIdentityKey(sourceURL: nil, title: "Archived")
+    let referenceSourceID = UUID()
+    let sourceOnlySourceID = UUID()
+    let archivedSourceID = UUID()
+    let unmatchedSourceID = UUID()
+    try database.write { db in
+      try Recipe.insert { reference }.execute(db)
+      try Recipe.insert { sourceOnly }.execute(db)
+      try Recipe.insert { archived }.execute(db)
+      try RecipeSource.insert { RecipeSource(id: UUID(), recipeID: sourceOnlyID, url: url) }.execute(db)
+      try RecipeSource.insert { RecipeSource(id: UUID(), recipeID: archivedID, url: nil) }.execute(db)
+      try RecipeImportRef.insert {
+        RecipeImportRef(id: UUID(), recipeID: referenceID, normalizedSourceURL: refKey.normalizedSourceURL,
+          normalizedTitle: refKey.normalizedTitle, dateCreated: now)
+      }.execute(db)
+      let keys: [Recipe.ID: RecipeImportIdentityKey] = [
+        referenceSourceID: refKey,
+        sourceOnlySourceID: sourceKey,
+        archivedSourceID: archivedKey,
+        unmatchedSourceID: RecipeImportIdentityKey(sourceURL: nil, title: "No match"),
+      ]
+      let matchingSourceIDs = try RecipeRepository.copiedSourceIDs(keys, in: db)
+      #expect(matchingSourceIDs == [referenceSourceID, sourceOnlySourceID])
+    }
+  }
+
 
   @Test func builderExcludesArchivedAndHashesOnlyChangedRecipes() throws {
     @Dependency(\.defaultDatabase) var database

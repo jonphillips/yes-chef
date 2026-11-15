@@ -9,6 +9,59 @@ import YesChefCore
 @Suite(.serialized)
 @MainActor
 struct CookbookLibraryModelTests {
+  @Test func acceptedZoneIsSelectedAndRequestsSectionSwitchOnlyWhenItsContextExists() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_000)
+      $0.uuid = .incrementing
+    } operation: {
+      let zone = CKRecordZone.ID(zoneName: "Cookbook", ownerName: "accepted-owner")
+      let stub = CookbookLibraryFetchStub(zones: [])
+      let model = CookbookLibraryModel(fetchClient: await stub.client(), directory: directory)
+      defer { model.contexts.forEach { try? $0.mirror.deleteMirror() } }
+
+      model.shareWasAccepted(in: zone.ownerName)
+      #expect(!model.selectAcceptedCookbookIfReady())
+      #expect(model.acceptedZoneOwnerName == zone.ownerName)
+
+      await stub.setZones([zone])
+      await model.fetchCookbooks()
+      #expect(model.selectAcceptedCookbookIfReady())
+      #expect(model.selectedZoneOwnerName == zone.ownerName)
+      #expect(model.acceptedZoneOwnerName == nil)
+      #expect(!model.selectAcceptedCookbookIfReady())
+
+      await stub.setZones([])
+      await model.fetchCookbooks()
+      await stub.setZones([zone])
+      await model.fetchCookbooks()
+      #expect(!model.selectAcceptedCookbookIfReady())
+    }
+  }
+
+  @Test func failedAcceptanceDoesNotSelectACookbook() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = Date(timeIntervalSince1970: 1_000)
+      $0.uuid = .incrementing
+    } operation: {
+      let zone = CKRecordZone.ID(zoneName: "Cookbook", ownerName: "existing-owner")
+      let stub = CookbookLibraryFetchStub(zones: [zone])
+      let model = CookbookLibraryModel(fetchClient: await stub.client(), directory: directory)
+      defer { model.contexts.forEach { try? $0.mirror.deleteMirror() } }
+      await model.fetchCookbooks()
+
+      model.shareAcceptanceFailed("Acceptance failed")
+      #expect(model.acceptanceErrorMessage == "Acceptance failed")
+      #expect(!model.selectAcceptedCookbookIfReady())
+      #expect(model.selectedZoneOwnerName == nil)
+    }
+  }
+
   @Test func fetchesAreSerializedAndAConcurrentTriggerGetsOneFollowUp() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }

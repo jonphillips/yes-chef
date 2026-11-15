@@ -144,7 +144,14 @@ struct RecipeDetailView: View {
       Text("This recipe already has a copy in your library.")
     }
     .alert("Cookbook Copy", isPresented: copyResultIsPresented) {
-      Button("OK", role: .cancel) { cookbookCopyModel?.clearPrompt() }
+      if case let .copyResult(result)? = cookbookCopyModel?.prompt, !result.uncopiedTargets.isEmpty {
+        Button("Copy Them Too") {
+          Task { await cookbookCopyModel?.copyThemTooButtonTapped(result) }
+        }
+        Button("Cancel", role: .cancel) { cookbookCopyModel?.clearPrompt() }
+      } else {
+        Button("OK", role: .cancel) { cookbookCopyModel?.clearPrompt() }
+      }
     } message: {
       Text(copyPromptMessage)
     }
@@ -157,7 +164,11 @@ struct RecipeDetailView: View {
       value: model.destination.workbench != nil || isVariationManagerPresented
     )
     .overlay(alignment: .top) {
-      AppToastOverlay(toastCenter: toastCenter)
+      AppToastOverlay(toastCenter: toastCenter, onAction: { action in
+        if case let .openRecipe(recipeID) = action {
+          onRecipeSelected(RecipeDetailPresentation(recipeID: recipeID, scope: .mine))
+        }
+      })
         .ignoresSafeArea(.keyboard)
     }
     .sensoryFeedback(.success, trigger: toastCenter.feedbackTrigger)
@@ -247,7 +258,6 @@ struct RecipeDetailView: View {
           } label: {
             Label("Copy to My Recipes", systemImage: "plus.circle")
           }
-          .task { await cookbookCopyModel.refreshCopyStatus(context: context, sourceID: model.recipeID) }
         }
       }
       ToolbarItemGroup(placement: .secondaryAction) {
@@ -299,7 +309,7 @@ struct RecipeDetailView: View {
         if case .existingCopies? = cookbookCopyModel?.prompt { return true }
         return false
       },
-      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+      set: { if !$0 { cookbookCopyModel?.promptDismissed() } }
     )
   }
 
@@ -307,17 +317,17 @@ struct RecipeDetailView: View {
     Binding(
       get: {
         switch cookbookCopyModel?.prompt {
-        case .copyResult?, .failure?: true
+        case .copyResult?, .missingTargets?, .failure?: true
         default: false
         }
       },
-      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+      set: { if !$0 { cookbookCopyModel?.promptDismissed() } }
     )
   }
 
   private var copyPromptMessage: String {
     switch cookbookCopyModel?.prompt {
-    case let .copyResult(result):
+    case let .copyResult(result), let .missingTargets(result):
       let lines = result.unlinkedRelated.isEmpty
         ? [] : ["Related recipes not in your library: " + result.unlinkedRelated.joined(separator: ", ")]
       let serves = result.textOnlyServeWith.isEmpty
@@ -543,8 +553,8 @@ private struct RecipeReaderView: View {
 
   private func header(_ recipe: Recipe) -> some View {
     VStack(alignment: .leading, spacing: 4) {
-      if model.scope != .mine, let cookbookCopyModel,
-        !(cookbookCopyModel.copyIDsBySource[model.recipeID] ?? []).isEmpty {
+      if let cookbookCopyModel, case let .cookbook(context) = model.scope,
+        cookbookCopyModel.copiedSourceIDsByCookbook[context.zoneOwnerName]?.contains(model.recipeID) == true {
         Label("In My Recipes", systemImage: "checkmark.circle.fill")
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)

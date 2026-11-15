@@ -1,7 +1,12 @@
 import SwiftUI
 import YesChefCore
 
+extension EnvironmentValues {
+  @Entry var cookbookCopiedSourceIDs: Set<Recipe.ID> = []
+}
+
 struct RecipeListRow: View {
+  @Environment(\.cookbookCopiedSourceIDs) private var cookbookCopiedSourceIDs
   let row: RecipeListRowData
   let options: RecipeListViewOptions
 
@@ -11,27 +16,34 @@ struct RecipeListRow: View {
     HStack(alignment: .top, spacing: 12) {
       RecipeListThumbnail(data: row.thumbnailData)
 
-      switch options.density {
-      case .compact:
-        RecipeListCompactContent(
-          title: recipe.title,
-          subtitleText: recipe.listSubtitleText,
-          libraryPlacement: recipe.libraryPlacement,
-          isFavorite: recipe.favorite,
-          sourceSummary: row.listSourceSummary,
-          categorySummary: row.listCategorySummary,
-          options: options
-        )
-      case .rich:
-        RecipeListRichContent(
-          title: recipe.title,
-          subtitleText: recipe.listSubtitleText,
-          libraryPlacement: recipe.libraryPlacement,
-          isFavorite: recipe.favorite,
-          sourceSummary: row.listSourceSummary,
-          categorySummary: row.listCategorySummary,
-          options: options
-        )
+      VStack(alignment: .leading, spacing: 4) {
+        switch options.density {
+        case .compact:
+          RecipeListCompactContent(
+            title: recipe.title,
+            subtitleText: recipe.listSubtitleText,
+            libraryPlacement: recipe.libraryPlacement,
+            isFavorite: recipe.favorite,
+            sourceSummary: row.listSourceSummary,
+            categorySummary: row.listCategorySummary,
+            options: options
+          )
+        case .rich:
+          RecipeListRichContent(
+            title: recipe.title,
+            subtitleText: recipe.listSubtitleText,
+            libraryPlacement: recipe.libraryPlacement,
+            isFavorite: recipe.favorite,
+            sourceSummary: row.listSourceSummary,
+            categorySummary: row.listCategorySummary,
+            options: options
+          )
+        }
+        if cookbookCopiedSourceIDs.contains(recipe.id) {
+          Label("In My Recipes", systemImage: "checkmark.circle.fill")
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.secondary)
+        }
       }
     }
     .padding(.vertical, options.rowVerticalPadding)

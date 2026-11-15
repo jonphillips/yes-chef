@@ -1,4 +1,5 @@
 import Dependencies
+import CloudKit
 import Foundation
 import Testing
 import YesChefCore
@@ -77,11 +78,10 @@ struct CookbookScopeTests {
       let copyModel = CookbookCopyModel()
       await copyModel.copyButtonTapped(context: context, sourceID: recipeID)
 
-      let copyIDs = copyModel.copyIDsBySource[recipeID] ?? []
-      #expect(copyIDs.count == 1)
-      #expect(copyIDs.first != recipeID)
+      #expect(copyModel.copiedSourceIDsByCookbook[context.zoneOwnerName]?.contains(recipeID) == true)
       let libraryIDs = try await libraryDatabase.read { try Recipe.fetchAll($0).map(\.id) }
-      #expect(libraryIDs == copyIDs)
+      #expect(libraryIDs.count == 1)
+      #expect(!libraryIDs.contains(recipeID))
       let mirrorRecipe = try await mirror.database.read { try Recipe.find(recipeID).fetchOne($0) }
       #expect(mirrorRecipe?.title == "Family Pie")
 
@@ -91,8 +91,153 @@ struct CookbookScopeTests {
         return
       }
       #expect(promptedRecipeID == recipeID)
-      #expect(matches == copyIDs)
-      #expect(await copyModel.newestCopy(of: matches) == copyIDs.first)
+      #expect(matches == libraryIDs)
+      #expect(await copyModel.newestCopy(of: matches) == libraryIDs.first)
+      copyModel.promptDismissed()  // SwiftUI dismisses the alert before the button's action runs.
+      await copyModel.copyAnywayButtonTapped()
+      let copiesAfterCopyAnyway = try await libraryDatabase.read { try Recipe.fetchAll($0) }
+      #expect(copiesAfterCopyAnyway.count == 2)
+    }
+  }
+
+  @Test
+  func copyThemTooCopiesMirrorTargetsAndRelinksThemWhileNamingMissingTargets() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 920_000_150)
+    let sourceID = UUID(), targetID = UUID(), missingID = UUID()
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer {
+      try? mirror.deleteMirror()
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let source = Recipe(id: sourceID, title: "Stew", dateCreated: now, dateModified: now)
+    let target = Recipe(id: targetID, title: "Rice", dateCreated: now, dateModified: now)
+    let missing = Recipe(id: missingID, title: "Bread", dateCreated: now, dateModified: now)
+    let targetRelation = RecipeRelatedRecipe(id: UUID(), recipeID: sourceID, relatedRecipeID: targetID, dateCreated: now)
+    let sourceBundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: source,
+      serveWith: [
+        RecipeServeWith(id: UUID(), recipeID: sourceID, linkedRecipeID: targetID, title: "Rice", sortOrder: 0,
+          provenance: .handAuthored, dateCreated: now, dateModified: now),
+        RecipeServeWith(id: UUID(), recipeID: sourceID, linkedRecipeID: missingID, title: "Bread", sortOrder: 1,
+          provenance: .handAuthored, dateCreated: now, dateModified: now),
+      ], relatedRecipes: [
+        targetRelation,
+        RecipeRelatedRecipe(id: UUID(), recipeID: sourceID, relatedRecipeID: missingID, dateCreated: now),
+      ], linkTargets: [
+        .init(recipeID: targetID, title: target.title, sourceURL: nil),
+        .init(recipeID: missingID, title: missing.title, sourceURL: nil),
+      ])
+    let targetVariation = RecipeVariation(id: UUID(), recipeID: targetID, name: "Unreadable", sortIndex: 0,
+      deltas: Data([255]), dateCreated: now, dateModified: now)
+    let targetBundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: target,
+      relatedRecipes: [targetRelation], variations: [targetVariation])
+    let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now, zoneOwnerName: "owner")
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      try mirror.apply(upserting: [sourceBundle, targetBundle], deleting: [])
+      @Dependency(\.defaultDatabase) var libraryDatabase
+      let model = CookbookCopyModel()
+      await model.copyButtonTapped(context: context, sourceID: sourceID)
+      guard case let .copyResult(result)? = model.prompt else {
+        Issue.record("Expected the first copy result")
+        return
+      }
+      #expect(Set(result.uncopiedTargets) == [targetID, missingID])
+
+      model.promptDismissed()
+      await model.copyThemTooButtonTapped(result)
+      guard case let .missingTargets(copyResult)? = model.prompt else {
+        Issue.record("Expected the missing-target result")
+        return
+      }
+      #expect(copyResult.warnings.contains { $0.contains("Not available in this cookbook: Bread") })
+      #expect(copyResult.warnings.contains { $0.contains("Variation Unreadable has unreadable deltas") })
+
+      let mirroredTarget = try #require(try await mirror.database.read {
+        try CookbookPayload.bundle(for: targetID, in: $0)
+      })
+      let copiedSourceIDs = try await libraryDatabase.read { try RecipeRepository.existingCopies(of: sourceBundle, in: $0) }
+      let copiedTargetIDs = try await libraryDatabase.read { try RecipeRepository.existingCopies(of: mirroredTarget, in: $0) }
+      let copiedSourceID = try #require(copiedSourceIDs.first)
+      let copiedTargetID = try #require(copiedTargetIDs.first)
+      #expect(copiedTargetIDs.count == 1)
+      let linkedRows = try await libraryDatabase.read { db in
+        try RecipeServeWith.where { $0.recipeID.eq(copiedSourceID) }.fetchAll(db)
+      }
+      #expect(linkedRows.first { $0.title == "Rice" }?.linkedRecipeID == copiedTargetID)
+      #expect(linkedRows.first { $0.title == "Bread" }?.linkedRecipeID == nil)
+      let relatedCount = try await libraryDatabase.read { try RecipeRelatedRecipe.fetchCount($0) }
+      #expect(relatedCount == 1)
+    }
+  }
+
+  @Test
+  func failedDisplayPhotoFetchStillCopiesWithWarning() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 920_000_175)
+    let recipeID = UUID(), photoID = UUID()
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer {
+      try? mirror.deleteMirror()
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let recipe = Recipe(id: recipeID, title: "Roast", dateCreated: now, dateModified: now, coverPhotoID: photoID)
+    let photo = RecipePhoto(id: photoID, recipeID: recipeID, imageDataReference: "photo", thumbnailData: Data([1]),
+      mediaType: "image/jpeg", pixelWidth: 1, pixelHeight: 1, sortOrder: 0, dateCreated: now)
+    let bundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: recipe, photos: [photo])
+    let client = photoFetchClient { throw CKError(.networkFailure) }
+    let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now, zoneOwnerName: "owner")
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      try mirror.apply(upserting: [bundle], deleting: [])
+      @Dependency(\.defaultDatabase) var libraryDatabase
+      let model = CookbookCopyModel(fetchClient: client)
+      await model.copyButtonTapped(context: context, sourceID: recipeID)
+      guard case let .copyResult(result)? = model.prompt else {
+        Issue.record("Expected the photo warning")
+        return
+      }
+      #expect(result.warnings.contains("The full photo couldn’t load; the copy has the thumbnail."))
+      #expect(try await libraryDatabase.read { try Recipe.fetchCount($0) } == 1)
+    }
+  }
+
+  @Test
+  func missingPublishedDisplayImageUsesThumbnailWithoutWarning() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 920_000_180)
+    let recipeID = UUID(), photoID = UUID()
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let mirror = try CookbookMirror(id: UUID(), directory: directory)
+    defer {
+      try? mirror.deleteMirror()
+      try? FileManager.default.removeItem(at: directory)
+    }
+    let recipe = Recipe(id: recipeID, title: "Roast", dateCreated: now, dateModified: now, coverPhotoID: photoID)
+    let photo = RecipePhoto(id: photoID, recipeID: recipeID, imageDataReference: "photo", thumbnailData: Data([1]),
+      mediaType: "image/jpeg", pixelWidth: 1, pixelHeight: 1, sortOrder: 0, dateCreated: now)
+    let bundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: recipe, photos: [photo])
+    let client = photoFetchClient { throw CookbookFetchError.missingDisplayImage(recipeID.uuidString) }
+    let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now, zoneOwnerName: "owner")
+
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+      $0.uuid = .incrementing
+    } operation: {
+      try mirror.apply(upserting: [bundle], deleting: [])
+      let model = CookbookCopyModel(fetchClient: client)
+      await model.copyButtonTapped(context: context, sourceID: recipeID)
+      #expect(model.prompt == nil)
+      @Dependency(\.defaultDatabase) var libraryDatabase
+      #expect(try await libraryDatabase.read { try Recipe.fetchCount($0) } == 1)
     }
   }
 
@@ -116,14 +261,17 @@ struct CookbookScopeTests {
       $0.date.now = now
     } operation: {
       try mirror.apply(page: CookbookMirrorPage(lensBundle: lensBundle))
+      let baseline = try await mirror.database.read { db in
+        (try RecipeLens.fetchAll(db), try RecipeLensShelf.fetchAll(db))
+      }
       let context = CookbookContext(ownerName: "Jon", mirror: mirror, loadedAt: now, zoneOwnerName: "owner-zone")
       let model = withDependencies { $0.defaultDatabase = mirror.database } operation: {
         PowerBrowserModel(scope: .cookbook(context))
       }
       try await model.$lensLibrary.load()
-      #expect(model.lensLibrary.lenses == [lens])
+      #expect(model.lensLibrary.lenses == baseline.0)
       model.lensSelectionChanged(lens.id)
-      #expect(model.selectedLens == lens)
+      #expect(model.selectedLens?.id == lens.id)
 
       model.editLensBaseQueryButtonTapped(lens)
       model.saveQueryEditsButtonTapped()
@@ -139,8 +287,18 @@ struct CookbookScopeTests {
       let saved = try await mirror.database.read { db in
         (try RecipeLens.fetchAll(db), try RecipeLensShelf.fetchAll(db))
       }
-      #expect(saved.0 == [lens])
-      #expect(saved.1 == [shelf])
+      #expect(saved.0 == baseline.0)
+      #expect(saved.1 == baseline.1)
     }
   }
+}
+
+private func photoFetchClient(
+  fetchDisplayImage: @escaping @Sendable () async throws -> Data
+) -> CookbookFetchClient {
+  CookbookFetchClient(
+    sharedZones: { [] },
+    fetchPage: { _, _ in CookbookFetchedPage(records: [], deletions: [], changeToken: Data(), moreComing: false) },
+    fetchDisplayImage: { _, _ in try await fetchDisplayImage() }
+  )
 }
