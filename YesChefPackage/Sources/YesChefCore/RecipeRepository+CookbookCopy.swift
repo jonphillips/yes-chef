@@ -24,18 +24,12 @@ extension RecipeRepository {
   ) throws -> Set<Recipe.ID> {
     let refs = try RecipeImportRef.fetchAll(db)
     let sources = try RecipeSource.fetchAll(db)
-    let recipes = try Recipe.fetchAll(db).filter { !$0.archived }
-    let recipeIDs = Set(recipes.map(\.id))
-    let urlsByRecipe = Dictionary(grouping: sources.compactMap { source in
-      RecipeImportIdentityKey.normalizedSourceURL(source.url).map { ($0, source.recipeID) }
-    }, by: \.0)
+    let liveRecipeIDs = Set(try Recipe.fetchAll(db).filter { !$0.archived }.map(\.id))
     var copied: Set<Recipe.ID> = []
     for (sourceID, key) in keys {
-      let refMatches = Array(refs.lazy
-        .filter { $0.normalizedSourceURL == key.normalizedSourceURL && $0.normalizedTitle == key.normalizedTitle }
-        .map(\.recipeID))
-      let urlMatches = key.normalizedSourceURL.flatMap { urlsByRecipe[$0] }?.map(\.1) ?? []
-      if (refMatches + urlMatches).contains(where: recipeIDs.contains) { copied.insert(sourceID) }
+      if !matchingCopies(for: key, refs: refs, sources: sources, liveRecipeIDs: liveRecipeIDs).isEmpty {
+        copied.insert(sourceID)
+      }
     }
     return copied
   }
@@ -44,11 +38,21 @@ extension RecipeRepository {
     let key = RecipeImportIdentityKey(sourceURL: sourceURL, title: title)
     let refs = try RecipeImportRef.fetchAll(db)
     let sources = try RecipeSource.fetchAll(db)
-    var ids = Set(refs.filter { $0.normalizedSourceURL == key.normalizedSourceURL && $0.normalizedTitle == key.normalizedTitle }.map(\.recipeID))
+    let liveRecipeIDs = Set(try Recipe.fetchAll(db).filter { !$0.archived }.map(\.id))
+    return matchingCopies(for: key, refs: refs, sources: sources, liveRecipeIDs: liveRecipeIDs)
+  }
+
+  private static func matchingCopies(
+    for key: RecipeImportIdentityKey, refs: [RecipeImportRef], sources: [RecipeSource],
+    liveRecipeIDs: Set<Recipe.ID>
+  ) -> [Recipe.ID] {
+    var ids = Set(refs.filter {
+      $0.normalizedSourceURL == key.normalizedSourceURL && $0.normalizedTitle == key.normalizedTitle
+    }.map(\.recipeID))
     if let url = key.normalizedSourceURL {
       ids.formUnion(sources.filter { RecipeImportIdentityKey.normalizedSourceURL($0.url) == url }.map(\.recipeID))
     }
-    return try Recipe.fetchAll(db).filter { !$0.archived && ids.contains($0.id) }.map(\.id).sorted { $0.uuidString < $1.uuidString }
+    return ids.filter(liveRecipeIDs.contains).sorted { $0.uuidString < $1.uuidString }
   }
 
   /// Copy preserves structured content and provenance, while resetting personal view state.

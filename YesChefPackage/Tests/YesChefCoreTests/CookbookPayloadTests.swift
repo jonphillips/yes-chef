@@ -196,15 +196,28 @@ struct CookbookPayloadTests {
     @Dependency(\.defaultDatabase) var database
     let recipeID = UUID()
     let targetID = UUID()
+    let duplicateTargetID = UUID()
     let recipe = Recipe(id: recipeID, title: "Stew", dateCreated: now, dateModified: now)
     let target = Recipe(id: targetID, title: "Rice", dateCreated: now, dateModified: now)
+    let duplicateTarget = Recipe(id: duplicateTargetID, title: "Sauce", dateCreated: now, dateModified: now)
     let relation = RecipeRelatedRecipe(id: UUID(), recipeID: recipeID, relatedRecipeID: targetID, dateCreated: now)
     let serve = RecipeServeWith(id: UUID(), recipeID: recipeID, linkedRecipeID: targetID, title: "Rice",
       sortOrder: 0, provenance: .handAuthored, dateCreated: now, dateModified: now)
-    let bundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: recipe, serveWith: [serve],
-      relatedRecipes: [relation], linkTargets: [.init(recipeID: targetID, title: target.title, sourceURL: nil)])
+    let duplicateRelation = RecipeRelatedRecipe(id: UUID(), recipeID: recipeID, relatedRecipeID: duplicateTargetID, dateCreated: now)
+    let duplicateServe = RecipeServeWith(id: UUID(), recipeID: recipeID, linkedRecipeID: duplicateTargetID, title: "Sauce",
+      sortOrder: 1, provenance: .handAuthored, dateCreated: now, dateModified: now)
+    let bundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: recipe, serveWith: [serve, duplicateServe],
+      relatedRecipes: [relation, duplicateRelation], linkTargets: [
+        .init(recipeID: targetID, title: target.title, sourceURL: nil),
+        .init(recipeID: duplicateTargetID, title: duplicateTarget.title, sourceURL: nil),
+      ])
 
     try database.write { db in
+      let duplicateTargetBundle = RecipeBundleCoding.RecipeBundle(version: 2, recipe: duplicateTarget)
+      _ = try RecipeRepository.copyCookbookRecipe(duplicateTargetBundle, ownerName: "Wendy", displayImages: [:],
+        in: db, now: now, uuid: UUID.init)
+      _ = try RecipeRepository.copyCookbookRecipe(duplicateTargetBundle, ownerName: "Wendy", displayImages: [:],
+        in: db, now: now, uuid: UUID.init)
       let first = try RecipeRepository.copyCookbookRecipe(bundle, ownerName: "Wendy", displayImages: [:],
         in: db, now: now, uuid: UUID.init)
       #expect(first.uncopiedTargets == [targetID])
@@ -213,8 +226,11 @@ struct CookbookPayloadTests {
         in: db, now: now, uuid: UUID.init)
 
       try RecipeRepository.relinkCookbookCopy(first.recipeID, from: bundle, in: db, now: now, uuid: UUID.init)
-      let copiedServe = try #require(try RecipeServeWith.where { $0.recipeID.eq(first.recipeID) }.fetchOne(db))
+      let copiedServeRows = try RecipeServeWith.where { $0.recipeID.eq(first.recipeID) }.fetchAll(db)
+      let copiedServe = try #require(copiedServeRows.first { $0.title == "Rice" })
       #expect(copiedServe.linkedRecipeID == targetCopy.recipeID)
+      #expect(copiedServeRows.first { $0.title == "Sauce" }?.linkedRecipeID == nil)
+      #expect(try RecipeRepository.existingCopies(of: duplicateTargetBundle, in: db).count == 2)
       #expect(try RecipeRelatedRecipe.fetchCount(db) == 1)
 
       try RecipeRepository.relinkCookbookCopy(first.recipeID, from: bundle, in: db, now: now, uuid: UUID.init)

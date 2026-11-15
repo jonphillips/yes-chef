@@ -22,6 +22,7 @@ final class CookbookLibraryModel {
   private(set) var errorMessage: String?
   var acceptanceErrorMessage: String?
   var selectedZoneOwnerName: String?
+  private(set) var acceptedZoneOwnerName: String?
   @ObservationIgnored @Dependency(\.date.now) private var now
   @ObservationIgnored @Dependency(\.uuid) private var uuid
   @ObservationIgnored let fetchClient: CookbookFetchClient
@@ -73,14 +74,30 @@ final class CookbookLibraryModel {
     notificationTask = Task { [weak self] in
       for await notification in NotificationCenter.default.notifications(named: .cookbookShareAccepted) {
         guard let self else { return }
-        if let ownerName = notification.userInfo?["zoneOwnerName"] as? String {
-          self.selectedZoneOwnerName = ownerName
-        }
+        if let message = notification.userInfo?["error"] as? String { self.shareAcceptanceFailed(message) }
+        else if let ownerName = notification.userInfo?["zoneOwnerName"] as? String { self.shareWasAccepted(in: ownerName) }
         await self.fetchCookbooks()
-        if let message = notification.userInfo?["error"] as? String { self.acceptanceErrorMessage = message }
       }
     }
     Task { await fetchCookbooks() }
+  }
+
+  func shareWasAccepted(in zoneOwnerName: String) {
+    acceptedZoneOwnerName = zoneOwnerName
+  }
+
+  func shareAcceptanceFailed(_ message: String) {
+    acceptedZoneOwnerName = nil
+    acceptanceErrorMessage = message
+  }
+
+  func selectAcceptedCookbookIfReady() -> Bool {
+    guard let acceptedZoneOwnerName,
+      contexts.contains(where: { $0.zoneOwnerName == acceptedZoneOwnerName })
+    else { return false }
+    selectedZoneOwnerName = acceptedZoneOwnerName
+    self.acceptedZoneOwnerName = nil
+    return true
   }
 
   func sceneBecameActive() { Task { await fetchCookbooks() } }

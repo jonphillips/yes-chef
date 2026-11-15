@@ -146,7 +146,7 @@ struct RecipeDetailView: View {
     .alert("Cookbook Copy", isPresented: copyResultIsPresented) {
       if case let .copyResult(result)? = cookbookCopyModel?.prompt, !result.uncopiedTargets.isEmpty {
         Button("Copy Them Too") {
-          Task { await cookbookCopyModel?.copyThemTooButtonTapped() }
+          Task { await cookbookCopyModel?.copyThemTooButtonTapped(result) }
         }
         Button("Cancel", role: .cancel) { cookbookCopyModel?.clearPrompt() }
       } else {
@@ -309,7 +309,7 @@ struct RecipeDetailView: View {
         if case .existingCopies? = cookbookCopyModel?.prompt { return true }
         return false
       },
-      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+      set: { _ in }
     )
   }
 
@@ -321,7 +321,7 @@ struct RecipeDetailView: View {
         default: false
         }
       },
-      set: { if !$0 { cookbookCopyModel?.clearPrompt() } }
+      set: { _ in }
     )
   }
 

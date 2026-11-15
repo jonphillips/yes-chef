@@ -81,8 +81,8 @@ final class CookbookCopyModel {
     }
   }
 
-  func copyThemTooButtonTapped() async {
-    guard let pendingCopy, case let .copyResult(initialResult) = prompt else { return }
+  func copyThemTooButtonTapped(_ initialResult: CookbookCopyResult) async {
+    guard let pendingCopy else { return }
     do {
       let targets = try await pendingCopy.context.mirror.database.read { db in
         try initialResult.uncopiedTargets.compactMap { id in
@@ -94,22 +94,28 @@ final class CookbookCopyModel {
       let copies = await withPhotoData(for: targets, context: pendingCopy.context)
       let copyDate = now
       let makeUUID = uuid
-      try await libraryDatabase.write { db in
+      let copyWarnings = try await libraryDatabase.write { db -> [String] in
+        var warnings: [String] = []
         for (bundle, images, _) in copies {
-          _ = try RecipeRepository.copyCookbookRecipe(bundle, ownerName: pendingCopy.context.ownerName,
+          let copyResult = try RecipeRepository.copyCookbookRecipe(bundle, ownerName: pendingCopy.context.ownerName,
             displayImages: images, in: db, now: copyDate, uuid: { makeUUID() })
+          warnings.append(contentsOf: copyResult.warnings)
         }
         try RecipeRepository.relinkCookbookCopy(initialResult.recipeID, from: pendingCopy.bundle,
           in: db, now: copyDate, uuid: { makeUUID() })
+        return warnings
       }
       await refreshCopyStatus(context: pendingCopy.context)
       let count = copies.count + 1
       let firstCopyID = initialResult.recipeID
       var result = initialResult
+      result.warnings.append(contentsOf: copyWarnings)
       result.warnings.append(contentsOf: copies.compactMap(\.2))
       if !missingIDs.isEmpty {
         let names = missingIDs.map { id in
-          pendingCopy.bundle.linkTargets.first { $0.recipeID == id }?.title ?? id.uuidString
+          pendingCopy.bundle.linkTargets.first { $0.recipeID == id }?.title
+            ?? pendingCopy.bundle.serveWith.first { $0.linkedRecipeID == id }?.title
+            ?? id.uuidString
         }
         result.warnings.append("Not available in this cookbook: \(names.joined(separator: ", ")).")
         prompt = .missingTargets(result)
@@ -196,6 +202,8 @@ final class CookbookCopyModel {
       let data = try await fetchClient.fetchDisplayImage(zoneID, bundle.recipe.id.uuidString)
       try context.mirror.cacheDisplayImage(data, photoID: photoID)
       return ([photoID: data], nil)
+    } catch CookbookFetchError.missingDisplayImage {
+      return ([:], nil)
     } catch {
       return ([:], "The full photo couldn’t load; the copy has the thumbnail.")
     }

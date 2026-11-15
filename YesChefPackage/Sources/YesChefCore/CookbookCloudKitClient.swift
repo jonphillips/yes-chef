@@ -324,11 +324,11 @@ public enum CookbookCloudKitClientFactory {
   }
 }
 
-private enum CookbookFetchError: LocalizedError {
+public enum CookbookFetchError: LocalizedError {
   case missingPayload(String)
   case missingDisplayImage(String)
 
-  var errorDescription: String? {
+  public var errorDescription: String? {
     switch self {
     case let .missingPayload(name): "Cookbook record \(name) has no payload asset."
     case let .missingDisplayImage(name): "Cookbook recipe \(name) has no full-size photo asset."

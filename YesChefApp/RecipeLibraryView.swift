@@ -86,7 +86,7 @@ struct AppContainer: View {
     }
     .task { await appStarted() }
     .onChange(of: scenePhase) { _, phase in if phase == .active { appBecameActive() } }
-    .onChange(of: cookbookLibraryModel.selectedZoneOwnerName) { _, _ in openAcceptedCookbookIfReady() }
+    .onChange(of: cookbookLibraryModel.acceptedZoneOwnerName) { _, _ in openAcceptedCookbookIfReady() }
     .onChange(of: cookbookLibraryModel.contexts.map(\.zoneOwnerName)) { _, _ in openAcceptedCookbookIfReady() }
     .modifier(CookbookAcceptanceAlert(model: cookbookLibraryModel))
     .fullScreenCover(item: $presentedRecipe) { presentation in
@@ -413,10 +413,9 @@ struct AppContainer: View {
   }
 
   private func openAcceptedCookbookIfReady() {
-    guard let ownerName = cookbookLibraryModel.selectedZoneOwnerName,
-      cookbookLibraryModel.contexts.contains(where: { $0.zoneOwnerName == ownerName })
-    else { return }
-    selectedSection = .cookbooks
+    if cookbookLibraryModel.selectAcceptedCookbookIfReady() {
+      selectedSection = .cookbooks
+    }
   }
 
   private func receiveFindReferral(from url: URL) async {
