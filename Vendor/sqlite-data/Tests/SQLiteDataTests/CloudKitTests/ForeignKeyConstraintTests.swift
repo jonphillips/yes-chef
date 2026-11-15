@@ -145,119 +145,7 @@
         try await syncEngine.metadatabase.read { db in
           try #expect(UnsyncedRecordID.count().fetchOne(db) == 0)
         }
-        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes).isEmpty)
-      }
-
-      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
-      @Test func parkedRecordWithoutSavedCopyFallsBackToCloudKit() async throws {
-        let record = reminderRecord(id: 1, listID: 1, title: "Saved remotely")
-        let parent = remindersListRecord(id: 1, title: "Personal")
-        try saveCloudRecords([parent, record])
-        await receive([record])
-        try await syncEngine.metadatabase.write { db in
-          try SyncMetadata.find(record.recordID)
-            .update {
-              $0.lastKnownServerRecord = #bind(nil)
-              $0._lastKnownServerRecordAllFields = #bind(nil)
-            }
-            .execute(db)
-        }
-
-        await receive([parent])
-
-        try await userDatabase.read { db in try #expect(Reminder.count().fetchOne(db) == 1) }
-        try await syncEngine.metadatabase.read { db in
-          try #expect(UnsyncedRecordID.count().fetchOne(db) == 0)
-        }
-        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes) == [1])
-      }
-
-      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
-      @Test func throttledFallbackPreservesLocalRetriesAndTheIncomingBatch() async throws {
-        let localRecord = reminderRecord(id: 1, listID: 1, title: "Local copy")
-        let fallbackRecord = reminderRecord(id: 2, listID: 1, title: "Missing copy")
-        let parent = remindersListRecord(id: 1, title: "Personal")
-        try saveCloudRecords([parent, localRecord, fallbackRecord])
-        await receive([localRecord, fallbackRecord])
-        try await syncEngine.metadatabase.write { db in
-          try SyncMetadata.find(fallbackRecord.recordID)
-            .update {
-              $0.lastKnownServerRecord = #bind(nil)
-              $0._lastKnownServerRecordAllFields = #bind(nil)
-            }
-            .execute(db)
-        }
-        container.privateCloudDatabase.state.withValue { $0.rateLimitRecordRequests = true }
-
-        await receive([parent])
-
-        try await userDatabase.read { db in
-          try #expect(Reminder.find(1).fetchCount(db) == 1)
-          try #expect(RemindersList.find(1).fetchCount(db) == 1)
-        }
-        try await syncEngine.metadatabase.read { db in
-          try #expect(UnsyncedRecordID.find(fallbackRecord.recordID).fetchCount(db) == 1)
-        }
-        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes) == [1])
-        try await syncEngine.metadatabase.write { db in
-          try UnsyncedRecordID.find(fallbackRecord.recordID).delete().execute(db)
-        }
-      }
-
-      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
-      @Test func fallbackRequestsAtMost150ParkedRecordsPerBatch() async throws {
-        let recordIDs = (1...151).map { Reminder.recordID(for: $0) }
-        try await syncEngine.metadatabase.write { db in
-          for recordID in recordIDs {
-            try UnsyncedRecordID.insert { UnsyncedRecordID(recordID: recordID) }.execute(db)
-          }
-        }
-        let parent = remindersListRecord(id: 1, title: "Personal")
-        try saveCloudRecords([parent])
-
-        await receive([parent])
-
-        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes) == [150])
-        try await syncEngine.metadatabase.read { db in
-          try #expect(UnsyncedRecordID.count().fetchOne(db) == 1)
-        }
-        try await syncEngine.metadatabase.write { db in
-          try UnsyncedRecordID.findAll(recordIDs).delete().execute(db)
-        }
-      }
-
-      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
-      @Test func firstFetchedBatchRetriesAllParkedRecords() async throws {
-        let parent = RemindersList(id: 1, title: "Personal")
-        let child = reminderRecord(id: 1, listID: 1, title: "Already has parent")
-        try await userDatabase.write { db in
-          try RemindersList.insert { parent }.execute(db)
-          try SyncMetadata.insert {
-            SyncMetadata(
-              recordPrimaryKey: "1",
-              recordType: Reminder.tableName,
-              zoneName: child.recordID.zoneID.zoneName,
-              ownerName: child.recordID.zoneID.ownerName,
-              parentRecordPrimaryKey: "1",
-              parentRecordType: RemindersList.tableName,
-              lastKnownServerRecord: child,
-              _lastKnownServerRecordAllFields: child,
-              userModificationTime: child.userModificationTime
-            )
-          }
-          .execute(db)
-          try UnsyncedRecordID.insert { UnsyncedRecordID(recordID: child.recordID) }.execute(db)
-        }
-
-        let parentRecord = remindersListRecord(id: 1, title: "Personal")
-        try saveCloudRecords([parentRecord, child])
-        await receive([parentRecord])
-
-        try await userDatabase.read { db in try #expect(Reminder.find(1).fetchCount(db) == 1) }
-        try await syncEngine.metadatabase.read { db in
-          try #expect(UnsyncedRecordID.count().fetchOne(db) == 0)
-        }
-        #expect(container.privateCloudDatabase.state.withValue(\.recordsRequestSizes).isEmpty)
+        #expect(container.privateCloudDatabase.state.withValue(\.fetchedRecordIDs).isEmpty)
       }
 
       /*
@@ -306,13 +194,22 @@
         }
         assertQuery(UnsyncedRecordID.all, database: syncEngine.metadatabase) {
           """
-          ┌─────────────────────────────────┐
-          │ UnsyncedRecordID(               │
-          │   recordName: "1:modelCs",      │
-          │   zoneName: "zone",             │
-          │   ownerName: "__defaultOwner__" │
-          │ )                               │
-          └─────────────────────────────────┘
+          ┌──────────────────────────────────────────────────────────────────────────────────┐
+          │ UnsyncedRecordID(                                                                │
+          │   recordName: "1:modelCs",                                                       │
+          │   zoneName: "zone",                                                              │
+          │   ownerName: "__defaultOwner__",                                                 │
+          │   assets: [:],                                                                   │
+          │   record: CKRecord(                                                              │
+          │     recordID: CKRecord.ID(1:modelCs/zone/__defaultOwner__),                      │
+          │     recordType: "modelCs",                                                       │
+          │     parent: CKReference(recordID: CKRecord.ID(1:modelBs/zone/__defaultOwner__)), │
+          │     share: nil,                                                                  │
+          │     id: 1,                                                                       │
+          │     modelBID: 1                                                                  │
+          │   )                                                                              │
+          │ )                                                                                │
+          └──────────────────────────────────────────────────────────────────────────────────┘
           """
         }
 
@@ -1002,7 +899,6 @@
             }
           }
         }
-        try await syncEngine.processPendingRecordZoneChanges(scope: .private)
         assertQuery(SyncMetadata.all, database: syncEngine.metadatabase) {
           """
           (No results)
@@ -1099,11 +995,6 @@
         record.setValue(listID, forKey: "remindersListID", at: now)
         record.parent = CKRecord.Reference(record: listRecord, action: .none)
         return record
-      }
-
-      private func saveCloudRecords(_ records: [CKRecord]) throws {
-        let (saveResults, _) = try container.privateCloudDatabase.modifyRecords(saving: records)
-        try saveResults.values.forEach { _ = try $0.get() }
       }
 
       private func receive(_ records: [CKRecord]) async {

@@ -1,6 +1,7 @@
 #if canImport(CloudKit)
   import CustomDump
   import CloudKit
+  import OrderedCollections
   import SQLiteData
 
   extension CKDatabase.Scope: @retroactive CustomDumpStringConvertible {
@@ -54,9 +55,12 @@
             : rhs
           return (baseLHS, lhsHasPrefix ? 1 : 0) < (baseRHS, rhsHasPrefix ? 1 : 0)
         }
-      let nonEncryptedKeys = Set(allKeys())
+      var nonEncryptedKeys = Set(allKeys())
         .subtracting(encryptedValues.allKeys())
-        .subtracting(["_recordChangeTag"])
+        .subtracting(["_modificationDate", "_recordChangeTag"])
+      if self is CKShare {
+        nonEncryptedKeys.insert(CKShare.SystemFieldKey.title)
+      }
       var baseChildren = [
         ("recordID", recordID as Any),
         ("recordType", recordType as Any),
@@ -172,19 +176,22 @@
     package var customDumpMirror: Mirror {
       return Mirror(
         self,
-        children: [
-          (
-            "pendingRecordZoneChanges",
-            _pendingRecordZoneChanges.withValue(\.self)
-              .sorted(by: comparePendingRecordZoneChange)
-              as Any
-          ),
-          (
-            "pendingDatabaseChanges",
-            _pendingDatabaseChanges.withValue(\.self)
-              .sorted(by: comparePendingDatabaseChange) as Any
-          ),
-        ],
+        children: withState {
+          [
+            (
+              "pendingRecordZoneChanges",
+              $0.pendingRecordZoneChanges.values
+                .sorted(by: comparePendingRecordZoneChange)
+              as any Sendable
+            ),
+            (
+              "pendingDatabaseChanges",
+              $0.pendingDatabaseChanges.values
+                .sorted(by: comparePendingDatabaseChange)
+              as any Sendable
+            ),
+          ] as [(label: String?, value: any Sendable)]
+        },
         displayStyle: .struct
       )
     }
@@ -248,13 +255,13 @@
         self,
         children: [
           "databaseScope": databaseScope,
-          "storage": state
-            .value
-            .storage
-            .flatMap { _, value in value.records.values }
-            .sorted {
-              ($0.recordType, $0.recordID.recordName) < ($1.recordType, $1.recordID.recordName)
-            },
+          "storage": state.withValue {
+            $0.storage
+              .flatMap { _, value in value.records.values }
+              .sorted {
+                ($0.recordType, $0.recordID.recordName) < ($1.recordType, $1.recordID.recordName)
+              }
+          },
         ],
         displayStyle: .struct
       )

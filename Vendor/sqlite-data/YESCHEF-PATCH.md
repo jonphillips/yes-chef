@@ -1,28 +1,32 @@
-# Yes Chef patches: SQLiteData 1.12.1
+# Yes Chef patch: SQLiteData 1.13.0
 
-Vendored from upstream tag `1.12.1`, commit `aa613accbe882b561f26e37a348a8f42e92cd398`.
+Vendored from upstream tag `1.13.0`, commit `e72164ceb92a10b62407624c98e5bc2c47d8c0e1`.
 The vendor contains upstream `Package.swift`, all `Package@swift-*.swift` manifests,
 `LICENSE`, `Sources/`, and `Tests/`; it excludes `Examples/`.
 
-The Yes Chef carry-forwards touch the following upstream surfaces:
+One Yes Chef carry-forward remains:
 
 1. `SyncEngine.handleSentRecordZoneChanges` carries forward Yes Chef's [#389 patch](https://github.com/jonphillips/yes-chef/pull/389),
-   re-applied unchanged. It preserves and re-queues a child and parent when the child save fails
-   with `referenceViolation`, the parent row exists locally, and the parent's last known server
-   record has no change tag. This is equivalent in effect to the keep-and-requeue half of
-   [upstream PR #548](https://github.com/pointfreeco/sqlite-data/pull/548), not its code: this
-   patch reads the parent key from the local row, requires the parent row to exist, and clears both
-   saved server copies before re-queuing. It does not port #548's `quotaExceeded` retry. Tracking:
+   re-applied unchanged. When a child save fails with `referenceViolation`, the parent row exists locally, and the
+   parent's last known server record has no change tag, it keeps the child and re-queues the child and parent,
+   instead of applying the foreign key's delete action. Tracking:
    [issue #547](https://github.com/pointfreeco/sqlite-data/issues/547).
-2. `SyncEngine.handleFetchedRecordZoneChanges` retries parked records from saved server copies
-   when their parent tables change, and retries every parked copy once on startup. It uses one
-   bounded CloudKit fetch only when a saved copy is missing or unusable.
-3. `SyncEngine.upsertFromServerRecord` refreshes a parked record's saved server copy when a newer
-   version arrives. `SyncEngine` also adds `didRetryParkedRecordScopesAfterStart` and
-   `fallbackRecordCursorsByScope` state. `MockCloudDatabase` records request sizes and can simulate
-   throttling for the parked-retry tests. Tracking:
-   [issue #565](https://github.com/pointfreeco/sqlite-data/issues/565). Related context:
-   [SQLiteData discussion #334](https://github.com/pointfreeco/sqlite-data/discussions/334).
+
+   1.13.0 covers part of this. #571 sorts parents ahead of children in a batch, and #335 with #576 re-queues a
+   parent held back by `quotaExceeded`. A parent whose save fails with an error that neither CKSyncEngine nor the
+   handler retries is never re-queued, for example `serverRejectedRequest` or `limitExceeded`. Without this patch,
+   upstream then deletes that parent's children locally and queues the deletes.
+   `ReferenceViolationTests.addReminderAfterListSaveWasRejected` reproduces that case through the CloudKit mock
+   alone. It fails on pristine 1.13.0 and passes with the patch.
+
+`MockCloudDatabase` adds a one-shot `rejectedSaves` map for that test.
+
+The former patches 2 and 3 (#414: retry parked records from saved server copies, and refresh a parked record's saved
+copy) were dropped in this rebase. 1.13.0 caches each parked record and its assets when it parks it, retries the
+cache locally on every fetched batch, and keeps the newest version (#567, #569; closes
+[#565](https://github.com/pointfreeco/sqlite-data/issues/565)).
+`ForeignKeyConstraintTests.newerParkedRecordIsAppliedAfterItsParentArrives` stays as the regression for that
+behavior.
 
 The Yes Chef-only stored-value regression lives in
 `Tests/SQLiteDataTests/StoredValuesCompatibilityTests.swift`; keep it when re-vendoring, along
@@ -31,6 +35,9 @@ with the CloudKit mock and regression tests.
 The package uses upstream's iOS 16 / macOS 13 / tvOS 16 / watchOS 9 platform floors. Yes Chef's
 `StructuredQueries` requirement starts at 0.39.1, the floor required by this base.
 
-Exit condition: remove this vendor and return to the remote SQLiteData package only when an
-upstream release fixes both [#547](https://github.com/pointfreeco/sqlite-data/issues/547) and
-[#565](https://github.com/pointfreeco/sqlite-data/issues/565).
+1.13.0 adds two metadatabase migrations (`unsyncedRecordIDs.record` and `.assets`, and
+`pendingRecordZoneChanges.databaseScope`). A device that has run this build can't go back to an older vendor in
+a Debug build: the metadatabase's `hasSchemaChanges` assert fires on launch. Release builds tolerate it.
+
+Exit condition: remove this vendor and return to the remote SQLiteData package when an upstream release fixes
+[#547](https://github.com/pointfreeco/sqlite-data/issues/547).
