@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-14 — Family cookbooks S4 device pass cleared (`fix/cookbook-lens-label-ids`)
+
+- **Result:** Jon's S4 pass on Yes Chef Dev passed. The pass found one problem: Lenses arrived in the cookbook, but every shelf was blank. Recipes reach the mirror with labels as name paths and get the mirror's own IDs, while the lens record carried the owner's label rows and IDs. The architect fixed it in #522: applying the lens record now finds each label by name and path, using the rule recipes use, and rewrites the shelf queries onto the mirror's IDs. The S4 line is gone from `device-passes.md`. The Held entry's Production schema deploy is still owed before the first TestFlight build.
+- **Verification:** Jon's device pass, 2026-11-14, with #522 installed.
+
+---
 ## 2026-11-14 — Family cookbooks S4 — Accept, fetch and lenses (`effort/family-cookbooks-s4`)
 
 - **Result:** Replaced the file and debug-only cookbook transport with accepted CloudKit shares, incremental recipe and Lens fetching, mirror state, full image loading, and release Family Cookbook browsing. Added owner-Lens publishing and guarded cookbook-scope writes.
