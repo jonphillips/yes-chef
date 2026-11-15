@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-15 — Cookbook Lens shelves open the cookbook's recipe (`fix/lens-shelf-cookbook-scope`)
+
+- **Result:** A recipe opened from a Lens shelf, from Everything else, or from See all now opens in the Lens's own library. Before, the shelf views built the recipe presentation without a scope, so it defaulted to `.mine`, and in a family cookbook the viewer's own library was searched for the owner's recipe ID. The Power Browser's results list already passed its scope. Found by the architect while designing the Lenses tab (ADR-0050 Amendment 2).
+- **Verification:** scripts/check-drift.sh passed (904 core tests, 20 script tests, SwiftLint, and app test-target build); generic iOS build passed. View-only change, so YesChefTests was not run.
+- **Owed:** folded into the family-cookbooks S5 visiting polish line in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-15 — SQLiteData 1.13.0 rebase (`vendor/sqlite-data-1.13.0`)
 
 - **Result:** `Vendor/sqlite-data` is now upstream 1.13.0 plus one patch, #389's keep-and-re-queue on `referenceViolation` (upstream #547, still open). The two parked-record patches (#414) were dropped, because 1.13.0 fixes #565 (#567, #569). A new mock-only regression test shows pristine 1.13.0 still deletes a child whose parent was rejected with `serverRejectedRequest`. `YesChefPackage` raises its SQLiteData floor to 1.13.0. Its tracked lockfile had pinned 1.8.2, so package tests never ran against the vendored base; it now pins 1.13.0, StructuredQueries 0.39.2 and xctest-dynamic-overlay 1.13.1, the app's set.

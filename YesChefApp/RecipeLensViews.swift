@@ -48,6 +48,7 @@ struct RecipeLensShelvesView: View {
               ShelfRow(
                 title: shelfResult.shelf.title,
                 rows: model.recipeRows(for: RecipeBrowserResult(matchingRecipeIDs: ids, availableFacets: [])),
+                scope: model.scope,
                 onSeeAll: { model.presentShelf(shelfResult.shelf) },
                 onRecipeSelected: onRecipeSelected
               )
@@ -57,6 +58,7 @@ struct RecipeLensShelvesView: View {
             ShelfRow(
               title: "Everything else",
               rows: model.recipeRows(for: RecipeBrowserResult(matchingRecipeIDs: evaluation.remainderRecipeIDs, availableFacets: [])),
+              scope: model.scope,
               onSeeAll: { model.presentRemainder() },
               onRecipeSelected: onRecipeSelected
             )
@@ -73,6 +75,7 @@ struct RecipeLensShelvesView: View {
 private struct ShelfRow: View {
   let title: String
   let rows: [RecipeListRowData]
+  let scope: LibraryScope
   let onSeeAll: () -> Void
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
 
@@ -88,7 +91,7 @@ private struct ShelfRow: View {
       ScrollView(.horizontal) {
         LazyHStack(alignment: .top, spacing: 16) {
           ForEach(rows) { row in
-            Button { onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id)) } label: {
+            Button { onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id, scope: scope)) } label: {
               RecipeListRow(row: row, options: .init(density: .rich, showsSourceMetadata: true, showsCategoryMetadata: true))
                 .frame(width: 340)
                 .contentShape(Rectangle())
@@ -248,6 +251,7 @@ struct SaveRecipeLensView: View {
 struct LensSeeAllView: View {
   let title: String
   let rows: [RecipeListRowData]
+  let scope: LibraryScope
   let onRecipeSelected: (RecipeDetailPresentation) -> Void
   @Environment(\.dismiss) private var dismiss
 
@@ -256,7 +260,7 @@ struct LensSeeAllView: View {
       ScrollView {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), alignment: .top)], alignment: .leading, spacing: 12) {
         ForEach(rows) { row in
-          Button { onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id)); dismiss() } label: {
+          Button { onRecipeSelected(RecipeDetailPresentation(recipeID: row.recipe.id, scope: scope)); dismiss() } label: {
             RecipeListRow(row: row, options: .init(density: .rich, showsSourceMetadata: true, showsCategoryMetadata: true))
           }
           .buttonStyle(.plain)

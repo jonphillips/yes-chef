@@ -36,7 +36,7 @@ struct PowerBrowserView: View {
           RecipeLensEditorView(model: model, lens: lens)
         }
       case let .seeAll(title, ids):
-        LensSeeAllView(title: title, rows: model.recipeRows(for: RecipeBrowserResult(matchingRecipeIDs: ids, availableFacets: [])), onRecipeSelected: onRecipeSelected)
+        LensSeeAllView(title: title, rows: model.recipeRows(for: RecipeBrowserResult(matchingRecipeIDs: ids, availableFacets: [])), scope: model.scope, onRecipeSelected: onRecipeSelected)
       }
     }
     .alert("Lens Error", isPresented: $model.isShowingLensError) {
