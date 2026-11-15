@@ -39,7 +39,6 @@ Dev, on CloudKit Development.
 - **kitchen-knowledge-promotion:** On the iPad, run Export What I've Taught; on the Mac, run `scripts/promote-knowledge -n` and check the summary includes the mint fix, then run it for real and open its data diff as a PR; install a build with that promotion and confirm the fix is gone from Name Fixes while fresh mint leaves and mint still merge into one item. ([brief](efforts/archive/kitchen-knowledge-promotion.md))
 - **grocery-consolidate-list:** On the iPad Thanksgiving Advance list, tap List Actions › Consolidate List and confirm the three unsalted butters become one 14-tablespoon item showing all three recipes on long-press. Add one more recipe with butter and confirm it merges straight in. ([brief](efforts/archive/grocery-consolidate-list.md))
 - **dogfood-polish-2026-11-13:** On iPad and iPhone, check dated sorting and new menu selection; menu title scrolling; Fresh rapid-add visibility and focus; Same As labels; rounded grocery quantities; and recipe sharing to Messages and Notes. ([brief](efforts/archive/dogfood-polish-2026-11-13.md))
-- **family-cookbooks §S4 accept, fetch and lenses:** On Jon’s iPad and Wendy’s phone, accept the existing share, fetch and browse recipes, choose owner Lenses without edit controls, verify title/archive/shelf freshness, load a full photo, exercise cold and live acceptance, and check Sync status on all devices. ([brief](efforts/family-cookbooks.md))
 
 ## Held
 
@@ -50,7 +49,7 @@ Dev, on CloudKit Development.
   - Before the first TestFlight build that shows Family Cookbook (S4 lifts the DEBUG gate): in CloudKit Console, deploy
     `CookbookRecipe` (`payload`, `contentHash`, `payloadVersion`, `displayImage`), `CookbookProfile` (`displayName`,
     `recipeCount`, `payloadVersion`, `publishedAt`) and S4's `CookbookLenses` (`payload`, `contentHash`,
-    `payloadVersion`) from Development to Production. Run S4's device pass first, so Development has every field.
+    `payloadVersion`) from Development to Production. S4's device pass has run (2026-11-14), so Development has every field.
 - **Cockpit Find handoff — the two-app round trip ([ADR-0058](decisions/ADR-0058-cockpit-find-referral-transport.md), PRs [#322](https://github.com/jonphillips/yes-chef/pull/322) + [#325](https://github.com/jonphillips/yes-chef/pull/325)), no schema.** This is Cockpit's S-join, so it is owed **after Cockpit S-c2** (verdict drain) lands; until then, Yes
   Chef's half can only be seen in `AppLog.handoff`. On device:
   - Send a multi-recipe email from Cockpit; Create Recipe opens with its provenance.

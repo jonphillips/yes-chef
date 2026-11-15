@@ -211,28 +211,40 @@ extension RecipeRepository {
     var categories = try Category.fetchAll(db)
     var joined: Set<UUID> = []
     for label in labels {
-      var facetID: UUID?
-      if let name = label.facet {
-        if let existing = facets.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) { facetID = existing.id }
-        else {
-          let facet = Facet(id: uuid(), name: name, sortOrder: facets.count, dateCreated: now)
-          try Facet.insert { facet }.execute(db); facets.append(facet); facetID = facet.id
-        }
-      }
-      var parentID: UUID?
-      for component in label.path {
-        if let existing = categories.first(where: { $0.facetID == facetID && $0.parentCategoryID == parentID && $0.name.caseInsensitiveCompare(component) == .orderedSame }) { parentID = existing.id }
-        else {
-          let category = Category(id: uuid(), name: component, facetID: facetID, parentCategoryID: parentID,
-            sortOrder: categories.filter { $0.facetID == facetID && $0.parentCategoryID == parentID }.count, dateCreated: now)
-          try Category.insert { category }.execute(db); categories.append(category); parentID = category.id
-        }
-      }
-      guard let categoryID = parentID else { throw CategoryHierarchyError.emptyPath }
+      let categoryID = try resolveCookbookLabel(label, facets: &facets, categories: &categories, in: db, now: now, uuid: uuid)
       if joined.insert(categoryID).inserted {
         let join = RecipeCategory(id: uuid(), recipeID: recipeID, categoryID: categoryID)
         try RecipeCategory.insert { join }.execute(db)
       }
     }
   }
+
+  /// Labels cross libraries by name path, never by ID: finds the label at `label`'s path, creating what's missing.
+  static func resolveCookbookLabel(
+    _ label: RecipeBundleCoding.LabelPath, facets: inout [Facet], categories: inout [Category],
+    in db: Database, now: Date, uuid: () -> UUID
+  ) throws -> Category.ID {
+    let facetID = try label.facet.map { try resolveCookbookFacet(named: $0, facets: &facets, in: db, now: now, uuid: uuid) }
+    var parentID: UUID?
+    for component in label.path {
+      if let existing = categories.first(where: { $0.facetID == facetID && $0.parentCategoryID == parentID && $0.name.caseInsensitiveCompare(component) == .orderedSame }) { parentID = existing.id }
+      else {
+        let category = Category(id: uuid(), name: component, facetID: facetID, parentCategoryID: parentID,
+          sortOrder: categories.filter { $0.facetID == facetID && $0.parentCategoryID == parentID }.count, dateCreated: now)
+        try Category.insert { category }.execute(db); categories.append(category); parentID = category.id
+      }
+    }
+    guard let categoryID = parentID else { throw CategoryHierarchyError.emptyPath }
+    return categoryID
+  }
+
+  static func resolveCookbookFacet(
+    named name: String, facets: inout [Facet], in db: Database, now: Date, uuid: () -> UUID
+  ) throws -> Facet.ID {
+    if let existing = facets.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) { return existing.id }
+    let facet = Facet(id: uuid(), name: name, sortOrder: facets.count, dateCreated: now)
+    try Facet.insert { facet }.execute(db); facets.append(facet)
+    return facet.id
+  }
+
 }

@@ -72,7 +72,9 @@ public struct CookbookLensBundle: Codable, Equatable, Sendable {
     categoryIDs = referencedCategoryIDs
     var categories: [Category] = []
     var pendingCategoryIDs = categoryIDs
+    var visitedCategoryIDs = Set<Category.ID>()
     while let categoryID = pendingCategoryIDs.popFirst() {
+      guard visitedCategoryIDs.insert(categoryID).inserted else { continue }
       guard let category = try Category.find(categoryID).fetchOne(db) else { continue }
       categories.append(category)
       if let parentID = category.parentCategoryID { pendingCategoryIDs.insert(parentID) }

@@ -156,7 +156,7 @@ public final class CookbookMirror: Sendable {
           try db.execute(sql: "INSERT OR IGNORE INTO cookbookMirrorSeen(recordName) VALUES (?)", arguments: [recordName])
         }
         if let lensBundle = page.lensBundle {
-          let invalidLensNames = try Self.replaceLenses(lensBundle, in: db)
+          let invalidLensNames = try Self.replaceLenses(lensBundle, in: db, now: now, uuid: { uuid() })
           try db.execute(sql: "DELETE FROM cookbookMirrorSkipped WHERE recordName = 'lenses' OR recordName LIKE 'lens-%'")
           for name in invalidLensNames {
             try db.execute(
@@ -165,7 +165,9 @@ public final class CookbookMirror: Sendable {
             )
           }
         } else if page.deletesLensRecord {
-          _ = try Self.replaceLenses(CookbookLensBundle(lenses: [], shelves: [], categories: [], facets: []), in: db)
+          _ = try Self.replaceLenses(
+            CookbookLensBundle(lenses: [], shelves: [], categories: [], facets: []), in: db, now: now, uuid: { uuid() }
+          )
           try db.execute(sql: "DELETE FROM cookbookMirrorSkipped WHERE recordName = 'lenses' OR recordName LIKE 'lens-%'")
         }
         for (name, version) in page.skippedRecords {
@@ -191,15 +193,8 @@ public final class CookbookMirror: Sendable {
           try db.execute(sql: "DELETE FROM cookbookMirrorSeen")
           try db.execute(sql: "UPDATE cookbookMirrorState SET fullFetchActive = 0 WHERE id = 1")
         }
-        let currentLensBundle: CookbookLensBundle?
-        if let lensBundle = page.lensBundle {
-          currentLensBundle = lensBundle
-        } else if page.deletesLensRecord {
-          currentLensBundle = nil
-        } else {
-          currentLensBundle = try CookbookLensBundle.read(from: db)
-        }
-        try Self.pruneLabels(in: db, preserving: currentLensBundle)
+        // Read back, not the page's bundle: the stored queries hold the mirror's label IDs.
+        try Self.pruneLabels(in: db, preserving: try CookbookLensBundle.read(from: db))
         return .commit
       }
     }
@@ -247,18 +242,23 @@ public final class CookbookMirror: Sendable {
     }
   }
 
-  private static func replaceLenses(_ bundle: CookbookLensBundle, in db: Database) throws -> [String] {
+  private static func replaceLenses(
+    _ bundle: CookbookLensBundle, in db: Database, now: Date, uuid: () -> UUID
+  ) throws -> [String] {
     try RecipeLensShelf.fetchAll(db).forEach { try RecipeLensShelf.find($0.id).delete().execute(db) }
     try RecipeLens.fetchAll(db).forEach { try RecipeLens.find($0.id).delete().execute(db) }
-    for facet in bundle.facets { try Facet.upsert { facet }.execute(db) }
-    for category in bundle.categories { try Category.upsert { category }.execute(db) }
+    let labels = try LensLabelMap(bundle, in: db, now: now, uuid: uuid)
     func decodes(_ value: String) -> Bool { (try? RecipeLensQueryCodec.decode(value)) != nil }
     let invalidLensIDs = Set(bundle.lenses.filter { !decodes($0.baseQuery) }.map(\.id)
       + bundle.shelves.filter { !decodes($0.query) }.map(\.lensID))
     let valid = bundle.lenses.filter { !invalidLensIDs.contains($0.id) && decodes($0.baseQuery) }
     let validIDs = Set(valid.map(\.id))
-    for lens in valid { try RecipeLens.upsert { lens }.execute(db) }
-    for shelf in bundle.shelves where validIDs.contains(shelf.lensID) && decodes(shelf.query) {
+    for var lens in valid {
+      lens.baseQuery = try labels.rewrite(lens.baseQuery)
+      try RecipeLens.upsert { lens }.execute(db)
+    }
+    for var shelf in bundle.shelves where validIDs.contains(shelf.lensID) && decodes(shelf.query) {
+      shelf.query = try labels.rewrite(shelf.query)
       try RecipeLensShelf.upsert { shelf }.execute(db)
     }
     return invalidLensIDs.sorted { $0.uuidString < $1.uuidString }.map { "lens-\($0.uuidString)" }
@@ -424,5 +424,60 @@ public final class CookbookMirror: Sendable {
         try FileManager.default.removeItem(atPath: path)
       }
     }
+  }
+}
+
+/// Recipes reach the mirror with labels as name paths, so the mirror's label IDs are its own, not the owner's. Lens
+/// queries hold the owner's IDs, so this maps each onto the mirror's label at the same path (created if no recipe has
+/// it yet) and carries the owner's hidden flag. An ID the bundle can't place stays as it is and reads as unresolved.
+private struct LensLabelMap {
+  var facetIDs: [Facet.ID: Facet.ID] = [:]
+  var categoryIDs: [Category.ID: Category.ID] = [:]
+
+  init(_ bundle: CookbookLensBundle, in db: Database, now: Date, uuid: () -> UUID) throws {
+    var facets = try Facet.fetchAll(db)
+    var categories = try Category.fetchAll(db)
+    let ownerFacets = Dictionary(bundle.facets.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    let ownerCategories = Dictionary(bundle.categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    for facet in ownerFacets.values {
+      let id = try RecipeRepository.resolveCookbookFacet(named: facet.name, facets: &facets, in: db, now: now, uuid: uuid)
+      try Facet.find(id).update { $0.hidden = facet.hidden }.execute(db)
+      facetIDs[facet.id] = id
+    }
+    for category in ownerCategories.values {
+      var path = [category.name]
+      var visited: Set<Category.ID> = [category.id]
+      var parentID = category.parentCategoryID
+      var placed = true
+      while let id = parentID {
+        guard visited.insert(id).inserted, let parent = ownerCategories[id] else { placed = false; break }
+        path.insert(parent.name, at: 0)
+        parentID = parent.parentCategoryID
+      }
+      var facetName: String?
+      if let facetID = category.facetID {
+        guard let facet = ownerFacets[facetID] else { continue }
+        facetName = facet.name
+      }
+      guard placed else { continue }
+      let id = try RecipeRepository.resolveCookbookLabel(
+        .init(facet: facetName, path: path), facets: &facets, categories: &categories, in: db, now: now, uuid: uuid
+      )
+      try Category.find(id).update { $0.hidden = category.hidden }.execute(db)
+      categoryIDs[category.id] = id
+    }
+  }
+
+  func rewrite(_ encoded: String) throws -> String {
+    var query = try RecipeLensQueryCodec.decode(encoded)
+    for index in query.facetSelections.indices {
+      let selection = query.facetSelections[index]
+      query.facetSelections[index] = .init(
+        facetID: facetIDs[selection.facetID] ?? selection.facetID,
+        categoryIDs: Set(selection.categoryIDs.map { categoryIDs[$0] ?? $0 })
+      )
+    }
+    query.looseLabelIDs = Set(query.looseLabelIDs.map { categoryIDs[$0] ?? $0 })
+    return try RecipeLensQueryCodec.encode(query)
   }
 }
