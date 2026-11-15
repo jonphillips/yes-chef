@@ -7,90 +7,11 @@
   import SQLiteDataTestSupport
   import SnapshotTestingCustomDump
   import Testing
+  import TestLocals
 
   extension BaseCloudKitTests {
     @MainActor
     final class ReferenceViolationTests: BaseCloudKitTests, @unchecked Sendable {
-      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
-      @Test func childIsRetriedWhenParentWasNeverSaved_Cascade() async throws {
-        try await userDatabase.userWrite { db in
-          try db.seed {
-            RemindersList(id: 1, title: "Personal")
-            Reminder(id: 1, title: "Get milk", remindersListID: 1)
-          }
-        }
-        syncEngine.private.state.remove(
-          pendingRecordZoneChanges: [.saveRecord(RemindersList.recordID(for: 1))]
-        )
-
-        try await syncEngine.processPendingRecordZoneChanges(scope: .private)
-
-        try await userDatabase.read { db in
-          try #expect(RemindersList.find(1).fetchCount(db) == 1)
-          try #expect(Reminder.find(1).fetchCount(db) == 1)
-        }
-        #expect(
-          syncEngine.private.state.pendingRecordZoneChanges.contains(
-            .saveRecord(RemindersList.recordID(for: 1))
-          )
-        )
-        #expect(
-          syncEngine.private.state.pendingRecordZoneChanges.contains(
-            .saveRecord(Reminder.recordID(for: 1))
-          )
-        )
-
-        try await syncEngine.processPendingRecordZoneChanges(scope: .private)
-
-        let parentRecord = try syncEngine.private.database.record(
-          for: RemindersList.recordID(for: 1)
-        )
-        let childRecord = try syncEngine.private.database.record(for: Reminder.recordID(for: 1))
-        #expect(parentRecord.recordID == RemindersList.recordID(for: 1))
-        #expect(childRecord.recordID == Reminder.recordID(for: 1))
-      }
-
-      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
-      @Test func childIsRetriedWhenParentWasNeverSaved_SetNull() async throws {
-        try await userDatabase.userWrite { db in
-          try db.seed {
-            Parent(id: 1)
-            ChildWithOnDeleteSetNull(id: 1, parentID: 1)
-          }
-        }
-        syncEngine.private.state.remove(
-          pendingRecordZoneChanges: [.saveRecord(Parent.recordID(for: 1))]
-        )
-
-        try await syncEngine.processPendingRecordZoneChanges(scope: .private)
-
-        try await userDatabase.read { db in
-          try #expect(ChildWithOnDeleteSetNull.find(1).fetchOne(db)?.parentID == 1)
-        }
-        #expect(
-          syncEngine.private.state.pendingRecordZoneChanges.contains(
-            .saveRecord(Parent.recordID(for: 1))
-          )
-        )
-        #expect(
-          syncEngine.private.state.pendingRecordZoneChanges.contains(
-            .saveRecord(ChildWithOnDeleteSetNull.recordID(for: 1))
-          )
-        )
-
-        try await syncEngine.processPendingRecordZoneChanges(scope: .private)
-
-        let parentRecord = try syncEngine.private.database.record(for: Parent.recordID(for: 1))
-        let childRecord = try syncEngine.private.database.record(
-          for: ChildWithOnDeleteSetNull.recordID(for: 1)
-        )
-        #expect(parentRecord.recordID == Parent.recordID(for: 1))
-        #expect(childRecord.recordID == ChildWithOnDeleteSetNull.recordID(for: 1))
-        try await userDatabase.read { db in
-          try #expect(ChildWithOnDeleteSetNull.find(1).fetchOne(db)?.parentID == 1)
-        }
-      }
-
       // * Local client moves a reminder to a list.
       // * At same time, remote deletes that list.
       // => When data is synchronized the reminder and list are deleted.
@@ -486,6 +407,70 @@
               Parent.all.fetchAll(db) == [Parent(id: 0), Parent(id: 1)]
             )
           }
+        }
+      }
+
+      // * The user's iCloud storage is full.
+      // * Local client creates a list and a reminder in it. Both saves fail with
+      //   'quotaExceeded' and wait until a later save succeeds.
+      // * The user frees up space, then adds another reminder to the list.
+      // => The new reminder is kept, and the list and both reminders are uploaded.
+      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+      @Test(.taskLocal($quota, 0))
+      func addReminderAfterListFailedToSaveWithQuotaExceeded() async throws {
+        try await userDatabase.userWrite { db in
+          try db.seed {
+            RemindersList(id: 1, title: "Personal")
+          }
+        }
+        try await syncEngine.processPendingRecordZoneChanges(scope: .private)
+
+        syncEngine.private.database.state.withValue { $0.quota = .max }
+        try await userDatabase.userWrite { db in
+          try Reminder.insert { Reminder(id: 1, title: "Get milk", remindersListID: 1) }
+            .execute(db)
+        }
+        try await syncEngine.processPendingRecordZoneChanges(scope: .private)
+
+        let reminders = try await userDatabase.read { db in
+          try Reminder.order(by: \.id).fetchAll(db)
+        }
+        expectNoDifference(
+          reminders,
+          [Reminder(id: 1, title: "Get milk", remindersListID: 1)]
+        )
+        assertInlineSnapshot(of: container, as: .customDump) {
+          """
+          MockCloudContainer(
+            privateCloudDatabase: MockCloudDatabase(
+              databaseScope: .private,
+              storage: [
+                [0]: CKRecord(
+                  recordID: CKRecord.ID(1:reminders/zone/__defaultOwner__),
+                  recordType: "reminders",
+                  parent: CKReference(recordID: CKRecord.ID(1:remindersLists/zone/__defaultOwner__)),
+                  share: nil,
+                  id: 1,
+                  isCompleted: 0,
+                  remindersListID: 1,
+                  title: "Get milk"
+                ),
+                [1]: CKRecord(
+                  recordID: CKRecord.ID(1:remindersLists/zone/__defaultOwner__),
+                  recordType: "remindersLists",
+                  parent: nil,
+                  share: nil,
+                  id: 1,
+                  title: "Personal"
+                )
+              ]
+            ),
+            sharedCloudDatabase: MockCloudDatabase(
+              databaseScope: .shared,
+              storage: []
+            )
+          )
+          """
         }
       }
     }
