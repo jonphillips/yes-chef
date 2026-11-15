@@ -3,9 +3,9 @@
 Status: Ready
 Summary: Lenses move out of the Power Browser into their own tab: a gallery of your Lenses and your family's, each Lens built and edited on its own screen with a tray of suggested shelves, and a family cookbook opening on its owner's Lenses. No schema change.
 
-Implements: [ADR-0050 Amendment 2](../decisions/ADR-0050-recipe-power-browser.md#amendment-2--lenses-get-their-own-tab-and-a-lens-is-built-on-its-own-screen-2026-11-15).
+Implements: [ADR-0050 Amendment 2](../../decisions/ADR-0050-recipe-power-browser.md#amendment-2--lenses-get-their-own-tab-and-a-lens-is-built-on-its-own-screen-2026-11-15).
 The amendment is the design; read A2-D1 through A2-D6 first, and Amendment 1 for what a Lens is. This brief adds
-where things go and what done looks like. Builds on [recipe-lenses](archive/recipe-lenses.md) (L1 + L2, #403) and
+where things go and what done looks like. Builds on [recipe-lenses](recipe-lenses.md) (L1 + L2, #403) and
 family-cookbooks S4 (#521), which carried Lenses into the cookbook.
 
 **No schema change.** `recipeLenses` and `recipeLensShelves` already hold everything here. If you find you need a

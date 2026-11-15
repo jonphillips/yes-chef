@@ -550,4 +550,4 @@ is still iPad-first (S5 is unchanged).
 
 ### Slice
 
-- **LT — the Lenses tab.** A2-D1 through A2-D6 in one dispatch: [`efforts/lenses-tab.md`](../efforts/lenses-tab.md).
+- **LT — the Lenses tab.** A2-D1 through A2-D6 in one dispatch: [`efforts/archive/lenses-tab.md`](../efforts/archive/lenses-tab.md).

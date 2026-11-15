@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-15 — The Lenses tab (`effort/lenses-tab`)
+
+- **Result:** Added the Lenses gallery, Lens editing and query sheets, and cookbook shelf copying. The Power Browser now saves queries as Lenses and no longer hosts Lens selection or editing.
+- **Verification:** scripts/check-drift.sh passed; generic iOS build passed; YesChefTests passed with 168 tests in 36 suites.
+- **Owed:** lenses-tab LT the Lenses tab's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-15 — Cookbook Lens shelves open the cookbook's recipe (`fix/lens-shelf-cookbook-scope`)
 
 - **Result:** A recipe opened from a Lens shelf, from Everything else, or from See all now opens in the Lens's own library. Before, the shelf views built the recipe presentation without a scope, so it defaulted to `.mine`, and in a family cookbook the viewer's own library was searched for the owner's recipe ID. The Power Browser's results list already passed its scope. Found by the architect while designing the Lenses tab (ADR-0050 Amendment 2).
