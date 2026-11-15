@@ -453,3 +453,101 @@ ADR-0046 sidebar is design, not decision.
   Power Browser query, rename, reorder, remove, remainder toggle), "Save as Lens" from the Power Browser, and the
   unresolved-shelf repair affordance. *Batchable with L1.*
 - **S5 (unchanged slot) — iPhone presentation** now also opens Lenses as vertical sections.
+
+## Amendment 2 — Lenses get their own tab, and a Lens is built on its own screen (2026-11-15)
+
+**The want (Jon, 2026-11-15).** The Power Browser is a good tool, but it isn't fun. Lenses are. They should have
+their own place in the app, and building one should be clear and quick. The family should be able to browse
+Jon's cookbook through Jon's Lenses, and build their own Lenses over the recipes they've copied.
+
+**What's wrong with building a Lens today.** Amendment 1 put Lenses inside the Power Browser, and making one is a
+tour through it. Save as Lens asks only for a name and doesn't open the new Lens. The editor is a sheet. Adding a
+shelf or editing a query closes that sheet and drops the cook into the browser in an editing mode marked only by a
+**Save query** button, with no Cancel. The counts shown there cover the whole library, not the Lens's base. The
+one-tap suggestions sit at the bottom of the editor, below Delete Lens. A new shelf you add yourself is called
+"New shelf". The name waits for Save while every other change saves straight away. And you never see a shelf fill
+with recipes while you're building it.
+
+A1-D1 through A1-D6 are unchanged: the model, intersection, remainder, empty versus broken, suggestions from counts,
+and storage. This amendment decides where Lenses live and how one is built. **No schema change.**
+
+### A2-D1 — Lenses are a tab, and the tab opens on a gallery
+
+A new `AppSection.lenses`. Its root is a full-width gallery of Lens cards, not a split view (jon-platform
+`ui-and-platforms.md`: a landing surface is never a sidebar). A card shows the Lens's name, its base chips, how many
+shelves it has, and a mosaic of thumbnails from its first shelves. Tapping a card pushes the Lens.
+
+The gallery has one section per library: **My Lenses** first, then one section per accepted family cookbook, named
+for its owner. A cookbook's Lenses are read from that cookbook's mirror and run against the owner's recipes, exactly
+as they do today. The tab only lists them together; nothing is copied into the viewer's library, so ADR-0071
+Amendment 4 and ADR-0070 D1 hold. A Lens is always evaluated inside one library. No Lens spans two.
+
+### A2-D2 — A Lens is edited on its own screen
+
+The Lens screen is the shelf view. **Edit** puts that same screen into edit mode; there is no editor sheet.
+
+- **New Lens asks for the base first.** It offers facet values with their counts ("Cuisine: Mexican 142"). Picking
+  one creates the Lens, names it after the value, and opens it in edit mode. A base needing more than one value is
+  built in the base-query sheet (A2-D3).
+- **Suggested shelves are a tray on the Lens screen**, from A1-D5's counts. Tapping one adds the shelf where the cook
+  can see it, with its recipes.
+- **Everything else is shown while editing**, with its count, whether or not the remainder toggle is on. It shrinks
+  as shelves are added, and what's left is the recipes in this Lens that still need labels (A1-D3).
+- Shelves are renamed in place, reordered by dragging and removed with a swipe or context menu. Empty shelves show
+  with a count of 0 and broken ones show **Fix** (A1-D4).
+- **Every change saves as it's made**, a row at a time (ADR-0040). Done leaves edit mode; there is no Save or Cancel.
+
+A Lens with no shelves opens on its own screen too, showing its base recipes, and when it's yours, the tray. This
+replaces A1-D1's "opening a zero-shelf Lens opens the Power Browser". A Lens is never a Power Browser state.
+
+### A2-D3 — Query sheets count inside the Lens
+
+A shelf that isn't one suggested value ("Up to 45 min", "Never cooked", two values) is made in a sheet holding the
+Power Browser's filter controls. **The sheet's counts cover only the Lens's base recipes**, so the numbers the cook
+sees are the numbers the shelf will show. That needs no engine change: the sheet runs an engine built over the
+base's recipes. The shelf's title defaults to its selections and can be renamed.
+
+Editing the base query uses the same sheet over the whole library. Editing an existing shelf's query reopens the
+sheet on it. Both have Cancel.
+
+### A2-D4 — The Power Browser goes back to being a tool
+
+The Lens picker, the shelf view and the saved-query editing mode leave the Power Browser. It keeps **Save as Lens**,
+which now creates the Lens from the current query and opens it in the Lenses tab, in edit mode. A Lens keeps a
+**Browse all** action that opens the Power Browser on its base query only (A1-D2), in the same library: your
+Power Browser for your Lens, the cookbook's Power Browser for a cookbook Lens.
+
+### A2-D5 — In a cookbook, Lenses are the front door
+
+A family cookbook's switcher becomes **Lenses | Recipes | Power Browser**, and a cookbook opens on Lenses when its
+owner has any. It shows the same gallery section as the Lenses tab, and opens the same Lens screen. It's
+read-only: no Edit, no New Lens, no tray, no Fix. Too-new Lenses stay left out and counted (ADR-0071 Amendment 4).
+
+The viewer copies from a shelf. A card's context menu has **Copy to My Recipes**, or **Open Mine** when the
+recipe is already in their library. A shelf has **Copy shelf**, which copies the shelf's recipes the viewer doesn't
+already have through the existing copy path (ADR-0071 D7), with progress and a report of any that failed.
+
+**A Lens is still never copied** (ADR-0071 Amendment 4). Family members build their own over their own library.
+They usually don't start from nothing: copied recipes bring their label names with them, so the tray in their own
+Lens offers those labels, counted over what they actually took.
+
+### A2-D6 — The phone gets Lenses, including editing
+
+The family's phones are where most of their browsing happens, and they build their own Lenses. So the phone
+gets the Lenses tab, the gallery and the Lens screen as A1-D7's vertical sections. It also gets edit mode with the
+tray, and the query sheets. This reverses A1-D7's "editing them there is not required". The Power Browser itself
+is still iPad-first (S5 is unchanged).
+
+### Rejected
+
+- **A Lens that spans your library and a cookbook.** It mixes two libraries' semantics in one query and crosses
+  ADR-0070 D1.
+- **Copying a Lens into your own library**, even with name matching. Jon's call: family members build their own.
+- **A per-Lens "show in my cookbook" switch.** It's a new column on a synced table. All Lenses travel, as now, until
+  one is actually unwelcome in the cookbook.
+- **Keeping the editor sheet and only moving it to the new tab.** The sheet is the cause of the round trips. Moving
+  it would carry them over.
+
+### Slice
+
+- **LT — the Lenses tab.** A2-D1 through A2-D6 in one dispatch: [`efforts/lenses-tab.md`](../efforts/lenses-tab.md).
