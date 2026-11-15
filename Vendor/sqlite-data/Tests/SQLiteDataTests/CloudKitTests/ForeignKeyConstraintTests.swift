@@ -110,6 +110,44 @@
         }
       }
 
+      @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+      @Test func newerParkedRecordIsAppliedAfterItsParentArrives() async throws {
+        let firstVersion = reminderRecord(id: 1, listID: 1, title: "First")
+        let parent = remindersListRecord(id: 2, title: "Business")
+        await receive([firstVersion])
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.count().fetchOne(db) == 1)
+        }
+
+        await withDependencies {
+          $0.currentTime.now += 1
+        } operation: {
+          let newerVersion = reminderRecord(id: 1, listID: 2, title: "Latest")
+          newerVersion.parent = CKRecord.Reference(
+            recordID: RemindersList.recordID(for: 2),
+            action: .none
+          )
+          await receive([newerVersion])
+        }
+
+        await receive([parent])
+
+        assertQuery(
+          Reminder.select { ($0.title, $0.remindersListID) },
+          database: userDatabase.database
+        ) {
+          """
+          ┌──────────┬───┐
+          │ "Latest" │ 2 │
+          └──────────┴───┘
+          """
+        }
+        try await syncEngine.metadatabase.read { db in
+          try #expect(UnsyncedRecordID.count().fetchOne(db) == 0)
+        }
+        #expect(container.privateCloudDatabase.state.withValue(\.fetchedRecordIDs).isEmpty)
+      }
+
       /*
        * Remote client creates records A <- B <- C
        * Records A and C are sync'd to local client.
@@ -944,6 +982,36 @@
           try #expect(RemindersList.fetchCount(db) == 1)
           try #expect(Reminder.fetchCount(db) == 500)
         }
+      }
+
+      private func reminderRecord(id: Int, listID: Int, title: String) -> CKRecord {
+        let listRecord = remindersListRecord(id: listID, title: "List \(listID)")
+        let record = CKRecord(
+          recordType: Reminder.tableName,
+          recordID: Reminder.recordID(for: id)
+        )
+        record.setValue(id, forKey: "id", at: now)
+        record.setValue(title, forKey: "title", at: now)
+        record.setValue(listID, forKey: "remindersListID", at: now)
+        record.parent = CKRecord.Reference(record: listRecord, action: .none)
+        return record
+      }
+
+      private func receive(_ records: [CKRecord]) async {
+        await syncEngine.handleFetchedRecordZoneChanges(
+          modifications: records,
+          syncEngine: syncEngine.private
+        )
+      }
+
+      private func remindersListRecord(id: Int, title: String) -> CKRecord {
+        let record = CKRecord(
+          recordType: RemindersList.tableName,
+          recordID: RemindersList.recordID(for: id)
+        )
+        record.setValue(id, forKey: "id", at: now)
+        record.setValue(title, forKey: "title", at: now)
+        return record
       }
     }
   }

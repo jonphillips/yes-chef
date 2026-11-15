@@ -24,6 +24,7 @@
       package var rateLimitDuration: Duration
       fileprivate var requestTimestamps: [AnyClock<Duration>.Instant] = []
       package var fetchedRecordIDs: [CKRecord.ID] = []
+      package var rejectedSaves: [CKRecord.ID: CKError.Code] = [:]
       mutating func nextRecordChangeTag() -> Int {
         lastRecordChangeTag += 1
         return lastRecordChangeTag
@@ -150,6 +151,11 @@
         switch savePolicy {
         case .ifServerRecordUnchanged:
           for recordToSave in recordsToSave {
+            // NB: Fail a save with a given error once, as CloudKit does when it rejects a record.
+            if let code = state.rejectedSaves.removeValue(forKey: recordToSave.recordID) {
+              saveResults[recordToSave.recordID] = .failure(CKError(code))
+              continue
+            }
             if let share = recordToSave as? CKShare {
               let isSavingRootRecord = recordsToSave.contains(where: {
                 $0.share?.recordID == share.recordID
