@@ -8,6 +8,53 @@ extension RecipeCoreTests {
   @Suite
   struct RecipeBrowserTests {
     @Test
+    func restrictedBrowserCountsAndSuggestionsStayInsideTheLensBase() throws {
+      let fixture = BrowserFixture()
+      let data = RecipeBrowserData(
+        recipes: [fixture.koreanBeef, fixture.mexicanBeef, fixture.koreanPork, fixture.mexicanPork],
+        recipeCategories: [
+          .init(id: fixture.ids.next(), recipeID: fixture.koreanBeef.id, categoryID: fixture.korean.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.koreanBeef.id, categoryID: fixture.beef.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.mexicanBeef.id, categoryID: fixture.mexican.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.mexicanBeef.id, categoryID: fixture.beef.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.koreanPork.id, categoryID: fixture.korean.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.koreanPork.id, categoryID: fixture.pork.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.mexicanPork.id, categoryID: fixture.mexican.id),
+          .init(id: fixture.ids.next(), recipeID: fixture.mexicanPork.id, categoryID: fixture.pork.id),
+        ],
+        categories: [fixture.korean, fixture.mexican, fixture.beef, fixture.tenderloin, fixture.pork],
+        facets: [fixture.cuisine, fixture.protein]
+      )
+      let base = RecipeBrowserQuery(facetSelections: [
+        .init(facetID: fixture.cuisine.id, categoryIDs: [fixture.korean.id])
+      ])
+      let restricted = data.restricted(to: Set(RecipeBrowserEngine(
+        recipes: data.recipes,
+        recipeCategories: data.recipeCategories,
+        categories: data.categories,
+        facets: data.facets
+      ).matchingRecipeIDs(for: base)))
+      let engine = RecipeBrowserEngine(
+        recipes: restricted.recipes,
+        recipeCategories: restricted.recipeCategories,
+        categories: restricted.categories,
+        facets: restricted.facets,
+        sources: restricted.sources,
+        variations: restricted.variations,
+        recipeIDsWithPhotos: restricted.recipeIDsWithPhotos
+      )
+
+      let unfiltered = engine.result(for: RecipeBrowserQuery())
+      let proteinCounts = try #require(unfiltered.availableFacets.first { $0.facet.id == fixture.protein.id }?.values)
+      #expect(proteinCounts.map(\.matchingRecipeCount) == [1, 1])
+      #expect(unfiltered.matchingRecipeIDs == [fixture.koreanBeef.id, fixture.koreanPork.id])
+      #expect(RecipeLensEvaluator.suggestions(for: RecipeBrowserQuery(), using: engine)
+        .flatMap(\.values).allSatisfy { $0.matchingRecipeCount > 0 })
+      #expect(RecipeLensEvaluator.suggestions(for: RecipeBrowserQuery(), using: engine)
+        .flatMap(\.values).map(\.category.id).contains(fixture.mexican.id) == false)
+    }
+
+    @Test
     func lensShelvesIntersectIndependentlyAndOverlapsStayOutOfRemainder() throws {
       let fixture = BrowserFixture()
       let base = try RecipeLensQueryCodec.encode(RecipeBrowserQuery())

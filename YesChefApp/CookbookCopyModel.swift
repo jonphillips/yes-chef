@@ -33,6 +33,7 @@ final class CookbookCopyModel {
   @ObservationIgnored let fetchClient: CookbookFetchClient
 
   private(set) var copiedSourceIDsByCookbook: [String: Set<Recipe.ID>] = [:]
+  private(set) var shelfCopyProgress: String?
   var prompt: Prompt?
   private var pendingCopy: PendingCopy?
   var toastCenter: AppToastCenter?
@@ -70,6 +71,48 @@ final class CookbookCopyModel {
     } catch {
       prompt = .failure(String(describing: error))
     }
+  }
+
+  func existingCopyID(context: CookbookContext, sourceID: Recipe.ID) async -> Recipe.ID? {
+    guard let bundle = try? await context.mirror.database.read({ try CookbookPayload.bundle(for: sourceID, in: $0) }) else {
+      return nil
+    }
+    return try? await libraryDatabase.read { db in
+      try RecipeRepository.existingCopies(of: bundle, in: db).first
+    }
+  }
+
+  func copyShelf(context: CookbookContext, sourceIDs: [Recipe.ID]) async -> (copied: Int, failures: [String]) {
+    var copied = 0
+    var failures: [String] = []
+    defer { shelfCopyProgress = nil }
+    for (index, sourceID) in sourceIDs.enumerated() {
+      shelfCopyProgress = "Copying \(index + 1) of \(sourceIDs.count)"
+      do {
+        guard let bundle = try await context.mirror.database.read({
+          try CookbookPayload.bundle(for: sourceID, in: $0)
+        }) else { throw CookbookCopyError.missingParent(sourceID) }
+        let existing = try await libraryDatabase.read {
+          try RecipeRepository.existingCopies(of: bundle, in: $0)
+        }
+        guard existing.isEmpty else { continue }
+        let (displayImages, _) = await displayImageData(for: bundle, context: context)
+        let copyDate = now
+        let makeUUID = uuid
+        _ = try await libraryDatabase.write { db in
+          try RecipeRepository.copyCookbookRecipe(bundle, ownerName: context.ownerName,
+            displayImages: displayImages, in: db, now: copyDate, uuid: { makeUUID() })
+        }
+        copied += 1
+      } catch {
+        let title = (try? await context.mirror.database.read { db in
+          try Recipe.find(sourceID).select(\.title).fetchOne(db)
+        }) ?? nil
+        failures.append("\(title ?? "Recipe \(sourceID.uuidString)"): \(error.localizedDescription)")
+      }
+    }
+    await refreshCopyStatus(context: context)
+    return (copied, failures)
   }
 
   func copyAnywayButtonTapped() async {

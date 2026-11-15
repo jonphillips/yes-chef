@@ -36,6 +36,7 @@ struct CookbookContext: Hashable {
 struct CookbookLibraryModels {
   let recipes: RecipeLibraryModel
   let powerBrowser: PowerBrowserModel
+  let lenses: LensesModel
 
   init(context: CookbookContext) {
     let models = withDependencies {
@@ -43,11 +44,13 @@ struct CookbookLibraryModels {
     } operation: {
       (
         RecipeLibraryModel(scope: .cookbook(context)),
-        PowerBrowserModel(scope: .cookbook(context))
+        PowerBrowserModel(scope: .cookbook(context)),
+        LensesModel(scope: .cookbook(context))
       )
     }
     recipes = models.0
     powerBrowser = models.1
+    lenses = models.2
   }
 }
 
@@ -115,6 +118,7 @@ struct TodayPrepPresentation: Hashable, Identifiable {
 
 enum AppSection: String, CaseIterable, Identifiable {
   case recipes
+  case lenses
   case cookbooks
   case fromChat
   case createRecipe
@@ -131,6 +135,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .recipes: "Recipes"
+    case .lenses: "Lenses"
     case .cookbooks: "Family Cookbooks"
     case .fromChat: "From Chat"
     case .createRecipe: "Create Recipe"
@@ -147,6 +152,7 @@ enum AppSection: String, CaseIterable, Identifiable {
   var symbol: AppSymbol {
     switch self {
     case .recipes: .recipe
+    case .lenses: AppSymbol("camera.aperture")
     case .cookbooks: AppSymbol("books.vertical")
     case .fromChat: .fromChat
     case .createRecipe: .addRecipes

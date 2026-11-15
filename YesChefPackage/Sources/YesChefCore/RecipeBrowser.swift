@@ -262,6 +262,20 @@ public struct RecipeBrowserData: Equatable, Sendable {
     self.recipeIDsWithPhotos = recipeIDsWithPhotos
   }
 
+  /// Returns browser data limited to a known set of recipes while retaining the
+  /// library's full facet and category vocabulary for unresolved-query checks.
+  public func restricted(to recipeIDs: Set<Recipe.ID>) -> Self {
+    Self(
+      recipes: recipes.filter { recipeIDs.contains($0.id) },
+      recipeCategories: recipeCategories.filter { recipeIDs.contains($0.recipeID) },
+      categories: categories,
+      facets: facets,
+      sources: sources.filter { recipeIDs.contains($0.recipeID) },
+      variations: variations.filter { recipeIDs.contains($0.recipeID) },
+      recipeIDsWithPhotos: recipeIDsWithPhotos.intersection(recipeIDs)
+    )
+  }
+
   public func result(for query: RecipeBrowserQuery) -> RecipeBrowserResult {
     RecipeBrowserEngine(
       recipes: recipes,

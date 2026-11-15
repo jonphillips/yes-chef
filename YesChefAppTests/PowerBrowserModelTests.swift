@@ -164,29 +164,6 @@ struct PowerBrowserModelTests {
   }
 
   @Test
-  func selectingLensLoadsItsBaseAndAllRecipesReturnsToBrowser() throws {
-    let now = Date(timeIntervalSinceReferenceDate: 904_900_000)
-    let query = RecipeBrowserQuery(text: "taco")
-    let lens = RecipeLens(
-      id: SampleUUIDSequence.uuid(94_901), name: "Tacos",
-      baseQuery: try RecipeLensQueryCodec.encode(query), sortOrder: 0,
-      dateCreated: now, dateModified: now
-    )
-    try withDependencies {
-      try $0.bootstrapDatabase()
-    } operation: {
-      let model = PowerBrowserModel()
-      model.lensSelectionChanged(lens.id, using: lens)
-      #expect(model.selectedLensID == lens.id)
-      #expect(model.query == query)
-
-      model.lensSelectionChanged(nil)
-      #expect(model.selectedLensID == nil)
-      #expect(model.query == RecipeBrowserQuery())
-    }
-  }
-
-  @Test
   func savingAsLensPersistsCurrentQueryAndShelfReorderKeepsIDs() async throws {
     let now = Date(timeIntervalSinceReferenceDate: 904_910_000)
     try await withDependencies {
@@ -215,54 +192,6 @@ struct PowerBrowserModelTests {
       }
       #expect(reordered.map(\.id) == [second.id, first.id])
       #expect(reordered.map(\.sortOrder) == [0, 1])
-    }
-  }
-
-  @Test
-  func savingShelfQueryThenReSelectingLensLoadsBaseQuery() async throws {
-    let now = Date(timeIntervalSinceReferenceDate: 904_920_000)
-    let lensID = SampleUUIDSequence.uuid(94_921)
-    let shelfID = SampleUUIDSequence.uuid(94_922)
-    let initialQuery = RecipeBrowserQuery(text: "initial")
-    let editedQuery = RecipeBrowserQuery(text: "edited")
-    try await withDependencies {
-      try $0.bootstrapDatabase()
-      $0.date.now = now
-    } operation: {
-      @Dependency(\.defaultDatabase) var database
-      let lens = RecipeLens(
-        id: lensID, name: "Edited", baseQuery: try RecipeLensQueryCodec.encode(initialQuery),
-        sortOrder: 0, dateCreated: now, dateModified: now
-      )
-      let shelf = RecipeLensShelf(
-        id: shelfID, lensID: lensID, title: "Shelf",
-        query: try RecipeLensQueryCodec.encode(initialQuery), sortOrder: 0
-      )
-      try await database.write { db in
-        try RecipeLens.insert { lens }.execute(db)
-        try RecipeLensShelf.insert { shelf }.execute(db)
-      }
-
-      let model = PowerBrowserModel()
-      model.query = editedQuery
-      model.queryEditTarget = .lensBase(lensID)
-      model.saveQueryEditsButtonTapped()
-      #expect(model.selectedLensID == lensID)
-      #expect(model.query == editedQuery)
-      let updatedLensRecord = try await database.read { db in
-        try RecipeLens.find(lensID).fetchOne(db)
-      }
-      let updatedLens = try #require(updatedLensRecord)
-
-      let shelfEdit = RecipeBrowserQuery(text: "shelf edit")
-      model.query = shelfEdit
-      model.queryEditTarget = .shelf(shelfID, lensID: lensID)
-      model.saveQueryEditsButtonTapped()
-      #expect(model.selectedLensID == lensID)
-      #expect(model.query == shelfEdit)
-      model.lensSelectionChanged(nil)
-      model.lensSelectionChanged(lensID, using: updatedLens)
-      #expect(model.query == editedQuery)
     }
   }
 
