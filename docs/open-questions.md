@@ -5,6 +5,19 @@
 
 ## Candidates
 
+**Siri AI tool intents — wait for the release, not the beta (Jon and the architect, 2026-11-16).** Apple's Siri AI
+developer preview ([news](https://developer.apple.com/news/?id=gdk2umrf),
+[docs](https://developer.apple.com/documentation/appintents/bringing-custom-actions-and-content-to-siri)) lets Siri
+call an App Intent marked `@AppIntent(.tool)` from natural speech, across apps. It's 27.3-beta only, and only for
+dev-signed and internal-TestFlight builds. Jon isn't running betas, so revisit when Siri AI ships to customers ("a few
+months" from 2026-11-03) and App Store submission opens (spring 2027). Re-read the docs first, because the API may change.
+- **Cheap:** mark `CaptureRecipeFromText` as a tool and add a description to `rawText`, so "save this recipe to Yes
+  Chef" works from Safari or Messages.
+- **A milestone, not cheap:** "what's for dinner Tuesday?" or "find my chili recipe" need real recipe, menu and
+  meal-plan entities, indexed in Spotlight, with a description on each property. The MCP tools (`search_recipes`,
+  `get_meal_plan`, …) already map out that surface.
+- **Not tools:** `ExportHandoffContext`, `ImportHandoffResult` and the handoff entities. They're ChatGPT-handoff plumbing.
+
 **Per-recipe facet/tag coverage is Jon's ongoing hand work and gates nothing** — Power Browser (ADR-0050)
 and everything downstream move forward without waiting on it.
 
