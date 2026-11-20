@@ -102,13 +102,14 @@ records" pass. Related: [[no-dead-data]] (sync status must never stay quietly gr
 The fix is a jon-platform CloudSyncKit slice (Galavant shares it): show "Syncing…" or the last scan's result
 instead of green when the scan is skipped, and count the engine's real queue.
 
-**Can SQLiteData 1.13.0 replace the vendored copy? (updated 2026-11-15).** `Vendor/sqlite-data` (ADR-0056 Amd 2)
-keeps children of parents the server never confirmed. It was waiting on
+**Can SQLiteData 1.13.0 replace the vendored copy? (updated 2026-11-19).** The patched copy (ADR-0056 Amd 2) keeps
+children of parents the server never confirmed. Since #532 (2026-11-18) it's the shared one in jon-platform's
+`Vendor/sqlite-data` (its notes are in `PATCH.md`), which Urbane overrides with too. It was waiting on
 [pointfreeco/sqlite-data#548](https://github.com/pointfreeco/sqlite-data/pull/548), which closed **unmerged**
 on 2026-11-04; issue #547 is still open, and point-free said they're reworking quota detection. 1.13.0 (2026-11-09)
 ships `quotaExceeded` handling (#335), batch sorting against reference violations (#571) and a `@Fetch` load
 cancellation fix (#536). Next step: check whether 1.13.0 covers #547's repro; if it does, return to the remote
-package and remove the `project.yml` override.
+package and remove the `project.yml` override (and Urbane's, in the same change).
 
 **Migration baseline squash — optional, post-cut, both apps (deferred by ADR-0056 Amd 1).** Use GRDB
 `registerMigration(_:merging:)`. The precondition is that every device is at the final legacy migration.
