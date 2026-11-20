@@ -388,6 +388,7 @@ struct GroceryItemRowView: View {
           .font(.title3)
           .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
           .frame(width: 32, height: 32)
+          .accessibilityLabel(isSelected ? "Deselect" : "Select")
       } else {
         Button {
           togglePurchased()
@@ -415,7 +416,7 @@ struct GroceryItemRowView: View {
         if !row.sources.isEmpty {
           VStack(alignment: .leading, spacing: 4) {
             ForEach(row.sources) { source in
-              GrocerySourceLabel(source: source) {
+              GrocerySourceLabel(source: source, isSelecting: isSelecting) {
                 deleteSource(source.id)
               } deleteContribution: {
                 deleteContribution(source.id)
@@ -447,7 +448,6 @@ struct GroceryItemRowView: View {
         .actions
       }
     }
-    .accessibilityLabel(isSelecting ? (isSelected ? "Deselect" : "Select") : row.item.title)
   }
 
   private var detailText: String? {
@@ -519,6 +519,7 @@ private struct GroceryItemActions {
 
 private struct GrocerySourceLabel: View {
   let source: GroceryItemSource
+  var isSelecting = false
   var deleteSource: () -> Void
   var deleteContribution: () -> Void
 
@@ -538,18 +539,20 @@ private struct GrocerySourceLabel: View {
 
     }
     .contextMenu {
-      if let contributionRemovalTitle = source.contributionRemovalTitle {
-        Button(role: .destructive) {
-          deleteContribution()
-        } label: {
-          Label(contributionRemovalTitle, systemImage: "minus.square")
+      if !isSelecting {
+        if let contributionRemovalTitle = source.contributionRemovalTitle {
+          Button(role: .destructive) {
+            deleteContribution()
+          } label: {
+            Label(contributionRemovalTitle, systemImage: "minus.square")
+          }
         }
-      }
 
-      Button(role: .destructive) {
-        deleteSource()
-      } label: {
-        Label("Remove Source", systemImage: "minus.circle")
+        Button(role: .destructive) {
+          deleteSource()
+        } label: {
+          Label("Remove Source", systemImage: "minus.circle")
+        }
       }
     }
   }
