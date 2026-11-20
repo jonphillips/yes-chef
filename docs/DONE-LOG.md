@@ -9,6 +9,13 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-19 — Move grocery items (`effort/grocery-move-items`)
+
+- **Result:** Added grocery item selection mode and transactional cross-list moves that preserve item identities, merge compatible lines with the existing consolidation logic, and leave trip assignments unchanged. Updated grocery help and added core and model regression coverage.
+- **Verification:** SwiftLint passed; 907 YesChefPackage tests and 20 YesChefMCP tests passed; 174 YesChefTests passed on the prescribed simulator command; generic iOS device build succeeded. The standard check-drift app build destination failed after CoreSimulator became unavailable, so its remaining stages were rerun with the app build skipped.
+- **Owed:** grocery-move-items MV move selected grocery items to another list's device gate, in [device-passes.md](device-passes.md).
+
+---
 ## 2026-11-18 — Shared patched SQLiteData vendor (`effort/shared-sqlitedata-vendor`)
 
 - **Result:** The app's `SQLiteData` package reference now points to the shared patched copy in jon-platform (#144), and the duplicate `Vendor/sqlite-data` tree is removed. Verification paths now point to the shared package.

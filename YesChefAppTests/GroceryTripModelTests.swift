@@ -177,4 +177,50 @@ struct GroceryTripModelTests {
       #expect(model.pantryStapleNames == ["Olive oil"])
     }
   }
+
+  @Test
+  func selectingAndMovingItemsEndsSelectionAndChangingListsClearsIt() async throws {
+    let now = Date(timeIntervalSinceReferenceDate: 900_810_000)
+    try await withDependencies {
+      try $0.bootstrapDatabase()
+      $0.date.now = now
+    } operation: {
+      @Dependency(\.defaultDatabase) var database
+      let (sourceListID, destinationListID, itemIDs) = try await database.write { db in
+        let sourceListID = try GroceryRepository.ensureDefaultList(in: db, now: now, uuid: { SampleUUIDSequence.uuid(90_810) })
+        let destinationListID = try GroceryRepository.addList(
+          title: "Fresh", in: db, now: now, uuid: { SampleUUIDSequence.uuid(90_811) }
+        )
+        let itemIDs = [SampleUUIDSequence.uuid(90_812), SampleUUIDSequence.uuid(90_813)]
+        for (index, itemID) in itemIDs.enumerated() {
+          try GroceryItem.insert {
+            GroceryItem(id: itemID, groceryListID: sourceListID, title: "Item \(index)", sortOrder: index,
+              dateCreated: now, dateModified: now)
+          }.execute(db)
+        }
+        return (sourceListID, destinationListID, itemIDs)
+      }
+
+      let model = GroceryLibraryModel()
+      model.selectedListID = sourceListID
+      model.selectItemsButtonTapped()
+      model.toggleItemSelection(itemID: itemIDs[0])
+      model.toggleItemSelection(itemID: itemIDs[1])
+      #expect(model.selectedItemIDs == Set(itemIDs))
+      model.moveSelectedItemsButtonTapped(toListID: destinationListID)
+      #expect(!model.isSelectingItems)
+      #expect(model.selectedItemIDs.isEmpty)
+      #expect(try await database.read { db in
+        try GroceryItem.where { $0.groceryListID.eq(destinationListID) }.fetchAll(db).map(\.id).sorted {
+          $0.uuidString < $1.uuidString
+        }
+      } == itemIDs.sorted { $0.uuidString < $1.uuidString })
+
+      model.selectItemsButtonTapped()
+      model.toggleItemSelection(itemID: itemIDs[0])
+      model.selectedListID = destinationListID
+      #expect(!model.isSelectingItems)
+      #expect(model.selectedItemIDs.isEmpty)
+    }
+  }
 }

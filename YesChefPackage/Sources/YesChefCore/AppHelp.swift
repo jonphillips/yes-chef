@@ -66,7 +66,7 @@ public struct AppHelpPage: Equatable, Sendable {
       Section(heading: "Merging", bullets: [
         "The same ingredient from different recipes becomes one item with the amounts added up, when the units can be added. Notes and areas don't keep items apart.",
         "Use **Same As…** when two names mean one ingredient; fixes are in **List Actions › Name Fixes**.",
-        "**List Actions › Consolidate List** merges this list again, such as after a new fix.",
+        "**List Actions › Consolidate List** merges this list again, such as after a new fix. **Select Items** moves lines to another list and merges them there.",
         "Long-press an item to see where it came from, or remove one recipe's share."
       ]),
       Section(heading: "Pantry", bullets: [

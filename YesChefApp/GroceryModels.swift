@@ -54,7 +54,13 @@ final class GroceryLibraryModel {
   @Fetch(MenuListRequest(), animation: .default) var menuRows: [MenuRowData] = []
 
   var destination: Destination?
-  var selectedListID: CoreGroceryList.ID?
+  var selectedListID: CoreGroceryList.ID? {
+    didSet {
+      if oldValue != selectedListID { doneSelectingButtonTapped() }
+    }
+  }
+  var isSelectingItems = false
+  var selectedItemIDs: Set<GroceryItem.ID> = []
   var errorMessage: String?
   var isShowingError = false
   var toastCenter: AppToastCenter?
