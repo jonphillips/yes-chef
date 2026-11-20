@@ -29,7 +29,7 @@ packages:
   # same fix, as the GRDB entries in YesChefPackage/Package.swift and
   # jon-platform/packages/CloudSyncKit/Package.swift.
   SQLiteData:
-    path: Vendor/sqlite-data
+    path: ../../jon-platform/Vendor/sqlite-data
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: 7.6.0

@@ -9,6 +9,12 @@ lean ticket precisely because this history lives here instead.
 Newest first.
 
 ---
+## 2026-11-18 — Shared patched SQLiteData vendor (`effort/shared-sqlitedata-vendor`)
+
+- **Result:** The app's `SQLiteData` package reference now points to the shared patched copy in jon-platform (#144), and the duplicate `Vendor/sqlite-data` tree is removed. Verification paths now point to the shared package.
+- **Verification:** `xcodegen generate` and Xcode package resolution passed; `scripts/check-drift.sh` passed (SwiftLint, 905 core tests, 20 script tests, and app test-target build). The app test target compiled and linked, not run.
+
+---
 ## 2026-11-15 — The Lenses tab (`effort/lenses-tab`)
 
 - **Result:** Added the Lenses gallery, Lens editing and query sheets, and cookbook shelf copying. The Power Browser now saves queries as Lenses and no longer hosts Lens selection or editing.

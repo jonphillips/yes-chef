@@ -422,7 +422,7 @@
 		CAC2C7635DF385243F2F9789 /* PowerBrowserSaveLens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerBrowserSaveLens.swift; sourceTree = "<group>"; };
 		CD89E4D3C6F5F5901942349A /* WebExtractorKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebExtractorKit; path = "../../jon-platform/packages/WebExtractorKit"; sourceTree = SOURCE_ROOT; };
 		CE5A1F4C00B47C679035FCEA /* RecipeDetailModel+Labels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeDetailModel+Labels.swift"; sourceTree = "<group>"; };
-		CF1594C8BADD3DA2D82B2E6B /* sqlite-data */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "sqlite-data"; path = "Vendor/sqlite-data"; sourceTree = SOURCE_ROOT; };
+		CF1594C8BADD3DA2D82B2E6B /* sqlite-data */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "sqlite-data"; path = "../../jon-platform/Vendor/sqlite-data"; sourceTree = SOURCE_ROOT; };
 		D2B809424555C42DEB0318A9 /* RecipeDeliberationLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDeliberationLogView.swift; sourceTree = "<group>"; };
 		D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryListState.swift; sourceTree = "<group>"; };
 		D4F3ADFFD14E222AAFF380E6 /* AISettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsModel.swift; sourceTree = "<group>"; };
@@ -903,7 +903,7 @@
 				31B99064C169F69BEBFDCDFC /* XCLocalSwiftPackageReference "../../jon-platform/packages/CloudSyncKit" */,
 				177E535AE1B360E716AFAF8E /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMClientKit" */,
 				30F1A320403584BEBC511745 /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMHandoffKit" */,
-				419CD0203C8C973F916543B1 /* XCLocalSwiftPackageReference "Vendor/sqlite-data" */,
+				A2603FEC2F348C1111B684D4 /* XCLocalSwiftPackageReference "../../jon-platform/Vendor/sqlite-data" */,
 				8D05F004F00CB681D1E3D4F2 /* XCLocalSwiftPackageReference "../../jon-platform/packages/WebExtractorKit" */,
 				FBAB5C8635244B7925C0418E /* XCLocalSwiftPackageReference "YesChefPackage" */,
 			);
@@ -1469,13 +1469,13 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../jon-platform/packages/CloudSyncKit";
 		};
-		419CD0203C8C973F916543B1 /* XCLocalSwiftPackageReference "Vendor/sqlite-data" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "Vendor/sqlite-data";
-		};
 		8D05F004F00CB681D1E3D4F2 /* XCLocalSwiftPackageReference "../../jon-platform/packages/WebExtractorKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../jon-platform/packages/WebExtractorKit";
+		};
+		A2603FEC2F348C1111B684D4 /* XCLocalSwiftPackageReference "../../jon-platform/Vendor/sqlite-data" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../jon-platform/Vendor/sqlite-data";
 		};
 		B468534CECE43469A50F161D /* XCLocalSwiftPackageReference "../../jon-platform/packages/ChatAccessKit" */ = {
 			isa = XCLocalSwiftPackageReference;

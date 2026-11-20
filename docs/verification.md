@@ -14,10 +14,10 @@ needs. SwiftPM sandboxes its own manifest compile, which fails nested inside Cod
 `sandbox-exec: sandbox_apply: Operation not permitted`, and the user-level SwiftPM, Swift and Clang caches are
 denied (`… is not accessible or not writable`). So **run every `swift build`, `swift test`, `xcodebuild` and
 `scripts/check-drift.sh`, and any `quiet-run` wrapping one, elevated from the first attempt,** for every package,
-`Vendor/sqlite-data` included. If a sandboxed run shows one of those signatures (or an unexplained `143`), rerun
+`../../jon-platform/Vendor/sqlite-data` included. If a sandboxed run shows one of those signatures (or an unexplained `143`), rerun
 the same command elevated, once; that is not a "retry with variations". **Fail fast applies to a failure from an
 elevated run:** paste the error and stop. A brief's "stop on a build or toolchain failure" means the same thing.
-(2026-11-01: the parked-retry dispatch stopped at a sandboxed `swift test --package-path Vendor/sqlite-data`.)
+(2026-11-01: the parked-retry dispatch stopped at a sandboxed `swift test --package-path ../../jon-platform/Vendor/sqlite-data`.)
 
 Lean by default — the cost center is the build/simulator loop, not the code, and Jon does the device pass
 regardless. So verify with **compiler + tests once**, then hand off:
