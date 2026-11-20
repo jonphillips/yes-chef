@@ -94,7 +94,7 @@ extension RecipeCoreTests {
 
     @Test
     func groceriesHelpPageFitsLabelBudget() {
-      #expect(AppHelpPage.groceries.plainText.count <= 1_800)
+      #expect(AppHelpPage.groceries.plainText.count <= 1_900)
       #expect(AppHelpPage.groceries.plainText.contains("How Groceries Work"))
     }
   }

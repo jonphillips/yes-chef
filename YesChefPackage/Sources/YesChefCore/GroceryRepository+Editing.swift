@@ -122,7 +122,7 @@ extension GroceryRepository {
     return distinct.joined(separator: "; ").nonEmptyGroceryText
   }
 
-  private static func merge(
+  static func merge(
     _ item: GroceryItem,
     into survivor: GroceryItem,
     in db: Database,
@@ -172,6 +172,49 @@ extension GroceryRepository {
         survivors.append(item)
       }
     }
+    return mergedCount
+  }
+
+  @discardableResult
+  public static func moveItems(
+    _ itemIDs: Set<GroceryItem.ID>,
+    toListID destinationListID: GroceryList.ID,
+    in db: Database,
+    now: Date
+  ) throws -> Int {
+    _ = try requireList(destinationListID, in: db)
+    let fixes = try IngredientNameFixes.load(in: db)
+    let destinationItems = try GroceryItem.where { $0.groceryListID.eq(destinationListID) }
+      .fetchAll(db)
+      .sorted {
+        if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+        return $0.id.uuidString < $1.id.uuidString
+      }
+    var survivors = destinationItems.filter { !$0.isPurchased }
+    var nextSortOrder = (destinationItems.map(\.sortOrder).max() ?? -1) + 1
+    let items = try GroceryItem.fetchAll(db)
+      .filter { itemIDs.contains($0.id) && $0.groceryListID != destinationListID }
+      .sorted {
+        if $0.sortOrder != $1.sortOrder { return $0.sortOrder < $1.sortOrder }
+        return $0.id.uuidString < $1.id.uuidString
+      }
+    var mergedCount = 0
+
+    for var item in items {
+      if !item.isPurchased,
+         let survivorIndex = survivors.firstIndex(where: { canConsolidate($0, item, fixes: fixes) }) {
+        survivors[survivorIndex] = try merge(item, into: survivors[survivorIndex], in: db, now: now)
+        mergedCount += 1
+      } else {
+        item.groceryListID = destinationListID
+        item.sortOrder = nextSortOrder
+        item.dateModified = now
+        nextSortOrder += 1
+        try GroceryItem.upsert { item }.execute(db)
+        if !item.isPurchased { survivors.append(item) }
+      }
+    }
+
     return mergedCount
   }
 

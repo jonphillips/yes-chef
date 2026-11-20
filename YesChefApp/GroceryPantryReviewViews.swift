@@ -13,6 +13,9 @@ struct GroceryPantryReviewSection: View {
             row: row,
             headline: reviewHeadline(for: row),
             includesQuantityInDetail: false,
+            isSelecting: model.isSelectingItems,
+            isSelected: model.selectedItemIDs.contains(row.id),
+            toggleSelection: { model.toggleItemSelection(itemID: row.id) },
             togglePurchased: {
               model.togglePurchasedButtonTapped(itemID: row.id)
             },
@@ -36,25 +39,29 @@ struct GroceryPantryReviewSection: View {
             }
           )
           .swipeActions(edge: .leading) {
-            Button {
-              model.togglePurchasedButtonTapped(itemID: row.id)
-            } label: {
-              Label("Mark Purchased", systemImage: "checkmark.circle")
+            if !model.isSelectingItems {
+              Button {
+                model.togglePurchasedButtonTapped(itemID: row.id)
+              } label: {
+                Label("Mark Purchased", systemImage: "checkmark.circle")
+              }
+              .tint(.green)
             }
-            .tint(.green)
           }
           .swipeActions {
-            Button {
-              model.editItemButtonTapped(itemID: row.id)
-            } label: {
-              Label("Edit", symbol: .editRow)
-            }
-            .tint(.blue)
+            if !model.isSelectingItems {
+              Button {
+                model.editItemButtonTapped(itemID: row.id)
+              } label: {
+                Label("Edit", symbol: .editRow)
+              }
+              .tint(.blue)
 
-            Button(role: .destructive) {
-              model.deleteButtonTapped(itemID: row.id)
-            } label: {
-              Label("Delete", symbol: .delete)
+              Button(role: .destructive) {
+                model.deleteButtonTapped(itemID: row.id)
+              } label: {
+                Label("Delete", symbol: .delete)
+              }
             }
           }
         }
@@ -85,6 +92,9 @@ struct GroceryAssumedPantrySection: View {
           ForEach(rows) { row in
             AssumedPantryRowView(
               row: row,
+              isSelecting: model.isSelectingItems,
+              isSelected: model.selectedItemIDs.contains(row.id),
+              toggleSelection: { model.toggleItemSelection(itemID: row.id) },
               addBack: {
                 model.addBackAssumedPantryItemButtonTapped(itemID: row.id)
               }
@@ -101,14 +111,18 @@ struct GroceryAssumedPantrySection: View {
 
 private struct AssumedPantryRowView: View {
   let row: GroceryItemRowData
+  var isSelecting = false
+  var isSelected = false
+  var toggleSelection: () -> Void = {}
   var addBack: () -> Void
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
-      Image(systemName: "archivebox")
+      Image(systemName: isSelecting ? (isSelected ? "checkmark.square.fill" : "square") : "archivebox")
         .font(.title3)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(isSelecting && isSelected ? Color.accentColor : Color.secondary)
         .frame(width: 32, height: 32)
+        .accessibilityLabel(isSelecting ? (isSelected ? "Deselect" : "Select") : "Assumed in pantry")
 
       VStack(alignment: .leading, spacing: 6) {
         Text(row.item.title)
@@ -123,17 +137,23 @@ private struct AssumedPantryRowView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      Button {
-        addBack()
-      } label: {
-        Label("Add Back", symbol: .addToGroceries)
-          .labelStyle(.iconOnly)
-          .frame(width: 32, height: 32)
+      if !isSelecting {
+        Button {
+          addBack()
+        } label: {
+          Label("Add Back", symbol: .addToGroceries)
+            .labelStyle(.iconOnly)
+            .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Add \(row.item.title) back to list")
       }
-      .buttonStyle(.borderless)
-      .accessibilityLabel("Add \(row.item.title) back to list")
     }
     .padding(.vertical, 4)
+    .contentShape(Rectangle())
+    .onTapGesture {
+      if isSelecting { toggleSelection() }
+    }
   }
 
   private var detailText: String? {
@@ -148,7 +168,7 @@ private struct AssumedPantryRowView: View {
   }
 }
 
-private func groceryQuantityText(for item: GroceryItem) -> String? {
+func groceryQuantityText(for item: GroceryItem) -> String? {
   [
     item.quantityText,
     item.unit,

@@ -57,7 +57,7 @@ struct GroceryDetailView: View {
     Group {
       if let selectedList = model.selectedListRow {
         List {
-          if showsListPicker {
+          if showsListPicker && !model.isSelectingItems {
             Section {
               Picker("List", selection: $model.selectedListID) {
                 ForEach(model.listRows) { row in
@@ -68,13 +68,15 @@ struct GroceryDetailView: View {
             }
           }
 
-          Section {
-            GroceryRapidAddField(model: model)
-              .attentionCard()
-              .padding(.horizontal)
-              .padding(.vertical, 8)
+          if !model.isSelectingItems {
+            Section {
+              GroceryRapidAddField(model: model)
+                .attentionCard()
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            .listRowBackground(Color.clear)
           }
-          .listRowBackground(Color.clear)
 
           if displaySections.isEmpty {
             Section {
@@ -108,35 +110,41 @@ struct GroceryDetailView: View {
         }
         // Dragging the list dismisses the keyboard so it stops covering the tab bar on iPhone.
         .scrollDismissesKeyboard(.immediately)
-        .navigationTitle(selectedList.list.title)
+        .navigationTitle(model.isSelectingItems && !model.selectedItemIDs.isEmpty
+          ? "\(model.selectedItemIDs.count) Selected"
+          : selectedList.list.title)
         .toolbar {
           ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-              model.addCustomItemButtonTapped()
-            } label: {
-              Label("Add Item", symbol: .addToGroceries)
-            }
-
-            GrocerySourceMenu(
-              model: model,
-              selectedMealRows: selectedMealRows,
-              selectedDate: mealCalendarModel.selectedDate
-            )
-
-            GroceryListActionsMenu(
-              row: selectedList,
-              shareText: model.selectedListShareText,
-              purchasedItemCount: displaySections.purchasedRows.count,
-              totalItemCount: displaySections.shoppingRows.count + displaySections.assumedInPantryRows.count,
-              listCount: model.listRows.count,
-              model: model
-            )
-
-            if showsListPicker {
+            if model.isSelectingItems {
+              GrocerySelectionToolbar(model: model, selectedListID: selectedList.id)
+            } else {
               Button {
-                model.addListButtonTapped()
+                model.addCustomItemButtonTapped()
               } label: {
-                Label("Add List", systemImage: "plus")
+                Label("Add Item", symbol: .addToGroceries)
+              }
+
+              GrocerySourceMenu(
+                model: model,
+                selectedMealRows: selectedMealRows,
+                selectedDate: mealCalendarModel.selectedDate
+              )
+
+              GroceryListActionsMenu(
+                row: selectedList,
+                shareText: model.selectedListShareText,
+                purchasedItemCount: displaySections.purchasedRows.count,
+                totalItemCount: displaySections.shoppingRows.count + displaySections.assumedInPantryRows.count,
+                listCount: model.listRows.count,
+                model: model
+              )
+
+              if showsListPicker {
+                Button {
+                  model.addListButtonTapped()
+                } label: {
+                  Label("Add List", systemImage: "plus")
+                }
               }
             }
           }
@@ -205,6 +213,8 @@ private struct GroceryListActionsMenu: View {
 
   var body: some View {
     Menu {
+      GrocerySelectItemsMenuButton(model: model)
+
       ShareLink(item: shareText, subject: Text(row.list.title)) {
         Label("Share List", symbol: .share)
       }
@@ -284,6 +294,9 @@ private struct GroceryItemsSection: View {
         ForEach(rows) { row in
           GroceryItemRowView(
             row: row,
+            isSelecting: model.isSelectingItems,
+            isSelected: model.selectedItemIDs.contains(row.id),
+            toggleSelection: { model.toggleItemSelection(itemID: row.id) },
             togglePurchased: {
               model.togglePurchasedButtonTapped(itemID: row.id)
             },
@@ -307,25 +320,29 @@ private struct GroceryItemsSection: View {
             }
           )
           .swipeActions(edge: .leading) {
-            Button {
-              model.addToPantryButtonTapped(itemID: row.id)
-            } label: {
-              Label("Add to Pantry", systemImage: "archivebox")
+            if !model.isSelectingItems {
+              Button {
+                model.addToPantryButtonTapped(itemID: row.id)
+              } label: {
+                Label("Add to Pantry", systemImage: "archivebox")
+              }
+              .tint(.green)
             }
-            .tint(.green)
           }
           .swipeActions {
-            Button {
-              model.editItemButtonTapped(itemID: row.id)
-            } label: {
-              Label("Edit", symbol: .editRow)
-            }
-            .tint(.blue)
+            if !model.isSelectingItems {
+              Button {
+                model.editItemButtonTapped(itemID: row.id)
+              } label: {
+                Label("Edit", symbol: .editRow)
+              }
+              .tint(.blue)
 
-            Button(role: .destructive) {
-              model.deleteButtonTapped(itemID: row.id)
-            } label: {
-              Label("Delete", symbol: .delete)
+              Button(role: .destructive) {
+                model.deleteButtonTapped(itemID: row.id)
+              } label: {
+                Label("Delete", symbol: .delete)
+              }
             }
           }
         }
@@ -353,6 +370,9 @@ struct GroceryItemRowView: View {
   let row: GroceryItemRowData
   var headline: String? = nil
   var includesQuantityInDetail = true
+  var isSelecting = false
+  var isSelected = false
+  var toggleSelection: () -> Void = {}
   var togglePurchased: () -> Void
   var deleteItem: () -> Void
   var editItem: () -> Void
@@ -363,15 +383,22 @@ struct GroceryItemRowView: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
-      Button {
-        togglePurchased()
-      } label: {
-        Image(systemName: row.item.isPurchased ? "checkmark.circle.fill" : "circle")
+      if isSelecting {
+        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
           .font(.title3)
+          .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
           .frame(width: 32, height: 32)
+      } else {
+        Button {
+          togglePurchased()
+        } label: {
+          Image(systemName: row.item.isPurchased ? "checkmark.circle.fill" : "circle")
+            .font(.title3)
+            .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(row.item.isPurchased ? "Mark unpurchased" : "Mark purchased")
       }
-      .buttonStyle(.borderless)
-      .accessibilityLabel(row.item.isPurchased ? "Mark unpurchased" : "Mark purchased")
 
       VStack(alignment: .leading, spacing: 6) {
         Text(headline ?? row.item.title)
@@ -403,17 +430,24 @@ struct GroceryItemRowView: View {
 
     }
     .padding(.vertical, 4)
-    .contextMenu {
-      GroceryItemActions(
-        row: row,
-        addToPantry: addToPantry,
-        sameAs: sameAs,
-        editItem: editItem,
-        deleteItem: deleteItem,
-        deleteContribution: deleteContribution
-      )
-      .actions
+    .contentShape(Rectangle())
+    .onTapGesture {
+      if isSelecting { toggleSelection() }
     }
+    .contextMenu {
+      if !isSelecting {
+        GroceryItemActions(
+          row: row,
+          addToPantry: addToPantry,
+          sameAs: sameAs,
+          editItem: editItem,
+          deleteItem: deleteItem,
+          deleteContribution: deleteContribution
+        )
+        .actions
+      }
+    }
+    .accessibilityLabel(isSelecting ? (isSelected ? "Deselect" : "Select") : row.item.title)
   }
 
   private var detailText: String? {
@@ -426,16 +460,6 @@ struct GroceryItemRowView: View {
     .joined(separator: " ")
     .nonEmptyGroceryViewText
   }
-}
-
-private func groceryQuantityText(for item: GroceryItem) -> String? {
-  [
-    item.quantityText,
-    item.unit,
-  ]
-  .compactMap { $0?.nonEmptyGroceryViewText }
-  .joined(separator: " ")
-  .nonEmptyGroceryViewText
 }
 
 @MainActor

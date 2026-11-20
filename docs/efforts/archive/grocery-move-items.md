@@ -10,7 +10,7 @@ Jon's decisions (2026-11-19, don't re-litigate):
 
 - **Collisions merge.** A moved unpurchased line folds into an unpurchased line on the destination when the two could
   merge. It's the same test and the same merge that Consolidate List uses
-  ([grocery-consolidate-list](archive/grocery-consolidate-list.md), ADR-0069 Amd 1). Lines that can't merge move
+  ([grocery-consolidate-list](grocery-consolidate-list.md), ADR-0069 Amd 1). Lines that can't merge move
   as they are.
 - **The marker replaces the circle.** In Select mode a square checkbox sits where the purchase circle was, and a
   tap anywhere on the row selects it. Select mode never checks items off.

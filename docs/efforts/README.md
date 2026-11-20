@@ -25,4 +25,3 @@ discoverable"):
 
 ## Live
 
-- [Move Grocery Items](grocery-move-items.md) — **Ready.** **List Actions › Select Items** puts a grocery list into Select mode, with a square checkbox in place of the purchase circle; **Move to** sends the selected lines to another list and merges them there. No schema change.
