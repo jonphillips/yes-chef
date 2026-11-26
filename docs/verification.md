@@ -22,10 +22,14 @@ elevated run:** paste the error and stop. A brief's "stop on a build or toolchai
 Lean by default — the cost center is the build/simulator loop, not the code, and Jon does the device pass
 regardless. So verify with **compiler + tests once**, then hand off:
 
-- Run `xcodegen generate` after adding Swift source files — `project.yml` globs the source dirs, so a new
-  `.swift` file is invisible to the **app target** until the `pbxproj` is regenerated (hand-editing the
-  `pbxproj` is a fragile workaround, not the pattern). **This is a build-claim tripwire:** ADR-0021 V4a's
-  first push added two `YesChefApp/` extension files without regenerating, so the app target could not have
+- `YesChef.xcodeproj` is generated from `project.yml` and never committed; only its project-level
+  `project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is tracked (jon-platform
+  `docs/ios/drift-control.md`). The git hooks (`git config core.hooksPath .githooks`),
+  `scripts/check-drift.sh` and `scripts/xcodebuild-summary.sh` all regenerate it; a raw `xcodebuild`
+  in a hook-less worktree runs `xcodegen generate` first. Edit `project.yml`, never the `pbxproj`.
+- Regenerate after adding Swift source files — `project.yml` globs the source dirs, so a new
+  `.swift` file is invisible to the **app target** until the project is regenerated.
+  **This is a build-claim tripwire:** ADR-0021 V4a's first push added two `YesChefApp/` extension files without regenerating, so the app target could not have
   compiled (their symbols would be undefined) — yet the PR claimed a green generic build. A "passing" app
   build that omits newly-added files is proof the build was never actually run ([[codex-build-excuse-reproduce]]);
   the architect re-runs it locally before approving (PR #285, fixed in `5388e31`).
