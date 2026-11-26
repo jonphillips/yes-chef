@@ -321,7 +321,7 @@
 		4EE9C07029923DFFFC06A977 /* RecipeTextViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeTextViews.swift; sourceTree = "<group>"; };
 		524747E80606624B20663AC9 /* HandoffReviewCoordinator+RecipeReturn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+RecipeReturn.swift"; sourceTree = "<group>"; };
 		5268A50ACE551C967AF9F890 /* CookbookScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookbookScopeTests.swift; sourceTree = "<group>"; };
-		54AC9C0D3BA4DD46B83A2A83 /* ChatAccessKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChatAccessKit; path = "../../jon-platform/packages/ChatAccessKit"; sourceTree = SOURCE_ROOT; };
+		54AC9C0D3BA4DD46B83A2A83 /* ChatAccessKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChatAccessKit; path = "../jon-platform/packages/ChatAccessKit"; sourceTree = SOURCE_ROOT; };
 		556B8CD9C6727F96C1BD4684 /* SeedCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedCoverageView.swift; sourceTree = "<group>"; };
 		557FDADA27F5D11ECEDADABA /* AppHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppHelpSheet.swift; sourceTree = "<group>"; };
 		56E450B24DC7459A2108DDFF /* RecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeModels.swift; sourceTree = "<group>"; };
@@ -346,13 +346,13 @@
 		6FE4F6BA219B7819AFB1FEAE /* RecipeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryView.swift; sourceTree = "<group>"; };
 		7090DA55279458851517DD5A /* MenuModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuModels.swift; sourceTree = "<group>"; };
 		71BB04447CDD6B75A1CD330A /* RecipePhotoViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePhotoViews.swift; sourceTree = "<group>"; };
-		723650C08EE6D537EBEA0253 /* CloudSyncKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CloudSyncKit; path = "../../jon-platform/packages/CloudSyncKit"; sourceTree = SOURCE_ROOT; };
+		723650C08EE6D537EBEA0253 /* CloudSyncKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CloudSyncKit; path = "../jon-platform/packages/CloudSyncKit"; sourceTree = SOURCE_ROOT; };
 		75337F357939E23B8A594784 /* HandoffIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffIntents.swift; sourceTree = "<group>"; };
 		754E1448B0A85B0698EFD056 /* MenuDetailSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuDetailSections.swift; sourceTree = "<group>"; };
 		76906E88E579D71619461798 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
 		76A768628F1345FDF66EDC49 /* MealCalendarViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCalendarViews.swift; sourceTree = "<group>"; };
 		76C7E4899A1093E58F713C2F /* OriginalSnapshotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OriginalSnapshotView.swift; sourceTree = "<group>"; };
-		771C2C4368450EDD66EC5E77 /* LLMClientKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LLMClientKit; path = "../../jon-platform/packages/LLMClientKit"; sourceTree = SOURCE_ROOT; };
+		771C2C4368450EDD66EC5E77 /* LLMClientKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LLMClientKit; path = "../jon-platform/packages/LLMClientKit"; sourceTree = SOURCE_ROOT; };
 		7765C9B42DCEFA4EAC3ED301 /* HandoffReviewCoordinator+PrepPlanEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HandoffReviewCoordinator+PrepPlanEvidence.swift"; sourceTree = "<group>"; };
 		7833F9C2BE7D5EE3F3099090 /* PowerBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerBrowserView.swift; sourceTree = "<group>"; };
 		7871BB8EDB397A338B979FCD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -383,7 +383,7 @@
 		90AEA6C80CDEFF87884B65A7 /* CookSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookSessionView.swift; sourceTree = "<group>"; };
 		9191D1F59D6B79E1E49A82B8 /* FacetCoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FacetCoverageView.swift; sourceTree = "<group>"; };
 		95B7026C795D2C7ADE1E0837 /* WorkbenchReferenceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchReferenceModel.swift; sourceTree = "<group>"; };
-		985301473FA815A45B50BF66 /* LLMHandoffKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LLMHandoffKit; path = "../../jon-platform/packages/LLMHandoffKit"; sourceTree = SOURCE_ROOT; };
+		985301473FA815A45B50BF66 /* LLMHandoffKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LLMHandoffKit; path = "../jon-platform/packages/LLMHandoffKit"; sourceTree = SOURCE_ROOT; };
 		987510FE835260D17DC91CBB /* RecipeVariationInstructionDisplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeVariationInstructionDisplayTests.swift; sourceTree = "<group>"; };
 		9916E601292DD101C2943916 /* RecipeCaptureModel+Labels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeCaptureModel+Labels.swift"; sourceTree = "<group>"; };
 		993185593DBEA80FD058C270 /* WorkbenchModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkbenchModels.swift; sourceTree = "<group>"; };
@@ -424,9 +424,9 @@
 		C96B85DDE40C2676CFF7A14C /* EditableRowsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableRowsSection.swift; sourceTree = "<group>"; };
 		CA17898A1596E60044FEFE09 /* BrowserModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserModels.swift; sourceTree = "<group>"; };
 		CAC2C7635DF385243F2F9789 /* PowerBrowserSaveLens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerBrowserSaveLens.swift; sourceTree = "<group>"; };
-		CD89E4D3C6F5F5901942349A /* WebExtractorKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebExtractorKit; path = "../../jon-platform/packages/WebExtractorKit"; sourceTree = SOURCE_ROOT; };
+		CD89E4D3C6F5F5901942349A /* WebExtractorKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebExtractorKit; path = "../jon-platform/packages/WebExtractorKit"; sourceTree = SOURCE_ROOT; };
 		CE5A1F4C00B47C679035FCEA /* RecipeDetailModel+Labels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecipeDetailModel+Labels.swift"; sourceTree = "<group>"; };
-		CF1594C8BADD3DA2D82B2E6B /* sqlite-data */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "sqlite-data"; path = "../../jon-platform/Vendor/sqlite-data"; sourceTree = SOURCE_ROOT; };
+		CF1594C8BADD3DA2D82B2E6B /* sqlite-data */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "sqlite-data"; path = "../jon-platform/Vendor/sqlite-data"; sourceTree = SOURCE_ROOT; };
 		D2B809424555C42DEB0318A9 /* RecipeDeliberationLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDeliberationLogView.swift; sourceTree = "<group>"; };
 		D3B1C7A7E48A8FFE074A05E0 /* RecipeLibraryListState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeLibraryListState.swift; sourceTree = "<group>"; };
 		D4F3ADFFD14E222AAFF380E6 /* AISettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsModel.swift; sourceTree = "<group>"; };
@@ -875,7 +875,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					032258E8301152A26FE46E63 = {
 						DevelopmentTeam = 7MQEE539G9;
@@ -905,12 +905,12 @@
 				0346D55682473A3511D799C7 /* XCRemoteSwiftPackageReference "swift-structured-queries" */,
 				8C626E2F21AE016D9E0C1DB5 /* XCRemoteSwiftPackageReference "swift-navigation" */,
 				8905B07D7FD63BCF3E395911 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
-				B468534CECE43469A50F161D /* XCLocalSwiftPackageReference "../../jon-platform/packages/ChatAccessKit" */,
-				31B99064C169F69BEBFDCDFC /* XCLocalSwiftPackageReference "../../jon-platform/packages/CloudSyncKit" */,
-				177E535AE1B360E716AFAF8E /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMClientKit" */,
-				30F1A320403584BEBC511745 /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMHandoffKit" */,
-				A2603FEC2F348C1111B684D4 /* XCLocalSwiftPackageReference "../../jon-platform/Vendor/sqlite-data" */,
-				8D05F004F00CB681D1E3D4F2 /* XCLocalSwiftPackageReference "../../jon-platform/packages/WebExtractorKit" */,
+				A10D7CD22F3E93F468B0F403 /* XCLocalSwiftPackageReference "../jon-platform/packages/ChatAccessKit" */,
+				B3117455D8EE7F5D888EC99D /* XCLocalSwiftPackageReference "../jon-platform/packages/CloudSyncKit" */,
+				FE548424818B4068C8ABFA27 /* XCLocalSwiftPackageReference "../jon-platform/packages/LLMClientKit" */,
+				85481CF1D62023BDF81C5345 /* XCLocalSwiftPackageReference "../jon-platform/packages/LLMHandoffKit" */,
+				1D96B8BA2FF7825D3F279784 /* XCLocalSwiftPackageReference "../jon-platform/Vendor/sqlite-data" */,
+				BADD966A108682E9DAE008CE /* XCLocalSwiftPackageReference "../jon-platform/packages/WebExtractorKit" */,
 				FBAB5C8635244B7925C0418E /* XCLocalSwiftPackageReference "YesChefPackage" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -1465,33 +1465,33 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		177E535AE1B360E716AFAF8E /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMClientKit" */ = {
+		1D96B8BA2FF7825D3F279784 /* XCLocalSwiftPackageReference "../jon-platform/Vendor/sqlite-data" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../jon-platform/packages/LLMClientKit";
+			relativePath = "../jon-platform/Vendor/sqlite-data";
 		};
-		30F1A320403584BEBC511745 /* XCLocalSwiftPackageReference "../../jon-platform/packages/LLMHandoffKit" */ = {
+		85481CF1D62023BDF81C5345 /* XCLocalSwiftPackageReference "../jon-platform/packages/LLMHandoffKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../jon-platform/packages/LLMHandoffKit";
+			relativePath = "../jon-platform/packages/LLMHandoffKit";
 		};
-		31B99064C169F69BEBFDCDFC /* XCLocalSwiftPackageReference "../../jon-platform/packages/CloudSyncKit" */ = {
+		A10D7CD22F3E93F468B0F403 /* XCLocalSwiftPackageReference "../jon-platform/packages/ChatAccessKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../jon-platform/packages/CloudSyncKit";
+			relativePath = "../jon-platform/packages/ChatAccessKit";
 		};
-		8D05F004F00CB681D1E3D4F2 /* XCLocalSwiftPackageReference "../../jon-platform/packages/WebExtractorKit" */ = {
+		B3117455D8EE7F5D888EC99D /* XCLocalSwiftPackageReference "../jon-platform/packages/CloudSyncKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../jon-platform/packages/WebExtractorKit";
+			relativePath = "../jon-platform/packages/CloudSyncKit";
 		};
-		A2603FEC2F348C1111B684D4 /* XCLocalSwiftPackageReference "../../jon-platform/Vendor/sqlite-data" */ = {
+		BADD966A108682E9DAE008CE /* XCLocalSwiftPackageReference "../jon-platform/packages/WebExtractorKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../jon-platform/Vendor/sqlite-data";
-		};
-		B468534CECE43469A50F161D /* XCLocalSwiftPackageReference "../../jon-platform/packages/ChatAccessKit" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../jon-platform/packages/ChatAccessKit";
+			relativePath = "../jon-platform/packages/WebExtractorKit";
 		};
 		FBAB5C8635244B7925C0418E /* XCLocalSwiftPackageReference "YesChefPackage" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = YesChefPackage;
+		};
+		FE548424818B4068C8ABFA27 /* XCLocalSwiftPackageReference "../jon-platform/packages/LLMClientKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../jon-platform/packages/LLMClientKit";
 		};
 /* End XCLocalSwiftPackageReference section */
 

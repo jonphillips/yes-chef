@@ -37,9 +37,9 @@ let package = Package(
     // linker. CloudSyncKit's manifest already carries this dependency for the
     // same reason; this package needed it too.
     .package(url: "https://github.com/pointfreeco/swift-structured-queries", from: "0.31.0"),
-    .package(path: "../../../jon-platform/packages/LLMClientKit"),
-    .package(path: "../../../jon-platform/packages/CloudSyncKit"),
-    .package(path: "../../../jon-platform/packages/LLMHandoffKit"),
+    .package(path: "../../jon-platform/packages/LLMClientKit"),
+    .package(path: "../../jon-platform/packages/CloudSyncKit"),
+    .package(path: "../../jon-platform/packages/LLMHandoffKit"),
   ],
   targets: [
     .target(
