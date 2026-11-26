@@ -10,9 +10,9 @@ let package = Package(
   ],
   dependencies: [
     .package(path: "../YesChefPackage"),
-    .package(path: "../../../jon-platform/packages/ChatAccessKit"),
-    .package(path: "../../../jon-platform/packages/MCPServerKit"),
-    .package(path: "../../../jon-platform/packages/LLMHandoffKit"),
+    .package(path: "../../jon-platform/packages/ChatAccessKit"),
+    .package(path: "../../jon-platform/packages/MCPServerKit"),
+    .package(path: "../../jon-platform/packages/LLMHandoffKit"),
   ],
   targets: [
     .target(

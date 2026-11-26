@@ -1,7 +1,7 @@
 # ADR-0060 — Chat assistants reach Yes Chef through a local MCP server, and an iCloud Drive folder carries the inbox and the read data to and from the phone
 
 > **One-line:** Yes Chef becomes the second consumer of jon-platform
-> [ADR-0007](../../../../jon-platform/docs/adr/0007-app-data-over-local-mcp.md) (app data over a local stdio MCP
+> [ADR-0007](../../../jon-platform/docs/adr/0007-app-data-over-local-mcp.md) (app data over a local stdio MCP
 > server). The pasted JSON becomes a `stage_recipe` tool call, and the prompts we copy out become read
 > tools. **One thing differs from Vinyl Fever: Yes Chef doesn't run on the Mac.** So the helper can't read
 > the database, and a Mac inbox folder would never reach the phone. Both the inbox and the read data move
@@ -9,7 +9,7 @@
 > in jon-platform alongside this ADR.
 
 Status: **Accepted** — 2026-10-22, after S0's device pass confirmed D2 (OQ1 answered below). Proposed 2026-10-21.
-**Amended by jon-platform [ADR-0008](../../../../jon-platform/docs/adr/0008-automatic-scheduled-backups.md)** (2026-10-25,
+**Amended by jon-platform [ADR-0008](../../../jon-platform/docs/adr/0008-automatic-scheduled-backups.md)** (2026-10-25,
 built by effort [`automatic-backups`](../efforts/archive/automatic-backups.md)): the container's `Documents/` is now
 published so automatic backups show in Files. D2's "the container is not published" no longer holds. `MCP/`
 sits outside `Documents/`, so it stays hidden.

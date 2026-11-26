@@ -6,7 +6,7 @@ name: CI
 # only on this repo's JON_PLATFORM_PAT secret, passed through via `secrets: inherit`.
 #
 # YesChefPackage consumes jon-platform packages by local path
-# (../../../jon-platform/packages/{LLMClientKit,CloudSyncKit,LLMHandoffKit}); the
+# (../../jon-platform/packages/{LLMClientKit,CloudSyncKit,LLMHandoffKit}); the
 # reusable workflow's checkout step provides them. The manifest tracks Swift 6.4
 # (Xcode 27 beta), so the capability gate skips the test job green on today's hosted
 # images and auto-runs it once they ship a matching toolchain.
@@ -23,5 +23,6 @@ jobs:
     uses: jonphillips/ci-workflows/.github/workflows/ios-ci.yml@main
     with:
       package-path: YesChefPackage
+      platform-relative-root: "../.."   # flat clone (~/code/yes-chef), jon-platform beside it
       # test-runner left at the default (macos-latest) until hosted runners ship Xcode 27
     secrets: inherit
