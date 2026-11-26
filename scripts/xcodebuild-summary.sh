@@ -27,6 +27,11 @@ if [[ ! -x "$qr" ]]; then
   echo "xcodebuild-summary.sh: $qr not found — Yes Chef needs ~/code/jon-platform (see AGENTS.md)." >&2
   exit 1
 fi
+# The project is generated, not committed (jon-platform drift-control.md). Regenerate it so a
+# worktree with hooks disabled, or a new source file, builds what project.yml says. --use-cache
+# makes this a no-op when nothing changed.
+(cd "$(dirname "${BASH_SOURCE[0]}")/.." && xcodegen generate --use-cache --quiet)
+
 # Build against the committed Package.resolved (jon-platform drift-control.md, ADR-0005 D16): a
 # stale or missing pin fails loudly instead of quietly re-resolving to newer packages.
 exec "$qr" --label yeschef-xcodebuild xcodebuild -onlyUsePackageVersionsFromResolvedFile "$@"

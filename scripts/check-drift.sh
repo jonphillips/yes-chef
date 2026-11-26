@@ -11,6 +11,10 @@ cd "$repo_root"
 qr="${JON_PLATFORM:-$HOME/code/jon-platform}/scripts/quiet-run"
 [[ -x "$qr" ]] || qr=""
 
+# The Xcode project is generated, not committed (jon-platform docs/ios/drift-control.md). The
+# bundle-id and scheme guards below read it, and xcodebuild builds it, so generate it first.
+xcodegen generate --quiet
+
 $qr swiftlint lint --strict --config .swiftlint.yml --cache-path .build/swiftlint-cache
 
 # Search with grep, not rg: ripgrep is not a project prerequisite, and when it
@@ -37,7 +41,8 @@ scan_bundle_ids() {
 project_yml_hits="$(scan_bundle_ids 'PRODUCT_BUNDLE_IDENTIFIER:' project.yml)" || exit 1
 pbxproj_hits="$(scan_bundle_ids 'PRODUCT_BUNDLE_IDENTIFIER =' YesChef.xcodeproj/project.pbxproj)" || exit 1
 
-# Both files are checked in and both declare bundle identifiers. Zero hits means
+# project.yml is checked in and the pbxproj was just generated from it; both declare
+# bundle identifiers, so they must agree. Zero hits means
 # the search did not actually inspect them, which is exactly the silent no-op
 # this guard exists to prevent.
 if [[ -z "$project_yml_hits" || -z "$pbxproj_hits" ]]; then
@@ -196,7 +201,7 @@ else
   # nothing exits 0, so the build's own status cannot distinguish "the tests
   # pass the compiler" from "the tests are no longer part of this scheme" —
   # which is the state the repo was in, in effect, for months. Both inputs are
-  # checked in, so this costs nothing and follows the same idiom as the
+  # on disk (the scheme was generated above), so this costs nothing and follows the same idiom as the
   # bundle-id and ChatSurface guards above: zero hits means the check did not
   # really run, and that is a failure, not a pass.
   app_test_scheme_file="YesChef.xcodeproj/xcshareddata/xcschemes/YesChef.xcscheme"
