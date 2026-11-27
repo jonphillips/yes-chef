@@ -4,26 +4,21 @@
 
 An Apple-first, private, local-first recipe management and cooking-planning app for serious
 home cooks who collect, adapt, plan, shop, cook, and remember what worked. Paprika-inspired,
-not a clone. The core is a single owner's private library (ADR-0003) — no
-`Household`/`Cook`/sharing schema.
+not a clone. The core is a single owner's private library (ADR-0003), with no
+`Household`/`Cook`/sharing schema. Product and style background (recipe model, UI feel, import, AI,
+original MVP scope) is in [`docs/product-principles.md`](docs/product-principles.md); read the
+section the work touches.
 
-## House Style and Guidelines
+## Working mode
 
-Shared style and architecture live in `~/code/jon-platform` — start with its `AGENTS.md`.
-Nothing here overrides it unless we discuss. If you cannot access it, stop and tell Jon.
+Architect / executor, per jon-platform `AGENTS.md`.
 
-**Progress reporting:** narrate exceptions, not routine — see jon-platform
-`docs/agent-workflow.md` § "Progress reporting". **Token discipline:** noisy commands go
-through `quiet-run` (same doc, § "Token discipline").
+## Read first
 
-## Work Intake & Dispatch
-
-The dispatch is **`docs/NEXT_UP.md`**: one ticket, and the executor's only planning input (empty →
-stop and ask). The loop around it is jon-platform's `AGENTS.md`, `docs/agent-collaboration.md`, and
-ADR-0005; this repo doesn't restate it. Yes Chef's homes for the rest: candidates in
-`docs/open-questions.md`, Jon's device passes and held ops in `docs/device-passes.md`, history in
-`docs/DONE-LOG.md`, and closed decisions in `docs/standing-guards.md` (read it when a dispatch
-touches what it guards).
+1. `~/code/jon-platform/AGENTS.md`: the house stack and rules. Nothing here overrides it unless we
+   discuss it. If you can't access it, stop and tell Jon.
+2. [`docs/README.md`](docs/README.md): the map of this repo's docs. Closed decisions live in
+   `docs/standing-guards.md`; read it when a dispatch touches what it guards.
 
 ## Development Priorities
 
@@ -44,58 +39,34 @@ Do not build, unless explicitly requested: user accounts, a server backend, soci
 a public feed, nutrition tracking, subscription/payment infrastructure, Android or web apps,
 complex AI recipe generation, OCR, or a voice assistant.
 
-## Architecture Guidance
-
-The house stack is jon-platform's (`AGENTS.md`, then `docs/ios/swift-style.md`,
-`persistence-and-sync.md`, and `ui-and-platforms.md`, read before proposing architecture). Yes
-Chef's own rule on top: keep model, persistence, parsing/import, and UI separate.
-
-Product and style background (recipe model, UI feel, import, AI, coding style, original MVP
-scope) is in [`docs/product-principles.md`](docs/product-principles.md) — read the relevant
-section when the work touches it.
+Keep model, persistence, parsing/import, and UI separate.
 
 ## Implementation Guardrails Learned From Pass 1
 
-These are project rules, not preferences:
+Project rules, not preferences. ADRs cite them by number, so the numbers are fixed. Items that are
+now house law are one-line pointers to where the rule lives.
 
-1. Composite detail reads use SQLiteData observation (`@Fetch` with a `FetchKeyRequest`) in a
-   feature model — never one-shot `database.read` from `.task` into view `@State` (surfaces
-   cancellation as errors; leaves detail stale after edits).
-2. Non-trivial feature behavior lives in `@Observable @MainActor` models. Views bind and
-   delegate; repository functions stay pure database operations taking an explicit `Database`.
+1. Composite detail reads are observed, never read once from `.task` into view `@State`
+   (jon-platform `persistence-and-sync.md` § Reads are observed, never hand-pulled).
+2. Behavior lives in `@Observable @MainActor` models, and repository functions are pure database
+   operations taking an explicit `Database` (`swift-style.md` § Thin views, § Persistence core).
 3. Editor text blobs are an input surface, not permission to flatten the model. Until the editor
    is section-aware it owns only the first default ingredient section, the first default
-   instruction section, and general notes; extra sections and typed notes stay untouched.
-4. Saves preserve stable child IDs when content is unchanged — no routine delete-all/reinsert of
-   lines, steps, notes, or join rows (sync churn, conflict risk).
-5. Finite persisted domains are real Swift enums (`RawRepresentable`, `Codable`,
-   `QueryBindable`), not strings.
+   instruction section, and general notes. Extra sections and typed notes stay untouched.
+4. Saves preserve stable child IDs (`persistence-and-sync.md` § Edits preserve row identity).
+5. Finite persisted domains are real Swift enums (`persistence-and-sync.md` § Schema hygiene).
 6. `Recipe.originalSnapshot` uses the canonical recipe-transfer bundle shape (full Recipe row +
-   structured children + tag/category names) — no separate lossy snapshot format.
-7. A review that finds a data-preservation bug gets a regression test — at minimum stable IDs and
-   preservation of out-of-scope structured data.
-8. Codex owns compiler/package verification, not simulator-driving or screenshot automation
+   structured children + tag/category names). There is no separate, lossy snapshot format.
+7. A review that finds a data-preservation bug gets a regression test, covering at least stable IDs
+   and the preservation of out-of-scope structured data.
+8. Codex owns compiler and package verification, not simulator-driving or screenshot automation
    unless asked. Jon does the primary UI testing pass.
-9. **Verify lean:** `scripts/check-drift.sh` plus the relevant compiler build, then hand off.
-   `check-drift.sh` runs SwiftLint, the package tests, and a `build-for-testing` of the app test
-   target; a green package build or `swiftc -parse` is never evidence an App-layer change compiles.
-   - A PR touching `YesChefApp/` runs the generic device build, **elevated/unsandboxed from the
-     start**: `scripts/xcodebuild-summary.sh -scheme YesChef -destination 'generic/platform=iOS'
-     -skipMacroValidation CODE_SIGNING_ALLOWED=NO build` (compile-only; no boot, no install).
-   - The default Codex sandbox can SIGTERM `xcodebuild` before the compiler starts. That is an
-     environment failure, not a result — never paste it as verification or treat it as leave to
-     skip. No target permutations, simulator resets, or install attempts. If the elevated build
-     still can't reach the compiler, report the log path and make the architect's local build a
-     required approval gate; if it reports source errors, fix and rerun the same command.
-   - A PR touching `YesChefApp/` **model** code also runs the `YesChefTests` app target on a
-     simulator, elevated from the first attempt (never sandboxed first, never falling back to
-     `swift test --filter`). Running a test target is not simulator-driving, so this narrows #8
-     rather than contradicting it. View-only or copy changes don't need it. Exact commands:
-     `docs/verification.md`.
+9. Verify lean, per [`docs/verification.md`](docs/verification.md).
 
 ## Data Preservation Rules
 
-Import and editing preserve source fidelity:
+Import and editing preserve source fidelity (the general rule is jon-platform
+`semantic-fidelity.md`):
 
 1. Never discard original imported text: the `originalSnapshot` and each line's original text. The raw page
    HTML is not kept ([ADR-0010 Amd 1](docs/decisions/ADR-0010-cloudkit-sync-enablement.md#amendment-1--raw-import-html-is-not-kept-in-any-build-2026-10-13)).
@@ -109,18 +80,10 @@ Import and editing preserve source fidelity:
 
 Before changing persistent model types, explain what is changing and why, whether existing data
 could be affected, whether a migration is required, and whether there is a simpler alternative.
-Never casually rename or remove persisted fields.
+Never casually rename or remove persisted fields. Yes Chef is on Production (`docs/PROD-CUTOVER.md`),
+so jon-platform `persistence-and-sync.md` § Once an app is on Production applies too.
 
 ## Testing Expectations
 
-Run `scripts/check-drift.sh` from the repo root before committing code changes; use it instead of
-broad "hunt for drift" sweeps, and keep code review scoped to the diff. Most work needs no
-`xcodebuild` at all (guardrails #8/#9). When it does, go through `scripts/xcodebuild-summary.sh`,
-never raw `xcodebuild` in chat; open the full log only to diagnose a failure.
-
 Test logic: model creation, ingredient parsing, scaling, search, import parsing (fixtures in a
 dedicated directory), shopping-list aggregation.
-
-When completing a slice as the executor, keep unrelated working-tree changes out. Use direct `gh` commands with
-network escalation immediately, and `gh pr create --body-file` rather than a multiline `--body`
-so saved permission prefixes match.
