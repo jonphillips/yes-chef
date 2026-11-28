@@ -29,9 +29,10 @@ link this brief.
      The kit runs it off the main actor and passes cancellation into it, as Galavant's `withTaskCancellationHandler` does.
 
    It exposes `isRefreshing`, the writer's `lastExport`, and the last outcome as an enum: written, throttled, already
-   writing, couldn't start the background task, or failed with an error. It has two entry points:
-   `appDidEnterBackground()`, which exports only when enabled and due, and `refresh()`, which always does. It runs one
-   export at a time. The kit doesn't word messages.
+   writing, couldn't start the background task, or failed with an error. It has three entry points:
+   `appDidEnterBackground()`, which exports only when enabled and due; `refresh()`, which always does; and `cancel()`,
+   which stops an export in flight and ends its background task (Fit Happens calls it when chat access is switched off).
+   It runs one export at a time. The kit doesn't word messages.
 2. **The background-task client** (ADR-0011 D3): begin with a name and an expiry handler, returning an identifier, and
    end. The live value calls `UIApplication` under `canImport(UIKit)`. On expiry the type cancels its task, then ends
    the background task. Galavant's `ChatExportBackgroundTaskClient` and `ExportAssertion`
@@ -43,7 +44,8 @@ link this brief.
    - `refresh()` writes while throttled;
    - expiry cancels the build, ends the background task, and clears `isRefreshing`;
    - a background task that can't begin reports that and starts no work;
-   - a second call while one export runs does nothing.
+   - a second call while one export runs does nothing;
+   - `cancel()` stops a running export, ends the background task, and records no error.
 5. **Housekeeping in the same PR:**
    - move the seam from `SEAM-LEDGER.md` ("Chat-access export read models") to `EXTRACTION-NOTES.md` (ledger rule 5),
      noting that Galavant's and Fit Happens' adoptions are still owed;
